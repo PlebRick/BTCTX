@@ -1,0 +1,11 @@
+bcrypt==4.2.1
+fastapi==0.115.8
+pydantic==2.10.6
+python-dotenv==1.0.1
+sqlalchemy==2.0.37
+starlette==0.45.3
+typer==0.15.1
+uvicorn==0.34.0
+python-jose==3.3.0
+passlib==1.7.4
+python-multipart==0.0.6

@@ -1,0 +1,23 @@
+{
+    "cSpell.words": [
+        "autoflush",
+        "dotenv",
+        "fastapi",
+        "passlib",
+        "pydantic",
+        "sessionmaker",
+        "sqlalchemy",
+        "starlette",
+        "typer",
+        "uvicorn"
+    ],
+    "python.pythonPath": "/opt/homebrew/Caskroom/miniforge/base/envs/bitcoin-tx/bin/python",
+    "python.envFile": "${workspaceFolder}/backend/.env",
+    "terminal.integrated.shellArgs.osx": [
+        "-l",
+        "-c",
+        "conda activate bitcoin-tx; exec bash"
+    ],
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false
+}
