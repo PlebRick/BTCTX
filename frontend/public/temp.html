@@ -1,0 +1,51 @@
+<html lang="en">
+<head>
+  <title>BitcoinTX Test Form</title>
+  <script>
+    async function submitTransaction() {
+      const formData = {
+        account_id: document.getElementById("account_id").value,
+        type: document.getElementById("type").value,
+        amount_usd: parseFloat(document.getElementById("amount_usd").value),
+        amount_btc: parseFloat(document.getElementById("amount_btc").value),
+        timestamp: new Date().toISOString(),
+        source: document.getElementById("source").value,
+        purpose: document.getElementById("purpose").value,
+        fee: {
+          currency: document.getElementById("fee_currency").value,
+          amount: parseFloat(document.getElementById("fee_amount").value)
+        }
+      };
+
+      const response = await fetch("http://127.0.0.1:8000/api/transactions/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+
+      const result = await response.json();
+      console.log(result);
+    }
+  </script>
+</head>
+<body>
+  <h1>Submit a Transaction</h1>
+  <form onsubmit="event.preventDefault(); submitTransaction();">
+    <label>Account ID: <input type="text" id="account_id" /></label><br />
+    <label>Type: <select id="type">
+      <option value="Deposit">Deposit</option>
+      <option value="Withdrawal">Withdrawal</option>
+      <option value="Transfer">Transfer</option>
+      <option value="Buy">Buy</option>
+      <option value="Sell">Sell</option>
+    </select></label><br />
+    <label>Amount USD: <input type="text" id="amount_usd" /></label><br />
+    <label>Amount BTC: <input type="text" id="amount_btc" /></label><br />
+    <label>Source: <input type="text" id="source" /></label><br />
+    <label>Purpose: <input type="text" id="purpose" /></label><br />
+    <label>Fee Currency: <input type="text" id="fee_currency" /></label><br />
+    <label>Fee Amount: <input type="text" id="fee_amount" /></label><br />
+    <button type="submit">Submit Transaction</button>
+  </form>
+</body>
+</html>
