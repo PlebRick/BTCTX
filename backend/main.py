@@ -11,7 +11,7 @@ from backend.routers import transaction, user, account
 load_dotenv()
 
 # --- Environment Variables Setup ---
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./bitcoin_tracker.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///backend/database.sqlite")
 SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))

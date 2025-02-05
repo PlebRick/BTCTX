@@ -12,7 +12,7 @@ load_dotenv()
 
 # --- Database URL Setup ---
 # Database connection string; defaults to SQLite if not provided.
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./bitcoin_tracker.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///backend/database.sqlite")
 
 # --- Engine Setup ---
 # SQLAlchemy engine manages the database connection.

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Transaction Test Page</title>
+</head>
+<body>
+  <h1>Transaction Test</h1>
+  <form id="transactionForm">
+    <div>
+      <label for="account_id">Account ID:</label>
+      <input type="number" id="account_id" name="account_id" required>
+    </div>
+    <div>
+      <label for="type">Transaction Type:</label>
+      <select id="type" name="type" required>
+        <option value="Deposit">Deposit</option>
+        <option value="Withdrawal">Withdrawal</option>
+        <option value="Transfer">Transfer</option>
+        <option value="Buy">Buy</option>
+        <option value="Sell">Sell</option>
+      </select>
+    </div>
+    <div>
+      <label for="amount_usd">Amount USD:</label>
+      <input type="number" id="amount_usd" name="amount_usd" step="0.01" required>
+    </div>
+    <div>
+      <label for="amount_btc">Amount BTC:</label>
+      <input type="number" id="amount_btc" name="amount_btc" step="0.00000001" required>
+    </div>
+    <button type="submit">Submit Transaction</button>
+  </form>
+
+  <script>
+    document.getElementById('transactionForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      // Gather form values
+      const account_id = parseInt(document.getElementById('account_id').value);
+      const type = document.getElementById('type').value;
+      const amount_usd = parseFloat(document.getElementById('amount_usd').value);
+      const amount_btc = parseFloat(document.getElementById('amount_btc').value);
+
+      // Construct the payload matching your TransactionCreate schema
+      const data = {
+        account_id,
+        type,
+        amount_usd,
+        amount_btc
+      };
+
+      try {
+        // Adjust the URL if your backend is running on a different port or host
+        const response = await fetch('http://127.0.0.1:8000/api/transactions/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // For testing JWT, replace 'YOUR_TEMP_JWT_TOKEN' with an actual token if needed.
+            'Authorization': 'Bearer YOUR_TEMP_JWT_TOKEN'
+          },
+          body: JSON.stringify(data)
+        });
+
+        // Check if the response is OK (status code 200-299)
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Transaction created:', result);
+        alert('Transaction submitted successfully!');
+      } catch (error) {
+        console.error('Error submitting transaction:', error);
+        alert('Error submitting transaction. Check console for details.');
+      }
+    });
+  </script>
+</body>
+</html>
