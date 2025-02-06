@@ -13,9 +13,9 @@ It includes:
 
 IMPORTANT:
   - The underlying ORM model (in backend/models/transaction.py) must include the
-    columns 'fee_currency' and 'fee_amount'. If these columns are missing from the database,
-    you'll encounter errors.
-  - After updating the ORM model, reinitialize the database (delete the old file and run
+    columns 'fee_currency' and 'fee_amount'. If these columns are missing from the
+    database, you'll encounter errors.
+  - After updating your ORM model, reinitialize the database (delete the old file and run
     the create_db script) to apply the new schema.
 """
 
@@ -28,7 +28,7 @@ from backend.models.transaction import TransactionType, TransactionPurpose, Tran
 class Fee(BaseModel):
     """
     Represents the fee details for a transaction.
-
+    
     Attributes:
       currency (str): The currency of the fee (e.g., USD, BTC).
       amount (float): The fee amount.
@@ -41,8 +41,8 @@ class Fee(BaseModel):
 class TransactionRead(BaseModel):
     """
     Schema for outputting transaction data in API responses.
-
-    This schema expects that the underlying ORM model for transactions provides
+    
+    This schema expects that the underlying ORM model for transactions includes
     separate columns 'fee_currency' and 'fee_amount'. A model validator then assembles
     these columns into a nested 'fee' object.
 
@@ -67,21 +67,32 @@ class TransactionRead(BaseModel):
     purpose: Optional[TransactionPurpose] = Field(None, description="Purpose of BTC withdrawals")
     fee: Optional[Fee] = Field(None, description="Optional transaction fee")
 
-    @model_validator(mode="after")
-    def assemble_fee(cls, values: dict) -> dict:
+    @model_validator(mode="before")
+    def assemble_fee(cls, values) -> dict:
         """
         Assemble the nested fee object from separate ORM columns.
 
-        This validator runs after the model's data is prepared (i.e. after ORM objects are converted
-        to a dictionary using 'from_attributes = True'). It checks for the keys 'fee_currency'
-        and 'fee_amount' and, if either is present, creates a nested 'fee' dictionary.
+        This validator runs before model instantiation. It first ensures that the input
+        is a dictionary. If not (i.e. if an ORM object is provided), it converts the object
+        to a dictionary by iterating over its table columns. Then, it checks for the keys
+        'fee_currency' and 'fee_amount'. If either is present, it creates a nested 'fee'
+        dictionary from them.
 
         Args:
-            values (dict): The dictionary of field values.
-        
+            values: The raw input data (either a dict or an ORM object).
+
         Returns:
-            dict: The updated dictionary with the 'fee' key added if applicable.
+            dict: The updated data dictionary with a nested 'fee' key if applicable.
         """
+        # If values is not a dict, attempt to convert the ORM object to a dict.
+        if not isinstance(values, dict):
+            try:
+                # Assuming the ORM object has a __table__ attribute, extract column values.
+                values = {col.name: getattr(values, col.name) for col in values.__table__.columns}
+            except AttributeError:
+                # If conversion fails, return the values as-is.
+                return values
+
         fee_currency = values.get("fee_currency")
         fee_amount = values.get("fee_amount")
         if fee_currency is not None or fee_amount is not None:
@@ -89,7 +100,7 @@ class TransactionRead(BaseModel):
         return values
 
     class Config:
-        # Use 'from_attributes = True' to allow compatibility with ORM objects.
+        # Enable compatibility with ORM objects (similar to orm_mode=True in Pydantic v1)
         from_attributes = True
 
 
@@ -97,15 +108,18 @@ class TransactionRead(BaseModel):
 class TransactionCreate(BaseModel):
     """
     Schema for creating a new transaction.
-
+    
+    The fields provided here are required to insert a new transaction into the database.
+    The timestamp defaults to the current UTC time if not provided.
+    
     Attributes:
       account_id (int): ID of the account for this transaction.
-      type (TransactionType): Transaction type (Deposit, Withdrawal, Transfer, Buy, Sell).
+      type (TransactionType): Transaction type.
       amount_usd (float): Transaction amount in USD.
       amount_btc (float): Transaction amount in BTC.
-      timestamp (datetime): When the transaction occurred (defaults to current UTC time).
-      source (Optional[TransactionSource]): Source for deposits.
-      purpose (Optional[TransactionPurpose]): Purpose for withdrawals.
+      timestamp (datetime): When the transaction occurred (defaults to now).
+      source (Optional[TransactionSource]): Source for BTC deposits.
+      purpose (Optional[TransactionPurpose]): Purpose for BTC withdrawals.
       fee (Optional[Fee]): Fee details, if any.
     """
     account_id: int = Field(..., description="ID of the account for this transaction")
@@ -122,9 +136,9 @@ class TransactionCreate(BaseModel):
 class TransactionUpdate(BaseModel):
     """
     Schema for updating an existing transaction.
-
+    
     Only the fields provided in the update request will be modified.
-
+    
     Attributes:
       type (Optional[TransactionType]): Updated transaction type.
       amount_usd (Optional[float]): Updated amount in USD.
