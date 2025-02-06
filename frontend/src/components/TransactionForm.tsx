@@ -97,6 +97,8 @@ const TransactionForm: React.FC = () => {
     // TODO: Replace this console.log with a fetch/axios call to your FastAPI endpoint
   };
 
+  const fromCurrency = watch("fromCurrency");
+
   // Render dynamic fields based on the selected transaction type
   const renderDynamicFields = () => {
     switch (currentType) {
@@ -220,84 +222,102 @@ const TransactionForm: React.FC = () => {
             </div>
           </div>
         );
-      case "transfer":
-        return (
-          <div>
-            <div>
-              <label>From Account:</label>
-              <select {...register("fromAccount", { required: "From Account is required" })}>
-                <option value="">Select From Account</option>
-                <option value="bank">Bank</option>
-                <option value="wallet">Wallet</option>
-                <option value="exchange">Exchange</option>
-              </select>
-              {errors.fromAccount && <span>{errors.fromAccount.message}</span>}
-            </div>
-            <div>
-              <label>From Currency:</label>
-              {fromAccount === "exchange" ? (
-                <select {...register("fromCurrency", { required: "From Currency is required" })}>
-                  <option value="">Select Currency</option>
-                  <option value="USD">USD</option>
-                  <option value="BTC">BTC</option>
-                </select>
-              ) : (
-                <input type="text" {...register("fromCurrency")} readOnly />
-              )}
-              {errors.fromCurrency && <span>{errors.fromCurrency.message}</span>}
-            </div>
-            <div>
-              <label>Amount (From):</label>
-              <input
-                type="number"
-                step="0.00000001"
-                {...register("amountFrom", { required: "Amount (From) is required", valueAsNumber: true })}
-              />
-              {errors.amountFrom && <span>{errors.amountFrom.message}</span>}
-            </div>
-            <div>
-              <label>To Account:</label>
-              <select {...register("toAccount", { required: "To Account is required" })}>
-                <option value="">Select To Account</option>
-                <option value="bank">Bank</option>
-                <option value="wallet">Wallet</option>
-                <option value="exchange">Exchange</option>
-              </select>
-              {errors.toAccount && <span>{errors.toAccount.message}</span>}
-            </div>
-            <div>
-              <label>To Currency:</label>
-              {toAccount === "exchange" ? (
-                <select {...register("toCurrency", { required: "To Currency is required" })}>
-                  <option value="">Select Currency</option>
-                  <option value="USD">USD</option>
-                  <option value="BTC">BTC</option>
-                </select>
-              ) : (
-                <input type="text" {...register("toCurrency")} readOnly />
-              )}
-              {errors.toCurrency && <span>{errors.toCurrency.message}</span>}
-            </div>
-            <div>
-              <label>Amount (To):</label>
-              <input
-                type="number"
-                step="0.00000001"
-                {...register("amountTo", { required: "Amount (To) is required", valueAsNumber: true })}
-              />
-              {errors.amountTo && <span>{errors.amountTo.message}</span>}
-            </div>
-            <div>
-              <label>Fee:</label>
-              <input type="number" step="0.00000001" {...register("fee", { valueAsNumber: true })} />
-              <select {...register("feeCurrency")}>
-                <option value="">Select Fee Currency</option>
-                <option value="USD">USD</option>
-                <option value="BTC">BTC</option>
-              </select>
-            </div>
-          </div>
-        );
+        case "transfer":
+  return (
+    <div>
+      {/* From Account */}
+      <div>
+        <label>From Account:</label>
+        <select {...register("fromAccount", { required: "From Account is required" })}>
+          <option value="">Select From Account</option>
+          <option value="bank">Bank</option>
+          <option value="wallet">Wallet</option>
+          <option value="exchange">Exchange</option>
+        </select>
+        {errors.fromAccount && <span>{errors.fromAccount.message}</span>}
+      </div>
+
+      {/* From Currency */}
+      <div>
+        <label>From Currency:</label>
+        {fromAccount === "exchange" ? (
+          <select {...register("fromCurrency", { required: "From Currency is required" })}>
+            <option value="">Select Currency</option>
+            <option value="USD">USD</option>
+            <option value="BTC">BTC</option>
+          </select>
+        ) : (
+          <input type="text" {...register("fromCurrency")} readOnly />
+        )}
+        {errors.fromCurrency && <span>{errors.fromCurrency.message}</span>}
+      </div>
+
+      {/* Amount (From) */}
+      <div>
+        <label>Amount (From):</label>
+        <input
+          type="number"
+          step="0.00000001"
+          {...register("amountFrom", { required: "Amount (From) is required", valueAsNumber: true })}
+        />
+        {errors.amountFrom && <span>{errors.amountFrom.message}</span>}
+      </div>
+
+      {/* To Account */}
+      <div>
+        <label>To Account:</label>
+        {fromAccount === "bank" || fromAccount === "wallet" ? (
+          // For bank or wallet, the only option is to transfer to Exchange.
+          <input type="text" value="Exchange" readOnly {...register("toAccount")} />
+        ) : fromAccount === "exchange" ? (
+          // For exchange, auto-set based on fromCurrency:
+          <input
+            type="text"
+            value={fromCurrency === "USD" ? "Bank" : fromCurrency === "BTC" ? "Wallet" : ""}
+            readOnly
+            {...register("toAccount")}
+          />
+        ) : (
+          <input type="text" value="" readOnly {...register("toAccount")} />
+        )}
+        {errors.toAccount && <span>{errors.toAccount.message}</span>}
+      </div>
+
+      {/* To Currency */}
+      <div>
+        <label>To Currency:</label>
+        {(fromAccount === "bank" || fromAccount === "wallet" || fromAccount === "exchange") ? (
+          // Auto-set to be the same as fromCurrency.
+          <input type="text" value={fromCurrency || ""} readOnly {...register("toCurrency")} />
+        ) : (
+          <input type="text" value="" readOnly {...register("toCurrency")} />
+        )}
+        {errors.toCurrency && <span>{errors.toCurrency.message}</span>}
+      </div>
+
+      {/* Amount (To) */}
+      <div>
+        <label>Amount (To):</label>
+        <input
+          type="number"
+          step="0.00000001"
+          {...register("amountTo", { required: "Amount (To) is required", valueAsNumber: true })}
+        />
+        {errors.amountTo && <span>{errors.amountTo.message}</span>}
+      </div>
+
+      {/* Fee */}
+      <div>
+        <label>Fee:</label>
+        <input type="number" step="0.00000001" {...register("fee", { valueAsNumber: true })} />
+        <select {...register("feeCurrency")}>
+          <option value="">Select Fee Currency</option>
+          <option value="USD">USD</option>
+          <option value="BTC">BTC</option>
+        </select>
+      </div>
+    </div>
+  );        
       case "buy":
         return (
           <div>
@@ -334,65 +354,43 @@ const TransactionForm: React.FC = () => {
             </div>
           </div>
         );
-      case "sell":
-        return (
-          <div>
+        case "sell":
+          return (
             <div>
-              <label>Account:</label>
-              <input type="text" value="Exchange" readOnly {...register("account")} />
-            </div>
-            <div>
-              <label>Trade Type:</label>
               <div>
-                <label>
-                  <input
-                    type="radio"
-                    value="sell"
-                    {...register("tradeType", { required: "Trade Type is required" })}
-                    defaultChecked
-                  />
-                  Sell
-                </label>
-                <label style={{ marginLeft: "10px" }}>
-                  <input
-                    type="radio"
-                    value="buy"
-                    {...register("tradeType", { required: "Trade Type is required" })}
-                  />
-                  Buy
-                </label>
+                <label>Account:</label>
+                <input type="text" value="Exchange" readOnly {...register("account")} />
               </div>
-              {errors.tradeType && <span>{errors.tradeType.message}</span>}
+              {/* Removed the trade type toggle since it's not needed */}
+              <div>
+                <label>Amount BTC:</label>
+                <input
+                  type="number"
+                  step="0.00000001"
+                  {...register("amountBTC", { required: "Amount BTC is required", valueAsNumber: true })}
+                />
+                {errors.amountBTC && <span>{errors.amountBTC.message}</span>}
+              </div>
+              <div>
+                <label>Amount USD:</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  {...register("amountUSD", { required: "Amount USD is required", valueAsNumber: true })}
+                />
+                {errors.amountUSD && <span>{errors.amountUSD.message}</span>}
+              </div>
+              <div>
+                <label>Fee:</label>
+                <input type="number" step="0.00000001" {...register("fee", { valueAsNumber: true })} />
+                <select {...register("feeCurrency")}>
+                  <option value="">Select Fee Currency</option>
+                  <option value="USD">USD</option>
+                  <option value="BTC">BTC</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label>Amount BTC:</label>
-              <input
-                type="number"
-                step="0.00000001"
-                {...register("amountBTC", { required: "Amount BTC is required", valueAsNumber: true })}
-              />
-              {errors.amountBTC && <span>{errors.amountBTC.message}</span>}
-            </div>
-            <div>
-              <label>Amount USD:</label>
-              <input
-                type="number"
-                step="0.01"
-                {...register("amountUSD", { required: "Amount USD is required", valueAsNumber: true })}
-              />
-              {errors.amountUSD && <span>{errors.amountUSD.message}</span>}
-            </div>
-            <div>
-              <label>Fee:</label>
-              <input type="number" step="0.00000001" {...register("fee", { valueAsNumber: true })} />
-              <select {...register("feeCurrency")}>
-                <option value="">Select Fee Currency</option>
-                <option value="USD">USD</option>
-                <option value="BTC">BTC</option>
-              </select>
-            </div>
-          </div>
-        );
+          );        
       default:
         return null;
     }
