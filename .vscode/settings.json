@@ -5,6 +5,7 @@
         "fastapi",
         "passlib",
         "pydantic",
+        "PYTHONPATH",
         "sessionmaker",
         "sqlalchemy",
         "starlette",

@@ -1,3 +1,20 @@
+#!/usr/bin/env python
+"""
+main.py
+
+This module is the entry point for the BitcoinTX backend application.
+It configures and launches the FastAPI app, including:
+  - Loading environment variables from a consolidated .env file in the project root.
+  - Setting up CORS middleware using allowed origins defined in the .env.
+  - Configuring JWT-based authentication helper functions.
+  - Including routers for transactions, users, and accounts.
+  - Defining basic test routes for verifying that the API is running.
+
+This file does not handle database configuration directly—the database
+settings are managed by backend/database.py. Ensure that your consolidated
+.env file (placed in the project root) contains the correct settings.
+"""
+
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException
@@ -5,48 +22,52 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from backend.routers import transaction, user, account
 
-# --- Load Environment Variables ---
+# Load environment variables from the project root .env file.
+# (Make sure your consolidated .env file is located in the project root.)
 load_dotenv()
 
-# --- Environment Variables Setup ---
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///backend/database.sqlite")
+# Retrieve security and authentication settings from environment variables.
 SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+# JWT_ACCESS_TOKEN_EXPIRE_MINUTES is expected to be set in .env as JWT_ACCESS_TOKEN_EXPIRE_MINUTES.
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+
+# Retrieve allowed origins for CORS; these should be defined as a comma-separated list in .env.
 ALLOWED_ORIGINS = os.getenv("CORS_ALLOW_ORIGINS", "http://127.0.0.1:3000").split(",")
 
-# --- OAuth2 Setup ---
+# Set up OAuth2 scheme for JWT authentication.
+# The tokenUrl should point to the endpoint that issues tokens (e.g., /api/token).
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
 
-# --- Initialize FastAPI App ---
+# Initialize the FastAPI application with descriptive metadata.
 app = FastAPI(
     title="BitcoinTX Portfolio Tracker API",
     description="API for managing Bitcoin transactions, accounts, and portfolio tracking.",
     version="1.0",
-    debug=True  # Enable debug mode
+    debug=True  # Enable debug mode during development; disable in production.
 )
 
-# --- Middleware Configuration ---
+# Configure CORS middleware to allow requests from specified origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,  # Read allowed origins from .env
+    allow_origins=ALLOWED_ORIGINS,  # These origins come from the .env file.
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # --- JWT Helper Functions ---
+
 def create_access_token(data: dict) -> str:
     """
-    Create a JWT access token.
-    
+    Create a JWT access token for authentication.
+
     Args:
-        data (dict): Payload data to encode in the token.
+        data (dict): The payload to include in the token. Should include a "sub" key representing the username.
 
     Returns:
-        str: Encoded JWT token.
+        str: The encoded JWT token.
     """
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -55,13 +76,13 @@ def create_access_token(data: dict) -> str:
 
 def verify_access_token(token: str) -> str:
     """
-    Verify and decode a JWT access token.
-    
+    Verify a JWT access token and extract the username.
+
     Args:
-        token (str): JWT token to verify.
+        token (str): The JWT token to verify.
 
     Returns:
-        str: Username from the token's payload if valid.
+        str: The username from the token's payload if the token is valid.
 
     Raises:
         HTTPException: If the token is invalid or expired.
@@ -75,56 +96,63 @@ def verify_access_token(token: str) -> str:
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# --- Dependency to Protect Routes ---
 def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     """
-    Dependency to retrieve the current user from a valid JWT token.
-    
+    FastAPI dependency that retrieves the current authenticated user from the JWT token.
+
     Args:
-        token (str): Bearer token from the request.
+        token (str): The JWT token provided in the Authorization header.
 
     Returns:
-        str: Username of the authenticated user.
+        str: The username of the authenticated user.
     """
     return verify_access_token(token)
 
-# --- Include Routers ---
+# --- Include Routers for Modular Functionality ---
+
+# Import routers from the backend routers package.
+from backend.routers import transaction, user, account
+
+# Include the transactions router under the prefix "/api/transactions".
 app.include_router(transaction.router, prefix="/api/transactions", tags=["Transactions"])
+# Include the users router under the prefix "/api/users".
 app.include_router(user.router, prefix="/api/users", tags=["Users"])
+# Include the accounts router under the prefix "/api/accounts".
 app.include_router(account.router, prefix="/api/accounts", tags=["Accounts"])
 
-# --- Example Protected Route ---
+# --- Define Basic Routes ---
+
 @app.get("/protected")
 def read_protected_route(current_user: str = Depends(get_current_user)):
     """
-    Example protected route.
-    
+    A protected route that requires JWT authentication.
+
     Args:
-        current_user (str): Username of the authenticated user.
+        current_user (str): The username extracted from a valid JWT token.
 
     Returns:
-        dict: Message confirming access.
+        dict: A message confirming access.
     """
     return {"message": f"Hello, {current_user}. You have access to this route!"}
 
-# --- Basic Root Route ---
 @app.get("/")
 def read_root():
     """
-    Basic route to confirm the API is running.
+    A basic root route to verify that the API is running.
+
+    Returns:
+        dict: A welcome message.
     """
     return {"message": "Welcome to BitcoinTX"}
 
-# --- Placeholder for bcrypt Setup ---
-# In the future, password hashing and verification will be added with bcrypt.
-# For now, we will integrate bcrypt when setting up user authentication details.
+# --- Placeholders for Future Enhancements ---
 
-# --- Placeholder for Additional Features ---
-# Example: Custom error handling middleware
-# Example: Logging and monitoring services
+# Placeholder for integrating bcrypt for password hashing.
+# Placeholder for additional error handling and logging middleware.
 
-# --- Testing Path Setup for pytest ---
-# Ensures that PYTHONPATH is correctly set when running tests.
+# --- Testing and Execution Setup ---
+# This block ensures that when the module is run directly, the PYTHONPATH is properly set,
+# which can help during testing with pytest or similar tools.
 if __name__ == "__main__":
     import sys
-    sys.path.append(os.getenv("PYTHONPATH", "."))  # Add the PYTHONPATH from .env for testing
+    sys.path.append(os.getenv("PYTHONPATH", "."))
