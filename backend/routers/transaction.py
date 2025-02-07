@@ -1,130 +1,83 @@
-# BitcoinTX_FastPYthon/backend/routers/transaction.py
 """
-This module defines the API routes for transaction management in BitcoinTX.
-It handles retrieving, creating, updating, and deleting transactions.
-Transactions follow various types (Deposit, Withdrawal, Transfer, Buy, Sell)
-and are validated via corresponding Pydantic schemas.
+routers/transaction.py
+
+Refined to:
+ - Accept and store costBasisUSD via the schemas.
+ - Use a single 'fee' field in USD.
+ - Mention that timestamps are treated as UTC.
+ - Provide basic create/read/update/delete endpoints.
 """
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from typing import List
-
-from backend.database import get_db  # Provides database session dependency
+from backend.database import get_db
 from backend.models.transaction import Transaction
-from backend.schemas.transaction import TransactionCreate, TransactionRead, TransactionUpdate
+from backend.schemas.transaction import (
+    TransactionCreate,
+    TransactionRead,
+    TransactionUpdate
+)
+from backend.services.transaction import (
+    get_all_transactions,
+    get_transaction_by_id,
+    create_transaction_record,
+    update_transaction_record,
+    delete_transaction_record
+)
 
 router = APIRouter()
 
 @router.get("/", response_model=List[TransactionRead])
 def get_transactions(db: Session = Depends(get_db)):
     """
-    Retrieve all transactions from the database, ordered by timestamp (newest first).
-    
-    Args:
-        db (Session): Database session dependency.
-    
-    Returns:
-        List[TransactionRead]: A list of transaction records.
+    Retrieve all transactions from the database, ordered by timestamp (desc).
+    Timestamps are considered UTC for any historical price lookups or date-based logic.
     """
     transactions = db.query(Transaction).order_by(Transaction.timestamp.desc()).all()
     return transactions
 
-
 @router.post("/", response_model=TransactionRead)
-def create_transaction(transaction: TransactionCreate, db: Session = Depends(get_db)):
+def create_transaction(
+    transaction: TransactionCreate,
+    db: Session = Depends(get_db)
+):
     """
-    Create a new transaction in the database.
-    
-    The incoming payload follows the dynamic form rules and corresponds to one of
-    the following transaction types: Deposit, Withdrawal, Transfer, Buy, or Sell.
-    
-    Args:
-        transaction (TransactionCreate): Payload for creating the transaction.
-        db (Session): Database session dependency.
-    
-    Returns:
-        TransactionRead: The newly created transaction record.
+    Create a new transaction.
+    If the type is 'Deposit' and the user enters cost_basis_usd, we store it.
+    Fee is now always in USD, so no fee_currency required.
+    Timestamps are stored as UTC by convention (though we do not forcibly convert naive datetimes here).
     """
-    # Create a new Transaction instance using the data from the TransactionCreate schema.
-    db_transaction = Transaction(
-        account_id=transaction.account_id,
-        type=transaction.type,
-        amount_usd=transaction.amount_usd,
-        amount_btc=transaction.amount_btc,
-        timestamp=transaction.timestamp,
-        source=transaction.source,
-        purpose=transaction.purpose,
-        fee_currency=transaction.fee.currency if transaction.fee else None,
-        fee_amount=transaction.fee.amount if transaction.fee else None
-    )
-    db.add(db_transaction)
-    db.commit()
-    db.refresh(db_transaction)
+    db_transaction = create_transaction_record(transaction, db)
+    if not db_transaction:
+        raise HTTPException(status_code=400, detail="Transaction could not be created.")
     return db_transaction
-
 
 @router.put("/{transaction_id}", response_model=TransactionRead)
-def update_transaction(transaction_id: int, transaction: TransactionUpdate, db: Session = Depends(get_db)):
+def update_transaction(
+    transaction_id: int,
+    transaction: TransactionUpdate,
+    db: Session = Depends(get_db)
+):
     """
     Update an existing transaction.
-    
-    Only provided fields in the TransactionUpdate payload will be updated.
-    
-    Args:
-        transaction_id (int): The ID of the transaction to update.
-        transaction (TransactionUpdate): Payload with updated fields.
-        db (Session): Database session dependency.
-    
-    Returns:
-        TransactionRead: The updated transaction record.
-    
-    Raises:
-        HTTPException: If the transaction with the specified ID does not exist.
+    If is_locked is True, future logic might block changes (placeholder).
     """
-    db_transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    db_transaction = update_transaction_record(transaction_id, transaction, db)
     if not db_transaction:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-    
-    # Update only the fields that are provided in the update payload.
-    if transaction.type is not None:
-        db_transaction.type = transaction.type
-    if transaction.amount_usd is not None:
-        db_transaction.amount_usd = transaction.amount_usd
-    if transaction.amount_btc is not None:
-        db_transaction.amount_btc = transaction.amount_btc
-    if transaction.purpose is not None:
-        db_transaction.purpose = transaction.purpose
-    if transaction.source is not None:
-        db_transaction.source = transaction.source
-    if transaction.fee:
-        db_transaction.fee_currency = transaction.fee.currency
-        db_transaction.fee_amount = transaction.fee.amount
-
-    db.commit()
-    db.refresh(db_transaction)
+        raise HTTPException(status_code=404, detail="Transaction not found or locked.")
     return db_transaction
 
-
 @router.delete("/{transaction_id}/", status_code=204)
-def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):
+def delete_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db)
+):
     """
-    Delete a transaction from the database.
-    
-    Args:
-        transaction_id (int): The ID of the transaction to delete.
-        db (Session): Database session dependency.
-    
-    Returns:
-        dict: A success message if the transaction was deleted.
-    
-    Raises:
-        HTTPException: If the transaction is not found.
+    Delete a transaction by its ID.
+    Future logic might forbid deletion if is_locked is True.
     """
-    db_transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
-    if not db_transaction:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-    
-    db.delete(db_transaction)
-    db.commit()
+    success = delete_transaction_record(transaction_id, db)
+    if not success:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
     return {"detail": "Transaction deleted successfully"}

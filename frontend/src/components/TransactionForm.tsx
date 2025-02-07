@@ -11,35 +11,46 @@ type DepositSource = "N/A" | "My BTC" | "Gift" | "Income" | "Interest" | "Reward
 type WithdrawalPurpose = "N/A" | "Spent" | "Gift" | "Donation" | "Lost";
 
 // --- Interface for the Form Data ---
-// 1) Add costBasisUSD to hold the manual cost basis for BTC Deposits if needed.
+// We add costBasisUSD to capture a manual cost basis for BTC deposits.
 interface TransactionFormData {
   dateTime: string;
   transactionType: TransactionType;
-  // For Deposit/Withdrawal
+
+  // Deposit/Withdrawal
   account?: AccountType;
   currency?: Currency;
   amount?: number;
+
+  // Fee fields remain unchanged, but we keep them for reference:
   fee?: number;
   feeCurrency?: Currency;
+
   source?: DepositSource; // for deposits
   purpose?: WithdrawalPurpose; // for withdrawals
-  // For Transfer
+
+  // Transfer
   fromAccount?: AccountType;
   fromCurrency?: Currency;
   amountFrom?: number;
   toAccount?: AccountType;
   toCurrency?: Currency;
   amountTo?: number;
-  // For Buy/Sell
+
+  // Buy/Sell
   amountUSD?: number;
   amountBTC?: number;
-  tradeType?: "buy" | "sell"; // applicable for Sell form toggle
+  tradeType?: "buy" | "sell"; // for Sell toggles, if needed
 
-  // NEW FIELD for cost basis on BTC deposits
+  // NEW: Only relevant if deposit + BTC
   costBasisUSD?: number;
 }
 
 const TransactionForm: React.FC = () => {
+  /*
+    useForm:
+    - We set defaultValues so that the date/time field starts with the current UTC (truncated).
+    - costBasisUSD is 0 by default; user can override only if it's a BTC deposit in a wallet/exchange.
+  */
   const {
     register,
     handleSubmit,
@@ -49,21 +60,26 @@ const TransactionForm: React.FC = () => {
     formState: { errors },
   } = useForm<TransactionFormData>({
     defaultValues: {
-      dateTime: new Date().toISOString().slice(0, 16), // format: YYYY-MM-DDTHH:MM
-      costBasisUSD: 0, // Default cost basis to 0 unless user sets it
+      dateTime: new Date().toISOString().slice(0, 16), // "YYYY-MM-DDTHH:MM"
+      costBasisUSD: 0, // By default, 0 cost basis unless user changes it
     },
   });
 
-  // State to store the selected transaction type
+  // This local state tracks which transaction type is selected in the dropdown
   const [currentType, setCurrentType] = useState<TransactionType | "">("");
 
-  // Watch for changes in account selections for dynamic behavior
+  // Watch these fields to trigger dynamic behaviors
   const account = watch("account");
   const fromAccount = watch("fromAccount");
   const toAccount = watch("toAccount");
-  const currency = watch("currency"); // watch if the user picks USD/BTC for exchange deposits
+  const currency = watch("currency"); // We'll need this for deposit logic
 
-  // For deposit/withdrawal: Auto-set the currency based on account type
+  /* 
+    Auto-set the currency for deposit/withdrawal:
+    - Bank => USD
+    - Wallet => BTC
+    - Exchange => user chooses from a dropdown
+  */
   useEffect(() => {
     if (currentType === "deposit" || currentType === "withdrawal") {
       if (account === "bank") {
@@ -71,11 +87,17 @@ const TransactionForm: React.FC = () => {
       } else if (account === "wallet") {
         setValue("currency", "BTC");
       }
-      // If account === "exchange", user can pick currency from the dropdown
+      // If account === "exchange", do nothing; user picks the currency manually
     }
   }, [account, currentType, setValue]);
 
-  // For transfer: Auto-set fromCurrency and toCurrency based on account selections
+  /*
+    Auto-set currencies for Transfers:
+    - If transferring from Bank => fromCurrency = USD
+    - If from Wallet => fromCurrency = BTC
+    - If from Exchange => user picks fromCurrency from [USD, BTC]
+    - Then set toCurrency accordingly, e.g., if from "bank" => to "exchange" => possibly BTC, etc.
+  */
   useEffect(() => {
     if (currentType === "transfer") {
       if (fromAccount === "bank") {
@@ -91,40 +113,58 @@ const TransactionForm: React.FC = () => {
     }
   }, [fromAccount, toAccount, currentType, setValue]);
 
-  // When the transaction type changes, reset the form fields (while preserving the date/time)
+  /*
+    Whenever the user changes transaction type, we reset the form to fresh defaults,
+    preserving the newly selected transactionType and a fresh dateTime. costBasisUSD
+    is reset to 0 because it's only meaningful for BTC deposits to wallet/exchange.
+  */
   const onTransactionTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedType = e.target.value as TransactionType;
     setCurrentType(selectedType);
     reset({
       transactionType: selectedType,
       dateTime: new Date().toISOString().slice(0, 16),
-      costBasisUSD: 0, // Reset cost basis to 0 for clarity
+      costBasisUSD: 0,
     });
   };
 
-  // onSubmit handler to send data to your backend
+  /*
+    onSubmit:
+    - If user is depositing BTC into wallet or exchange but doesn't enter costBasisUSD,
+      we ensure it's 0 to avoid storing undefined or null.
+    - Otherwise, just log the data (or post it to your backend).
+  */
   const onSubmit: SubmitHandler<TransactionFormData> = (data) => {
-    // 2) If user is depositing BTC into a wallet or exchange but didn't specify costBasisUSD, default to 0
     const isBTCDeposit =
       data.transactionType === "deposit" &&
       data.currency === "BTC" &&
       (data.account === "wallet" || data.account === "exchange");
 
+    // If it's a BTC deposit and costBasis is missing/undefined, set to 0
     if (isBTCDeposit && !data.costBasisUSD) {
       data.costBasisUSD = 0;
     }
 
     console.log("Submitting transaction data:", data);
-    // TODO: Replace this console.log with a fetch/axios call to your FastAPI endpoint
+    // Replace with fetch/axios to POST to FastAPI when ready
   };
 
-  // Conditionally show Cost Basis (USD) field if deposit + BTC + (wallet or exchange)
+  /*
+    We'll show a "Cost Basis (USD)" field only if:
+      - transactionType == "deposit"
+      - currency == "BTC"
+      - account == "wallet" or "exchange"
+  */
   const showCostBasisField =
     currentType === "deposit" &&
     currency === "BTC" &&
     (account === "wallet" || account === "exchange");
 
-  // Render dynamic fields based on the selected transaction type
+  /*
+    Render dynamic fields:
+    - We keep your existing cases for deposit, withdrawal, transfer, buy, sell exactly the same,
+      only adding the cost basis field for deposit in the place you'd prefer.
+  */
   const renderDynamicFields = () => {
     switch (currentType) {
       case "deposit":
@@ -141,7 +181,8 @@ const TransactionForm: React.FC = () => {
               </select>
               {errors.account && <span>{errors.account.message}</span>}
             </div>
-            {/* Currency: Auto-set for bank and wallet; selectable for exchange */}
+
+            {/* Currency: auto for bank/wallet, user-chosen if exchange */}
             <div>
               <label>Currency:</label>
               {account === "exchange" ? (
@@ -155,17 +196,22 @@ const TransactionForm: React.FC = () => {
               )}
               {errors.currency && <span>{errors.currency.message}</span>}
             </div>
+
             {/* Amount Field */}
             <div>
               <label>Amount:</label>
               <input
                 type="number"
                 step="0.00000001"
-                {...register("amount", { required: "Amount is required", valueAsNumber: true })}
+                {...register("amount", {
+                  required: "Amount is required",
+                  valueAsNumber: true,
+                })}
               />
               {errors.amount && <span>{errors.amount.message}</span>}
             </div>
-            {/* Source Selector */}
+
+            {/* Source: user-chosen from N/A, My BTC, Gift, etc. */}
             <div>
               <label>Source:</label>
               <select {...register("source", { required: "Source is required" })}>
@@ -178,10 +224,15 @@ const TransactionForm: React.FC = () => {
               </select>
               {errors.source && <span>{errors.source.message}</span>}
             </div>
-            {/* Fee Field */}
+
+            {/* Fee: We do NOT change the existing logic for fees, just keep it as is. */}
             <div>
               <label>Fee:</label>
-              <input type="number" step="0.00000001" {...register("fee", { valueAsNumber: true })} />
+              <input
+                type="number"
+                step="0.00000001"
+                {...register("fee", { valueAsNumber: true })}
+              />
               <select {...register("feeCurrency")}>
                 <option value="">Select Fee Currency</option>
                 <option value="USD">USD</option>
@@ -189,7 +240,7 @@ const TransactionForm: React.FC = () => {
               </select>
             </div>
 
-            {/* 3) Conditionally Render Cost Basis (USD) for BTC deposits */}
+            {/* If deposit + BTC + wallet or exchange => display costBasisUSD */}
             {showCostBasisField && (
               <div>
                 <label>Cost Basis (USD):</label>
@@ -203,6 +254,8 @@ const TransactionForm: React.FC = () => {
             )}
           </div>
         );
+
+      // The rest remain unchanged from your original code, only commented more thoroughly.
 
       case "withdrawal":
         return (
@@ -235,7 +288,10 @@ const TransactionForm: React.FC = () => {
               <input
                 type="number"
                 step="0.00000001"
-                {...register("amount", { required: "Amount is required", valueAsNumber: true })}
+                {...register("amount", {
+                  required: "Amount is required",
+                  valueAsNumber: true,
+                })}
               />
               {errors.amount && <span>{errors.amount.message}</span>}
             </div>
@@ -252,7 +308,11 @@ const TransactionForm: React.FC = () => {
             </div>
             <div>
               <label>Fee:</label>
-              <input type="number" step="0.00000001" {...register("fee", { valueAsNumber: true })} />
+              <input
+                type="number"
+                step="0.00000001"
+                {...register("fee", { valueAsNumber: true })}
+              />
               <select {...register("feeCurrency")}>
                 <option value="">Select Fee Currency</option>
                 <option value="USD">USD</option>
@@ -261,10 +321,10 @@ const TransactionForm: React.FC = () => {
             </div>
           </div>
         );
+
       case "transfer":
         return (
           <div>
-            {/* From Account */}
             <div>
               <label>From Account:</label>
               <select {...register("fromAccount", { required: "From Account is required" })}>
@@ -275,8 +335,6 @@ const TransactionForm: React.FC = () => {
               </select>
               {errors.fromAccount && <span>{errors.fromAccount.message}</span>}
             </div>
-
-            {/* From Currency */}
             <div>
               <label>From Currency:</label>
               {fromAccount === "exchange" ? (
@@ -290,29 +348,32 @@ const TransactionForm: React.FC = () => {
               )}
               {errors.fromCurrency && <span>{errors.fromCurrency.message}</span>}
             </div>
-
-            {/* Amount (From) */}
             <div>
               <label>Amount (From):</label>
               <input
                 type="number"
                 step="0.00000001"
-                {...register("amountFrom", { required: "Amount (From) is required", valueAsNumber: true })}
+                {...register("amountFrom", {
+                  required: "Amount (From) is required",
+                  valueAsNumber: true,
+                })}
               />
               {errors.amountFrom && <span>{errors.amountFrom.message}</span>}
             </div>
-
-            {/* To Account */}
             <div>
               <label>To Account:</label>
               {fromAccount === "bank" || fromAccount === "wallet" ? (
-                // For bank or wallet, the only option is to transfer to Exchange.
                 <input type="text" value="Exchange" readOnly {...register("toAccount")} />
               ) : fromAccount === "exchange" ? (
-                // For exchange, auto-set based on fromCurrency:
                 <input
                   type="text"
-                  value={watch("fromCurrency") === "USD" ? "Bank" : watch("fromCurrency") === "BTC" ? "Wallet" : ""}
+                  value={
+                    watch("fromCurrency") === "USD"
+                      ? "Bank"
+                      : watch("fromCurrency") === "BTC"
+                      ? "Wallet"
+                      : ""
+                  }
                   readOnly
                   {...register("toAccount")}
                 />
@@ -321,34 +382,41 @@ const TransactionForm: React.FC = () => {
               )}
               {errors.toAccount && <span>{errors.toAccount.message}</span>}
             </div>
-
-            {/* To Currency */}
             <div>
               <label>To Currency:</label>
-              {(fromAccount === "bank" || fromAccount === "wallet" || fromAccount === "exchange") ? (
-                // Auto-set to be the same as fromCurrency.
-                <input type="text" value={watch("fromCurrency") || ""} readOnly {...register("toCurrency")} />
+              {(fromAccount === "bank" ||
+                fromAccount === "wallet" ||
+                fromAccount === "exchange") ? (
+                <input
+                  type="text"
+                  value={watch("fromCurrency") || ""}
+                  readOnly
+                  {...register("toCurrency")}
+                />
               ) : (
                 <input type="text" value="" readOnly {...register("toCurrency")} />
               )}
               {errors.toCurrency && <span>{errors.toCurrency.message}</span>}
             </div>
-
-            {/* Amount (To) */}
             <div>
               <label>Amount (To):</label>
               <input
                 type="number"
                 step="0.00000001"
-                {...register("amountTo", { required: "Amount (To) is required", valueAsNumber: true })}
+                {...register("amountTo", {
+                  required: "Amount (To) is required",
+                  valueAsNumber: true,
+                })}
               />
               {errors.amountTo && <span>{errors.amountTo.message}</span>}
             </div>
-
-            {/* Fee */}
             <div>
               <label>Fee:</label>
-              <input type="number" step="0.00000001" {...register("fee", { valueAsNumber: true })} />
+              <input
+                type="number"
+                step="0.00000001"
+                {...register("fee", { valueAsNumber: true })}
+              />
               <select {...register("feeCurrency")}>
                 <option value="">Select Fee Currency</option>
                 <option value="USD">USD</option>
@@ -357,6 +425,7 @@ const TransactionForm: React.FC = () => {
             </div>
           </div>
         );
+
       case "buy":
         return (
           <div>
@@ -369,7 +438,10 @@ const TransactionForm: React.FC = () => {
               <input
                 type="number"
                 step="0.01"
-                {...register("amountUSD", { required: "Amount USD is required", valueAsNumber: true })}
+                {...register("amountUSD", {
+                  required: "Amount USD is required",
+                  valueAsNumber: true,
+                })}
               />
               {errors.amountUSD && <span>{errors.amountUSD.message}</span>}
             </div>
@@ -378,13 +450,20 @@ const TransactionForm: React.FC = () => {
               <input
                 type="number"
                 step="0.00000001"
-                {...register("amountBTC", { required: "Amount BTC is required", valueAsNumber: true })}
+                {...register("amountBTC", {
+                  required: "Amount BTC is required",
+                  valueAsNumber: true,
+                })}
               />
               {errors.amountBTC && <span>{errors.amountBTC.message}</span>}
             </div>
             <div>
               <label>Fee:</label>
-              <input type="number" step="0.00000001" {...register("fee", { valueAsNumber: true })} />
+              <input
+                type="number"
+                step="0.00000001"
+                {...register("fee", { valueAsNumber: true })}
+              />
               <select {...register("feeCurrency")}>
                 <option value="">Select Fee Currency</option>
                 <option value="USD">USD</option>
@@ -393,6 +472,7 @@ const TransactionForm: React.FC = () => {
             </div>
           </div>
         );
+
       case "sell":
         return (
           <div>
@@ -400,13 +480,15 @@ const TransactionForm: React.FC = () => {
               <label>Account:</label>
               <input type="text" value="Exchange" readOnly {...register("account")} />
             </div>
-            {/* Removed the trade type toggle since it's not needed */}
             <div>
               <label>Amount BTC:</label>
               <input
                 type="number"
                 step="0.00000001"
-                {...register("amountBTC", { required: "Amount BTC is required", valueAsNumber: true })}
+                {...register("amountBTC", {
+                  required: "Amount BTC is required",
+                  valueAsNumber: true,
+                })}
               />
               {errors.amountBTC && <span>{errors.amountBTC.message}</span>}
             </div>
@@ -415,13 +497,20 @@ const TransactionForm: React.FC = () => {
               <input
                 type="number"
                 step="0.01"
-                {...register("amountUSD", { required: "Amount USD is required", valueAsNumber: true })}
+                {...register("amountUSD", {
+                  required: "Amount USD is required",
+                  valueAsNumber: true,
+                })}
               />
               {errors.amountUSD && <span>{errors.amountUSD.message}</span>}
             </div>
             <div>
               <label>Fee:</label>
-              <input type="number" step="0.00000001" {...register("fee", { valueAsNumber: true })} />
+              <input
+                type="number"
+                step="0.00000001"
+                {...register("fee", { valueAsNumber: true })}
+              />
               <select {...register("feeCurrency")}>
                 <option value="">Select Fee Currency</option>
                 <option value="USD">USD</option>
@@ -430,6 +519,7 @@ const TransactionForm: React.FC = () => {
             </div>
           </div>
         );
+
       default:
         return null;
     }
@@ -437,6 +527,7 @@ const TransactionForm: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
+      {/* Transaction Type dropdown */}
       <div>
         <label>Transaction Type:</label>
         <select value={currentType} onChange={onTransactionTypeChange} required>
@@ -448,6 +539,8 @@ const TransactionForm: React.FC = () => {
           <option value="sell">Sell</option>
         </select>
       </div>
+
+      {/* Date & Time field */}
       <div>
         <label>Date &amp; Time:</label>
         <input
@@ -457,8 +550,10 @@ const TransactionForm: React.FC = () => {
         {errors.dateTime && <span>{errors.dateTime.message}</span>}
       </div>
 
+      {/* Render transaction-specific fields */}
       {renderDynamicFields()}
 
+      {/* Submit */}
       <button type="submit">Submit Transaction</button>
     </form>
   );
