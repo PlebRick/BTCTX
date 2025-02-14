@@ -33,8 +33,20 @@ ALGORITHM = "HS256"
 # JWT_ACCESS_TOKEN_EXPIRE_MINUTES is expected to be set in .env as JWT_ACCESS_TOKEN_EXPIRE_MINUTES.
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
+# Provide a fallback list of allowed origins if nothing is set in .env
+default_origins = (
+    "http://127.0.0.1:3000,"
+    "http://localhost:3000,"
+    "http://127.0.0.1:5173,"
+    "http://localhost:5173"
+)
+
+# Read the env var; if not present, default to the above
+raw_origins = os.getenv("CORS_ALLOW_ORIGINS", default_origins)
+
 # Retrieve allowed origins for CORS; these should be defined as a comma-separated list in .env.
-ALLOWED_ORIGINS = os.getenv("CORS_ALLOW_ORIGINS", "http://127.0.0.1:3000").split(",")
+# Split by comma and strip whitespace
+ALLOWED_ORIGINS = [origin.strip() for origin in raw_origins.split(",")]
 
 # Set up OAuth2 scheme for JWT authentication.
 # The tokenUrl should point to the endpoint that issues tokens (e.g., /api/token).

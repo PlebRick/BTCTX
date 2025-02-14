@@ -37,7 +37,7 @@ def get_transactions(db: Session = Depends(get_db)):
     transactions = db.query(Transaction).order_by(Transaction.timestamp.desc()).all()
     return transactions
 
-@router.post("/", response_model=TransactionRead)
+@router.post("", response_model=TransactionRead)
 def create_transaction(
     transaction: TransactionCreate,
     db: Session = Depends(get_db)
