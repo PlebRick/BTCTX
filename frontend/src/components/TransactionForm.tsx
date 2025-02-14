@@ -9,30 +9,22 @@ type TransactionType = "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
 
 type AccountType = "Bank" | "Wallet" | "Exchange";
 
-// The backend's TransactionSource enum has these values:
 type DepositSource = "N/A" | "My BTC" | "Gift" | "Income" | "Interest" | "Reward";
-
-// The backend's TransactionPurpose enum:
 type WithdrawalPurpose = "N/A" | "Spent" | "Gift" | "Donation" | "Lost";
-
 type Currency = "USD" | "BTC";
 
-// The shape of the form data we'll capture before sending to the backend
+// The shape of the form data we'll capture
 interface TransactionFormData {
-  // Basic
+  // Basic fields
   type: TransactionType;
-  timestamp: string;        // We'll convert to ISO string for the backend
-
-  // Single-Account transactions (Deposit, Withdrawal, Buy, Sell)
+  timestamp: string; // We'll convert to ISO string for the backend
   account?: AccountType;
   currency?: Currency;
   amount?: number;
-  source?: DepositSource;   // Only used if type = "Deposit"
-  purpose?: WithdrawalPurpose; // Only used if type = "Withdrawal"
-  fee?: number;             // Always in USD
-
-  // Cost Basis for a BTC deposit
-  costBasisUSD?: number;
+  source?: DepositSource;          // For deposit
+  purpose?: WithdrawalPurpose;     // For withdrawal
+  fee?: number;                    // Always in USD
+  costBasisUSD?: number;           // For BTC deposits
 
   // Transfer fields
   fromAccount?: AccountType;
@@ -48,11 +40,8 @@ interface TransactionFormData {
 }
 
 // --------------------------------------------------
-// 2) Label Dictionaries (Optional User-Friendly Text)
+// 2) Label Dictionaries for Display
 // --------------------------------------------------
-
-// Here, we keep the actual keys the same as the backend, 
-// but you can change the displayed labels if you want.
 const transactionTypeLabels: Record<TransactionType, string> = {
   Deposit: "Deposit",
   Withdrawal: "Withdrawal",
@@ -61,7 +50,6 @@ const transactionTypeLabels: Record<TransactionType, string> = {
   Sell: "Sell",
 };
 
-// If you want to do the same for accounts or any other field, you can.
 const accountLabels: Record<AccountType, string> = {
   Bank: "Bank Account",
   Wallet: "Bitcoin Wallet",
@@ -69,7 +57,7 @@ const accountLabels: Record<AccountType, string> = {
 };
 
 // --------------------------------------------------
-// 3) Helpers: Converting AccountType -> numeric ID
+// 3) Helper: Convert AccountType -> numeric ID
 // --------------------------------------------------
 function mapAccountToId(account?: AccountType): number {
   switch (account) {
@@ -80,12 +68,12 @@ function mapAccountToId(account?: AccountType): number {
     case "Exchange":
       return 3;
     default:
-      return 0; // or throw an error
+      return 0;
   }
 }
 
 // --------------------------------------------------
-// 4) The Form Component
+// 4) TransactionForm Component
 // --------------------------------------------------
 const TransactionForm: React.FC = () => {
   const {
@@ -97,7 +85,6 @@ const TransactionForm: React.FC = () => {
     formState: { errors },
   } = useForm<TransactionFormData>({
     defaultValues: {
-      // By default, set the timestamp to "now" for a datetime-local input
       timestamp: new Date().toISOString().slice(0, 16),
       fee: 0,
       costBasisUSD: 0,
@@ -110,8 +97,7 @@ const TransactionForm: React.FC = () => {
   const account = watch("account");
   const currency = watch("currency");
   const fromAccount = watch("fromAccount");
-  const toAccount = watch("toAccount");
-
+  
   // (A) Auto-set currency for deposit/withdrawal
   useEffect(() => {
     if (currentType === "Deposit" || currentType === "Withdrawal") {
@@ -124,29 +110,65 @@ const TransactionForm: React.FC = () => {
     }
   }, [account, currentType, setValue]);
 
-  // (B) Auto-set fromCurrency/toCurrency for transfers
-  useEffect(() => {
-    if (currentType === "Transfer") {
-      if (fromAccount === "Bank") {
-        setValue("fromCurrency", "USD");
-        setValue("toAccount", "Exchange");
-        setValue("toCurrency", "USD");
-      } else if (fromAccount === "Wallet") {
-        setValue("fromCurrency", "BTC");
-        setValue("toAccount", "Exchange");
-        setValue("toCurrency", "BTC");
-      } else if (fromAccount === "Exchange") {
-        const selectedCurrency = watch("fromCurrency");
-        if (selectedCurrency === "USD") {
-          setValue("toAccount", "Bank");
-          setValue("toCurrency", "USD");
-        } else if (selectedCurrency === "BTC") {
-          setValue("toAccount", "Wallet");
-          setValue("toCurrency", "BTC");
-        }
-      }
+  // 1) Create a local variable to store the "fromCurrency" value from the form.
+//    This way, we can reference it easily in our effect below.
+const fromCurrencyVal = watch("fromCurrency");
+
+// 2) Auto-set fromCurrency/toCurrency for Transfers.
+//
+// This effect runs whenever:
+//   - The transaction type (`currentType`) changes
+//   - The "fromAccount" field changes
+//   - The user changes the "fromCurrency" for "Exchange"
+//
+// By watching these dependencies, we ensure that when the user picks
+// "Exchange" and then chooses "USD" or "BTC", the effect re-runs
+// and sets the correct destination (toAccount/toCurrency).
+useEffect(() => {
+  // If the selected transaction type is NOT "Transfer," do nothing.
+  if (currentType !== "Transfer") return;
+
+  // CASE A: User picked "Bank" for fromAccount.
+  //   - The only currency for a bank is USD.
+  //   - The receiving account is always "Exchange" with "USD".
+  if (fromAccount === "Bank") {
+    setValue("fromCurrency", "USD");   // Bank -> fromCurrency=USD
+    setValue("toAccount", "Exchange"); // toAccount=Exchange
+    setValue("toCurrency", "USD");     // Exchange side is also USD
+  }
+
+  // CASE B: User picked "Wallet" for fromAccount.
+  //   - The only currency for a wallet is BTC.
+  //   - The receiving account is always "Exchange" with "BTC".
+  else if (fromAccount === "Wallet") {
+    setValue("fromCurrency", "BTC");   // Wallet -> fromCurrency=BTC
+    setValue("toAccount", "Exchange"); // toAccount=Exchange
+    setValue("toCurrency", "BTC");     // Exchange side is also BTC
+  }
+
+  // CASE C: User picked "Exchange" for fromAccount.
+  //   - We don't *assume* a currency, because the Exchange can do both USD & BTC.
+  //   - The user picks fromCurrency in a dropdown, so we read the current value 
+  //     from our local "fromCurrencyVal".
+  //   - Then we auto-populate the receiving side based on that choice.
+  else if (fromAccount === "Exchange") {
+    if (fromCurrencyVal === "USD") {
+      // If Exchange side is sending USD, the destination is a Bank (USD).
+      setValue("toAccount", "Bank");
+      setValue("toCurrency", "USD");
+    } else if (fromCurrencyVal === "BTC") {
+      // If Exchange side is sending BTC, the destination is a Wallet (BTC).
+      setValue("toAccount", "Wallet");
+      setValue("toCurrency", "BTC");
     }
-  }, [fromAccount, toAccount, currentType, setValue, watch]);
+  }
+}, [
+  // This is the list of dependencies that re-trigger the effect if any change:
+  currentType,     // If the user changes the transaction type away from Transfer, skip.
+  fromAccount,     // If the user changes the 'fromAccount' select (Bank, Wallet, Exchange).
+  fromCurrencyVal, // If the user changes the 'fromCurrency' while on Exchange, we update toAccount/toCurrency.
+  setValue         // We need setValue in scope to actually set the form fields.
+]);
 
   // (C) Reset form if user changes the transaction type
   const onTransactionTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -166,20 +188,15 @@ const TransactionForm: React.FC = () => {
     currency === "BTC" &&
     (account === "Wallet" || account === "Exchange");
 
-  // (E) Submit Handler: build the final payload for the backend
+  // (E) Submit Handler
   const onSubmit: SubmitHandler<TransactionFormData> = async (data) => {
-    // Convert the local datetime to an ISO string
     const isoTimestamp = new Date(data.timestamp).toISOString();
-
-    // Default values
     let amountUSD = 0.0;
     let amountBTC = 0.0;
-    let source: string = "N/A";
-    let purpose: string = "N/A";
+    let source = "N/A";
+    let purpose = "N/A";
     let accountId = 0;
 
-    // The 'type' here already matches the backend exactly 
-    // (e.g. "Deposit", "Withdrawal", etc.).
     switch (data.type) {
       case "Deposit":
         accountId = mapAccountToId(data.account);
@@ -202,36 +219,34 @@ const TransactionForm: React.FC = () => {
         break;
 
       case "Transfer":
-        // Single-record transfer is incomplete in the DB. We only store 'from' side.
+        // Single-record model: store only the "from" side
         accountId = mapAccountToId(data.fromAccount);
         if (data.fromCurrency === "USD") {
           amountUSD = data.amountFrom || 0;
         } else {
           amountBTC = data.amountFrom || 0;
         }
-        // The "to" side is just UI-only for now
         break;
 
       case "Buy":
-        accountId = 3; // Exchange ID
+        accountId = 3; // Exchange
         amountUSD = data.amountUSD || 0;
         amountBTC = data.amountBTC || 0;
         break;
 
       case "Sell":
-        accountId = 3; // Exchange ID
+        accountId = 3; // Exchange
         amountUSD = data.amountUSD || 0;
         amountBTC = data.amountBTC || 0;
         break;
     }
 
-    // If we're depositing BTC, we might have a cost basis
+    // If depositing BTC, we might have a cost basis
     const finalCostBasis = showCostBasisField ? (data.costBasisUSD || 0) : 0;
 
-    // Build the final payload for the backend
     const transactionPayload = {
       account_id: accountId,
-      type: data.type,           // e.g. "Deposit"
+      type: data.type,
       amount_usd: amountUSD,
       amount_btc: amountBTC,
       timestamp: isoTimestamp,
@@ -245,36 +260,31 @@ const TransactionForm: React.FC = () => {
     console.log("Submitting transaction to backend:", transactionPayload);
 
     try {
-      // Adjust the URL as needed; add auth headers if required.
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/transactions",
+        "http://127.0.0.1:8000/api/transactions", 
         transactionPayload
       );
       console.log("Transaction created:", response.data);
 
-      // Reset form or set success message
       reset();
       setCurrentType("");
       alert("Transaction created successfully!");
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        // Error is specifically an AxiosError
         console.error("Axios error creating transaction:", error.response?.data);
         const message = error.response?.data?.detail || error.message || "An error occurred";
         alert(`Failed to create transaction: ${message}`);
       } else if (error instanceof Error) {
-        // Error is a generic JS Error
         console.error("Error creating transaction:", error.message);
         alert(`Failed to create transaction: ${error.message}`);
       } else {
-        // Fallback for anything else (non-Error objects, etc.)
         console.error("Unexpected error creating transaction:", error);
         alert("An unexpected error occurred while creating the transaction.");
       }
     }
   };
 
-  // (F) Render dynamic fields for each transaction type
+  // (F) Render dynamic fields
   const renderDynamicFields = () => {
     switch (currentType) {
       case "Deposit":
@@ -415,7 +425,6 @@ const TransactionForm: React.FC = () => {
             </div>
             <div>
               <label>From Currency:</label>
-              {/* If fromAccount === "Exchange", user can choose; else read-only */}
               {fromAccount === "Exchange" ? (
                 <select {...register("fromCurrency", { required: true })}>
                   <option value="">Select Currency</option>
@@ -436,10 +445,8 @@ const TransactionForm: React.FC = () => {
               />
               {errors.amountFrom && <span>Amount (From) is required</span>}
             </div>
-            {/* 
-              The "toAccount" / "toCurrency" are auto-filled or read-only in this UI.
-              We do not store them in the single transaction row, so it's mostly for display.
-            */}
+
+            {/* We auto-populate the toAccount/toCurrency, just for display */}
             <div>
               <label>To Account:</label>
               <input type="text" {...register("toAccount")} readOnly />
@@ -533,10 +540,9 @@ const TransactionForm: React.FC = () => {
     }
   };
 
-  // (G) Final JSX
+  // (G) Return the JSX form
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      {/* Transaction Type */}
       <div>
         <label>Transaction Type:</label>
         <select value={currentType} onChange={onTransactionTypeChange} required>
@@ -549,9 +555,8 @@ const TransactionForm: React.FC = () => {
         </select>
       </div>
 
-      {/* Date & Time */}
       <div>
-        <label>Date &amp; Time:</label>
+        <label>Date & Time:</label>
         <input
           type="datetime-local"
           {...register("timestamp", { required: "Date & Time is required" })}
@@ -559,7 +564,7 @@ const TransactionForm: React.FC = () => {
         {errors.timestamp && <span>{errors.timestamp.message}</span>}
       </div>
 
-      {/* Dynamic Fields */}
+      {/* Render fields specific to the chosen transaction type */}
       {renderDynamicFields()}
 
       <button type="submit">Submit Transaction</button>
