@@ -1,26 +1,26 @@
 // src/components/AppLayout.tsx
 import React from 'react';
-import Header from './Header';
 import Sidebar from './Sidebar';
-import Footer from './Footer';
+import Header from './Header';
 
 interface LayoutProps {
-  children: React.ReactNode;
+  pageTitle: string;         // The title to show in the Header
+  children: React.ReactNode; // Page content
 }
 
-const AppLayout: React.FC<LayoutProps> = ({ children }) => {
+const AppLayout: React.FC<LayoutProps> = ({ pageTitle, children }) => {
   return (
-    <div className="app-layout">
-      <Header />
+    <div className="app-container">
+      {/* Sidebar on the left, full height */}
+      <Sidebar />
 
-      <div className="layout-body">
-        <Sidebar />
+      {/* Content area on the right */}
+      <div className="content-area">
+        <Header pageTitle={pageTitle} />
         <main className="main-content">
           {children}
         </main>
       </div>
-
-      <Footer />
     </div>
   );
 };

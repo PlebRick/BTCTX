@@ -1,6 +1,6 @@
 // src/App.tsx
 import React from 'react';
-import './styles/app.css'; // Theme & layout
+import './styles/app.css';  // global theme + layout
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 import AppLayout from './components/AppLayout';
@@ -11,34 +11,44 @@ import Settings from './pages/Settings';
 
 const App: React.FC = () => {
   return (
-    <AppLayout>
-      <Routes>
-        {/* Redirect root to /dashboard */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+    <Routes>
+      {/* Redirect root to /dashboard */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/transactions" element={<Transactions />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/settings" element={<Settings />} />
-      </Routes>
-    </AppLayout>
+      <Route
+        path="/dashboard"
+        element={
+          <AppLayout pageTitle="Dashboard">
+            <Dashboard />
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/transactions"
+        element={
+          <AppLayout pageTitle="Transactions">
+            <Transactions />
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <AppLayout pageTitle="Reports">
+            <Reports />
+          </AppLayout>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <AppLayout pageTitle="Settings">
+            <Settings />
+          </AppLayout>
+        }
+      />
+    </Routes>
   );
 };
 
 export default App;
-
-
-
-
-/* Set TransactionPage as the default page for testing
-const App: React.FC = () => {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<TransactionPage />} />
-        <Route path="/transaction" element={<TransactionPage />} />
-      </Routes>
-    </Router>
-  );
-};
-*/

@@ -1,114 +1,150 @@
-/* src/styles/app.css */
-
-/* -----------------------
-   1) THEME VARIABLES
------------------------- */
+/* =======================
+   Theme & Global
+======================= */
 :root {
-    --color-bg: #121212;       /* Overall background */
-    --color-panel: #1c1c1c;    /* Header/Sidebar/Panel backgrounds */
-    --color-text: #ffffff;     /* Main text color */
-    --color-text-dim: #cfcfcf; /* Less prominent text color */
-    --color-accent: #d9a75f;   /* Gold accent for buttons */
-    --color-accent-hover: #e0b76b;
-  }
-  
-  /* Basic body styling */
-  body {
-    background-color: var(--color-bg);
-    color: var(--color-text);
-    font-family: sans-serif;
-  }
-  
-  /* -----------------------
-     2) LAYOUT STRUCTURE
-  ------------------------ */
-  
-  /* App layout: Vertical stack of Header -> Body -> Footer */
-  .app-layout {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-  
-  /* The region that holds Sidebar + Main Content side-by-side */
-  .layout-body {
-    display: flex;
-    flex: 1;
-  }
-  
-  /* Header styles */
-  .header {
-    background-color: var(--color-panel);
-    padding: 1rem;
-    border-bottom: 1px solid #333;
+  --color-bg: #121212;       /* main page background */
+  --color-panel: #1c1c1c;    /* sidebar background */
+  --color-header: #121212;   /* header background in-between */
+  --color-text: #ffffff;
+  --color-text-dim: #cfcfcf;
+  --color-accent: #d9a75f;
+  --color-accent-hover: #e0b76b;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: sans-serif;
+}
+
+/* =======================
+   Layout Container
+======================= */
+.app-container {
+  display: flex; 
+  /* Sidebar on left, content on right */
+}
+
+/* =======================
+   Sidebar (Left)
+======================= */
+.sidebar {
+  background-color: var(--color-panel);
+  width: 210px;
+  min-height: 100vh; /* full vertical height */
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+/* Top brand area: large logo + text */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  height: 64px;     /* matches header height */
+  padding-left: 1rem;  /* side padding if needed */
+}
+
+/* The logo is round */
+.sidebar-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  transform: translateY(-1px);
+}
+
+/* "BitcoinTX" larger & bright white */
+.sidebar-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #fff; 
+  margin-left: 0.5rem;
+}
+
+.sidebar-divider {
+  border: none;                /* remove the default hr border */
+  border-top: 1px solid #333;  /* replace it with a subtle top border */
+  margin: 0 rem 0;            /* top/bottom spacing */
+  /* You can tweak margin and color as you like */
+}
+
+/* Nav links in the middle */
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  /* add top padding so nav items aren’t glued to the border */
+  padding: 1rem;
+}
+
+/* Nav items with darker hover & corner radius */
+.nav-item {
+  display: block;
+  padding: 0.5rem 0.75rem; /* horizontal padding for consistent hover shape */
+  color: var(--color-text-dim);
+  transition: color 0.2s, background-color 0.2s;
+  margin-bottom: 0.25rem;
+  border-radius: 6px; /* corners for normal state */
+}
+.nav-item:hover {
+  color: var(--color-text);
+  background-color: #121212;
+  border-radius: 6px; /* ensure corners remain rounded on hover */
+}
+
+/* Button pinned to bottom, centered horizontally */
+.sidebar-btn {
+  margin-top: auto;
+  margin-left: auto;     /* center horizontally */
+  margin-right: auto;    /* center horizontally */
+  margin-bottom: 2rem;   /* some space from bottom */
+  background-color: var(--color-accent);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  max-width: 160px;
+}
+.sidebar-btn:hover {
+  background-color: var(--color-accent-hover);
+}
+
+/* =======================
+   Content Area (Right)
+======================= */
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header – fix height to 64px so it lines up with the sidebar brand block.
+   Also add a bottom border that lines up with .sidebar-divider. */
+   .header {
+    background: linear-gradient(to bottom, #000000, #121212);
+    height: 64px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    padding: 0 1rem;
   }
-  .header .brand {
-    font-size: 1.25rem;
-    font-weight: bold;
-  }
-  
-  /* Sidebar styles */
-  .sidebar {
-    width: 240px;
-    background-color: var(--color-panel);
-    padding: 1rem;
-  }
-  
-  /* Nav items (links) in the sidebar */
-  .sidebar .nav-item {
-    display: block;
-    padding: 0.5rem 0;
-    color: var(--color-text-dim);
-    transition: color 0.2s, background-color 0.2s;
-    margin-bottom: 0.25rem;
-  }
-  .sidebar .nav-item:hover {
-    color: var(--color-text);
-    background-color: #1a1a1a; /* Subtle hover highlight */
-  }
-  
-  /* Main content area (right side) */
-  .main-content {
-    flex: 1;
-    padding: 1rem;
-  }
-  
-  /* Footer styles */
-  .footer {
-    background-color: var(--color-panel);
-    color: var(--color-text-dim);
-    text-align: center;
-    padding: 0.5rem;
-    border-top: 1px solid #333;
-  }
-  
-  /* -----------------------
-     3) SHARED COMPONENT STYLES
-  ------------------------ */
-  
-  /* Accent button: gold background, black text */
-  .btn {
-    background-color: var(--color-accent);
-    color: #000;
-    border: none;
-    border-radius: 4px;
-    padding: 0.75rem 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    margin-top: 1rem; /* optional spacing */
-  }
-  .btn:hover {
-    background-color: var(--color-accent-hover);
-  }
-  
-  /* Example card/panel style (optional) */
-  .card {
-    background-color: var(--color-panel);
-    border-radius: 6px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-  }
+
+/* Match nav-item's font size & color exactly */
+.header-title {
+  color: var(--color-text-dim);
+  font-size: 1rem; 
+  /* No margin needed, but adjust as you see fit */
+  margin: 0;
+}
+
+/* Main content below header */
+.main-content {
+  flex: 1;
+  padding: 1rem;
+}

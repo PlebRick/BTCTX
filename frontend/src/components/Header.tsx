@@ -1,11 +1,15 @@
 // src/components/Header.tsx
 import React from 'react';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  pageTitle: string;
+}
+
+const Header: React.FC<HeaderProps> = ({ pageTitle }) => {
   return (
     <header className="header">
-      <div className="brand">BitcoinTX</div>
-      {/* You could add a user profile, search, or other controls on the right */}
+      <div className="header-title">{pageTitle}</div>
+      {/* If needed: right-side items here */}
     </header>
   );
 };
