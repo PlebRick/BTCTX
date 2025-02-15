@@ -1,15 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import '../styles/transactionPanel.css'; // Keep your existing CSS import
-
-// (NEW) Import your real TransactionForm
 import TransactionForm from '../components/TransactionForm';
 
 interface TransactionPanelProps {
+  /** Controls if the panel is visible */
   isOpen: boolean;
+  /** Callback to close the panel */
   onClose: () => void;
+  /**
+   * (Optional) If the parent wants to know
+   * when a transaction is submitted successfully
+   * (e.g. to refresh data), it can pass this prop.
+   */
+  onSubmitSuccess?: () => void;
 }
 
-const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose }) => {
+const TransactionPanel: React.FC<TransactionPanelProps> = ({
+  isOpen,
+  onClose,
+  onSubmitSuccess,
+}) => {
   // Track if the form has been modified (dirty)
   const [isFormDirty, setIsFormDirty] = useState(false);
 
@@ -25,7 +35,7 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose }) 
   }, [isOpen]);
 
   // ------------------------------------------------------------
-  // (A) Overly click logic:
+  // (A) Overlay click logic:
   //     If form is not dirty -> close immediately.
   //     If form is dirty -> show discard confirmation.
   // ------------------------------------------------------------
@@ -50,15 +60,20 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose }) 
 
   // ------------------------------------------------------------
   // (B) Called from TransactionForm after a successful POST
-  //     -> close this panel so user sees the updated list
   // ------------------------------------------------------------
   const handleFormSubmitSuccess = () => {
+    // (1) Close this panel
     onClose();
+
+    // (2) If parent's callback is given, call it
+    if (onSubmitSuccess) {
+      onSubmitSuccess();
+    }
   };
 
   // ------------------------------------------------------------
-  // (C) We'll rely on the form's "id" to let our panel's 
-  //     "Save Transaction" button trigger a submit.
+  // (C) We'll rely on the form's "id" so that our panel's
+  //     "Save Transaction" button can submit that form
   // ------------------------------------------------------------
   const FORM_ID = "transactionFormId";
 
@@ -76,12 +91,10 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose }) 
           <h2>Add Transaction</h2>
         </div>
 
-        {/* Main content area -- now containing the REAL TransactionForm */}
+        {/* Main content area -- containing the REAL TransactionForm */}
         <div className="panel-body">
           <TransactionForm
-            // The form uses an id so the panel button can submit it
-            // see (E) below.
-            // We'll also pass our isDirty callback & submit success callback
+            id={FORM_ID} // The form "id" that <button form=...> references
             onDirtyChange={(dirty) => setIsFormDirty(dirty)}
             onSubmitSuccess={handleFormSubmitSuccess}
           />
@@ -92,7 +105,7 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({ isOpen, onClose }) 
           {/* 
             (D) We reference the form by "form=FORM_ID" 
             and specify type="submit". 
-            This means clicking this button will submit 
+            Clicking this button will submit 
             the form that has id={FORM_ID} in TransactionForm.
           */}
           <button 

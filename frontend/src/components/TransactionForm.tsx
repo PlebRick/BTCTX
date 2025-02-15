@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import axios from "axios";
-import "../styles/transactionForm.css"; // updated below
+import "../styles/transactionForm.css";
 
+/** Possible transaction types */
 type TransactionType = "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
+/** Possible account types */
 type AccountType = "Bank" | "Wallet" | "Exchange";
+
+/** Additional dropdown enumerations */
 type DepositSource = "N/A" | "My BTC" | "Gift" | "Income" | "Interest" | "Reward";
 type WithdrawalPurpose = "N/A" | "Spent" | "Gift" | "Donation" | "Lost";
 type Currency = "USD" | "BTC";
 
+/** Data we collect from the form */
 interface TransactionFormData {
   type: TransactionType;
   timestamp: string; 
@@ -33,6 +38,7 @@ interface TransactionFormData {
   amountBTC?: number;
 }
 
+/** Label dictionaries for display */
 const transactionTypeLabels: Record<TransactionType, string> = {
   Deposit: "Deposit",
   Withdrawal: "Withdrawal",
@@ -47,6 +53,7 @@ const accountLabels: Record<AccountType, string> = {
   Exchange: "Exchange",
 };
 
+/** Helper to map account type -> numeric ID in your backend */
 function mapAccountToId(account?: AccountType): number {
   switch (account) {
     case "Bank":
@@ -60,15 +67,20 @@ function mapAccountToId(account?: AccountType): number {
   }
 }
 
+/** Props for TransactionForm */
 interface TransactionFormProps {
+  id?: string;
   onDirtyChange?: (dirty: boolean) => void;
   onSubmitSuccess?: () => void;
 }
 
+/** The TransactionForm component */
 const TransactionForm: React.FC<TransactionFormProps> = ({
+  id,
   onDirtyChange,
   onSubmitSuccess,
 }) => {
+  // Initialize react-hook-form
   const {
     register,
     handleSubmit,
@@ -78,20 +90,23 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     formState: { errors, isDirty },
   } = useForm<TransactionFormData>({
     defaultValues: {
+      // Pre-fill timestamp as now, but in local datetime format
       timestamp: new Date().toISOString().slice(0, 16),
       fee: 0,
       costBasisUSD: 0,
     },
   });
 
+  // Track the currently selected transaction type (for dynamic fields)
   const [currentType, setCurrentType] = useState<TransactionType | "">("");
 
+  // Watch needed form fields for dynamic behaviors
   const account = watch("account");
   const currency = watch("currency");
   const fromAccount = watch("fromAccount");
   const fromCurrencyVal = watch("fromCurrency");
 
-  // Notify parent if 'isDirty' changes
+  // Notify parent if the form's dirty state changes
   useEffect(() => {
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
@@ -104,14 +119,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       } else if (account === "Wallet") {
         setValue("currency", "BTC");
       }
-      // If "Exchange", user must choose
+      // If account === "Exchange", user must pick
     }
   }, [account, currentType, setValue]);
 
-  // Auto-set fromCurrency/toCurrency for transfers
+  // Auto-set from/to for transfers
   useEffect(() => {
     if (currentType !== "Transfer") return;
-
     if (fromAccount === "Bank") {
       setValue("fromCurrency", "USD");
       setValue("toAccount", "Exchange");
@@ -131,7 +145,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   }, [currentType, fromAccount, fromCurrencyVal, setValue]);
 
-  // Reset form on transaction type change
+  // Reset form if user selects a new transaction type
   const onTransactionTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedType = e.target.value as TransactionType;
     setCurrentType(selectedType);
@@ -143,13 +157,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     });
   };
 
-  // Show cost basis if deposit + BTC
+  // Show cost-basis only if deposit + BTC
   const showCostBasisField =
     currentType === "Deposit" &&
     currency === "BTC" &&
     (account === "Wallet" || account === "Exchange");
 
-  // Form submit
+  // onSubmit handler for the entire form
   const onSubmit: SubmitHandler<TransactionFormData> = async (data) => {
     const isoTimestamp = new Date(data.timestamp).toISOString();
     let amountUSD = 0.0;
@@ -158,6 +172,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     let purpose = "N/A";
     let accountId = 0;
 
+    // Determine which fields go where, based on the transaction type
     switch (data.type) {
       case "Deposit":
         accountId = mapAccountToId(data.account);
@@ -190,14 +205,17 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
       case "Buy":
       case "Sell":
-        accountId = 3; // Exchange
+        // For Buy/Sell, we assume the account is always "Exchange"
+        accountId = 3;
         amountUSD = data.amountUSD || 0;
         amountBTC = data.amountBTC || 0;
         break;
     }
 
+    // If we are depositing BTC, get cost basis from the user input
     const finalCostBasis = showCostBasisField ? (data.costBasisUSD || 0) : 0;
 
+    // Build the payload for the backend
     const transactionPayload = {
       account_id: accountId,
       type: data.type,
@@ -211,6 +229,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       is_locked: false,
     };
 
+    // Send to the server
     try {
       const response = await axios.post(
         "http://127.0.0.1:8000/api/transactions",
@@ -218,11 +237,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       );
       console.log("Transaction created:", response.data);
 
+      // Reset the form to its default
       reset();
       setCurrentType("");
 
+      // Let the user know it succeeded
       alert("Transaction created successfully!");
 
+      // If a parent callback is provided, call it
       onSubmitSuccess?.();
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -237,7 +259,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   };
 
-  // Dynamic fields
+  // Dynamically render fields based on transaction type
   const renderDynamicFields = () => {
     switch (currentType) {
       case "Deposit":
@@ -334,6 +356,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             )}
           </>
         );
+
       case "Withdrawal":
         return (
           <>
@@ -416,6 +439,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             </div>
           </>
         );
+
       case "Transfer":
         return (
           <>
@@ -513,6 +537,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             </div>
           </>
         );
+
       case "Buy":
         return (
           <>
@@ -561,6 +586,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             </div>
           </>
         );
+
       case "Sell":
         return (
           <>
@@ -614,14 +640,16 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   };
 
+  // Final render: transaction type & date/time + dynamic fields
   return (
     <form
-      id="transactionFormId" /* important so the panel's button can submit */
+      // 2) Use the passed 'id' or default to "transactionFormId"
+      id={id || "transactionFormId"}
       className="transaction-form"
       onSubmit={handleSubmit(onSubmit)}
     >
       <div className="form-fields-grid">
-        {/* Top row: Transaction Type & Date/Time */}
+        {/* The top row: Transaction Type & Date/Time */}
         <div className="form-group">
           <label>Transaction Type:</label>
           <select
@@ -651,15 +679,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           )}
         </div>
 
-        {/* Dynamic fields: Deposit/Withdrawal/Transfer/Buy/Sell */}
+        {/* Dynamic fields go here */}
         {renderDynamicFields()}
 
-        {/* If you want to hide the internal submit button, remove or comment out below */}
-        {/* <div className="form-group" style={{ gridColumn: "1 / -1" }}>
+        {/* Optional internal submit button (commented out) 
+            The parent panel can also provide a "Save" button 
+            referencing form="transactionFormId" 
+        */}
+        {/*
+        <div className="form-group" style={{ gridColumn: "1 / -1" }}>
           <button type="submit" className="submit-button">
             Submit Transaction
           </button>
-        </div> */}
+        </div>
+        */}
       </div>
     </form>
   );
