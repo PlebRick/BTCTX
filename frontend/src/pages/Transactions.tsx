@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import TransactionPanel from "../components/TransactionPanel";
+import '../styles/transactions.css';
 
 // Example transaction interface (or import from a types folder)
 interface ITransaction {
@@ -103,7 +104,6 @@ const Transactions: React.FC = () => {
   // ------------------------------------------------------------
   return (
     <div className="transactions-page" style={{ padding: "1rem" }}>
-      <h2>Transactions</h2>
 
       {/* Add Transaction button */}
       <button className="accent-btn" onClick={openPanel}>
