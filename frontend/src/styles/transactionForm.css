@@ -1,66 +1,68 @@
 /* transactionForm.css */
+/*
+  A suggested stylesheet for your TransactionForm in a dark + gold accent theme.
+  Import this in TransactionForm.tsx via:
+  import "../styles/transactionForm.css";
+*/
 
-/* Top-level form container */
+/* The overall form container */
 .transaction-form {
     display: flex;
     flex-direction: column;
-    gap: 1rem; /* spacing between sections of the form */
+    gap: 1rem; /* spacing between major sections */
     color: var(--color-text);
-    font-size: 0.75rem;
+    font-size: 0.9rem; /* slightly smaller font than before */
   }
   
-  /* Each field: label + input/select + error message */
+  /* Each label + input (or select) pair */
   .form-group {
     display: flex;
     flex-direction: column;
-    margin-bottom: 0.5rem; /* vertical space between groups */
+    margin-bottom: 0.75rem; /* vertical spacing between fields */
   }
   
-  /* The label above each input */
+  /* The label styling */
   .form-group label {
     font-weight: 500;
     margin-bottom: 0.25rem;
   }
   
-  /* The actual inputs and selects */
+  /* Inputs and selects share this .form-control class */
   .form-control {
-    padding: 0.3rem;
-    background-color: #1a1a1a; /* or var(--color-bg) / var(--color-panel) */
+    padding: 0.5rem;
+    background-color: #1a1a1a; /* or var(--color-panel) if you prefer */
     color: var(--color-text);
     border: 1px solid #444;
     border-radius: 4px;
-    font-size: 0.75rem;
+    font-size: 0.9rem; /* match overall slightly smaller font size */
     outline: none;
-    transition: border-color 0.2s;
-    max-width: 280px;
+    transition: border-color 0.2s, background-color 0.2s;
   }
   
-  /* Focus effect for input fields */
+  /* Focus styling using your gold accent */
   .form-control:focus {
     border-color: var(--color-accent);
-    background-color: #2a2a2a; /* slight highlight on focus */
+    background-color: #2a2a2a; /* subtle highlight on focus */
   }
   
-  /* For side-by-side layout (optional) */
-  .form-row {
-    display: flex;
+  /* Grid wrapper for the dynamic fields */
+  .form-fields-grid {
+    display: grid;
     gap: 1rem;
-  }
-
-  .form-row .form-group {
-    flex: 1;
+    /* auto-fit columns with a min of 280px, up to 1fr */
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
   
-  /* The error text for invalid fields */
+  /* Error message styling */
   .error-text {
-    color: #e74c3c;  /* or something like var(--color-error) */
+    color: #e74c3c; /* typical red for errors */
     font-size: 0.85rem;
     margin-top: 0.25rem;
   }
   
-  /* If you keep the built-in form button (instead of the panel's button) */
+  /* If you keep the form's own button for submission */
   .submit-button {
-    align-self: flex-start; /* or flex-end */
+    align-self: flex-start; /* or 'flex-end' if you want it right-aligned */
     background-color: var(--color-accent);
     color: #000;
     border: none;
@@ -69,9 +71,25 @@
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s;
+    margin-top: 0.5rem;
   }
   
-  /* Hover effect for .submit-button */
+  /* Hover effect for the button */
   .submit-button:hover {
     background-color: var(--color-accent-hover);
   }
+  
+  /* 
+    .form-row remains optional if you want occasional manual row layouts.
+    It's not required if you're primarily using the auto-fit grid approach.
+  */
+  
+  /* 
+  .form-row {
+    display: flex;
+    gap: 1rem;
+  }
+  .form-row .form-group {
+    flex: 1;
+  }
+  */

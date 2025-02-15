@@ -18,7 +18,7 @@
     position: fixed;
     top: 0;
     right: 0; 
-    width: 400px;  /* adjust as needed */
+    width: 500px;  /* adjust as needed */
     height: 100vh;
     background-color: var(--color-panel); /* match sidebar color */
     z-index: 1000; /* above the overlay */

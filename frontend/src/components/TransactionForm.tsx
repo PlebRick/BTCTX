@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import axios from "axios";
-import "../styles/transactionForm.css"; // <-- Ensure this CSS file is created/updated
+import "../styles/transactionForm.css"; // Import your updated CSS with the .form-fields-grid class
 
 // --------------------------------------------------
 // 1) TypeScript Types & Enums (Matching the Backend)
@@ -22,10 +22,10 @@ interface TransactionFormData {
   account?: AccountType;
   currency?: Currency;
   amount?: number;
-  source?: DepositSource;          // For deposit
-  purpose?: WithdrawalPurpose;     // For withdrawal
-  fee?: number;                    // Always in USD
-  costBasisUSD?: number;           // For BTC deposits
+  source?: DepositSource;
+  purpose?: WithdrawalPurpose;
+  fee?: number; // Always in USD
+  costBasisUSD?: number; // For BTC deposits
 
   // Transfer fields
   fromAccount?: AccountType;
@@ -74,7 +74,7 @@ function mapAccountToId(account?: AccountType): number {
 }
 
 // --------------------------------------------------
-// 4) Props for TransactionForm (Newly Added for Panel Integration)
+// 4) Props for TransactionForm (For Panel Integration)
 // --------------------------------------------------
 interface TransactionFormProps {
   /**
@@ -104,7 +104,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     watch,
     setValue,
     reset,
-    formState: { errors, isDirty }, // 'isDirty' tells us if any field changed from default
+    formState: { errors, isDirty },
   } = useForm<TransactionFormData>({
     defaultValues: {
       timestamp: new Date().toISOString().slice(0, 16),
@@ -120,9 +120,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const currency = watch("currency");
   const fromAccount = watch("fromAccount");
 
-  // --------------------------------------------------
-  // (NEW) UseEffect: Notify Parent if 'isDirty' changes
-  // --------------------------------------------------
+  // Notify parent if 'isDirty' changes
   useEffect(() => {
     if (onDirtyChange) {
       onDirtyChange(isDirty);
@@ -141,40 +139,22 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   }, [account, currentType, setValue]);
 
-  // 1) Create a local variable to store the "fromCurrency" value from the form.
-  //    This way, we can reference it easily in our effect below.
+  // For transfers, watch 'fromCurrency'
   const fromCurrencyVal = watch("fromCurrency");
 
-  // 2) Auto-set fromCurrency/toCurrency for Transfers.
-  //
-  // This effect runs whenever:
-  //   - The transaction type (`currentType`) changes
-  //   - The "fromAccount" field changes
-  //   - The user changes the "fromCurrency" for "Exchange"
-  //
-  // By watching these dependencies, we ensure that when the user picks
-  // "Exchange" and then chooses "USD" or "BTC", the effect re-runs
-  // and sets the correct destination (toAccount/toCurrency).
+  // 2) Auto-set fromCurrency/toCurrency for Transfers
   useEffect(() => {
-    // If the selected transaction type is NOT "Transfer," do nothing.
     if (currentType !== "Transfer") return;
 
-    // CASE A: User picked "Bank" for fromAccount (USD -> Exchange).
     if (fromAccount === "Bank") {
       setValue("fromCurrency", "USD");
       setValue("toAccount", "Exchange");
       setValue("toCurrency", "USD");
-    }
-
-    // CASE B: User picked "Wallet" for fromAccount (BTC -> Exchange).
-    else if (fromAccount === "Wallet") {
+    } else if (fromAccount === "Wallet") {
       setValue("fromCurrency", "BTC");
       setValue("toAccount", "Exchange");
       setValue("toCurrency", "BTC");
-    }
-
-    // CASE C: User picked "Exchange" for fromAccount (could be USD or BTC).
-    else if (fromAccount === "Exchange") {
+    } else if (fromAccount === "Exchange") {
       if (fromCurrencyVal === "USD") {
         setValue("toAccount", "Bank");
         setValue("toCurrency", "USD");
@@ -280,20 +260,21 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       );
       console.log("Transaction created:", response.data);
 
-      // Reset the form after success
+      // Reset the form
       reset();
       setCurrentType("");
 
       alert("Transaction created successfully!");
 
-      // If there's an onSubmitSuccess callback, call it now
+      // If parent's callback is given, call it
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         console.error("Axios error creating transaction:", error.response?.data);
-        const message = error.response?.data?.detail || error.message || "An error occurred";
+        const message =
+          error.response?.data?.detail || error.message || "An error occurred";
         alert(`Failed to create transaction: ${message}`);
       } else if (error instanceof Error) {
         console.error("Error creating transaction:", error.message);
@@ -323,7 +304,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               </select>
               {errors.account && <span className="error-text">Please select an account</span>}
             </div>
-
             <div className="form-group">
               <label>Currency:</label>
               {account === "Exchange" ? (
@@ -342,7 +322,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               )}
               {errors.currency && <span className="error-text">Currency is required</span>}
             </div>
-
             <div className="form-group">
               <label>Amount:</label>
               <input
@@ -353,7 +332,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               />
               {errors.amount && <span className="error-text">Amount is required</span>}
             </div>
-
             <div className="form-group">
               <label>Source:</label>
               <select className="form-control" {...register("source", { required: true })}>
@@ -366,7 +344,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               </select>
               {errors.source && <span className="error-text">Source is required</span>}
             </div>
-
             <div className="form-group">
               <label>Fee (USD):</label>
               <input
@@ -406,7 +383,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               </select>
               {errors.account && <span className="error-text">Please select an account</span>}
             </div>
-
             <div className="form-group">
               <label>Currency:</label>
               {account === "Exchange" ? (
@@ -425,7 +401,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               )}
               {errors.currency && <span className="error-text">Currency is required</span>}
             </div>
-
             <div className="form-group">
               <label>Amount:</label>
               <input
@@ -436,7 +411,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               />
               {errors.amount && <span className="error-text">Amount is required</span>}
             </div>
-
             <div className="form-group">
               <label>Purpose:</label>
               <select className="form-control" {...register("purpose", { required: true })}>
@@ -448,7 +422,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               </select>
               {errors.purpose && <span className="error-text">Purpose is required</span>}
             </div>
-
             <div className="form-group">
               <label>Fee (USD):</label>
               <input
@@ -474,9 +447,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   </option>
                 ))}
               </select>
-              {errors.fromAccount && <span className="error-text">From Account is required</span>}
+              {errors.fromAccount && (
+                <span className="error-text">From Account is required</span>
+              )}
             </div>
-
             <div className="form-group">
               <label>From Currency:</label>
               {fromAccount === "Exchange" ? (
@@ -486,11 +460,17 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   <option value="BTC">BTC</option>
                 </select>
               ) : (
-                <input type="text" className="form-control" {...register("fromCurrency")} readOnly />
+                <input
+                  type="text"
+                  className="form-control"
+                  {...register("fromCurrency")}
+                  readOnly
+                />
               )}
-              {errors.fromCurrency && <span className="error-text">From Currency is required</span>}
+              {errors.fromCurrency && (
+                <span className="error-text">From Currency is required</span>
+              )}
             </div>
-
             <div className="form-group">
               <label>Amount (From):</label>
               <input
@@ -499,7 +479,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 className="form-control"
                 {...register("amountFrom", { required: true, valueAsNumber: true })}
               />
-              {errors.amountFrom && <span className="error-text">Amount (From) is required</span>}
+              {errors.amountFrom && (
+                <span className="error-text">Amount (From) is required</span>
+              )}
             </div>
 
             {/* We auto-populate the toAccount/toCurrency, just for display */}
@@ -512,7 +494,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 readOnly
               />
             </div>
-
             <div className="form-group">
               <label>To Currency:</label>
               <input
@@ -522,7 +503,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 readOnly
               />
             </div>
-
             <div className="form-group">
               <label>Amount (To):</label>
               <input
@@ -531,9 +511,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 className="form-control"
                 {...register("amountTo", { required: true, valueAsNumber: true })}
               />
-              {errors.amountTo && <span className="error-text">Amount (To) is required</span>}
+              {errors.amountTo && (
+                <span className="error-text">Amount (To) is required</span>
+              )}
             </div>
-
             <div className="form-group">
               <label>Fee (USD):</label>
               <input
@@ -559,7 +540,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 {...register("account")}
               />
             </div>
-
             <div className="form-group">
               <label>Amount USD:</label>
               <input
@@ -570,7 +550,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               />
               {errors.amountUSD && <span className="error-text">Amount USD is required</span>}
             </div>
-
             <div className="form-group">
               <label>Amount BTC:</label>
               <input
@@ -581,7 +560,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               />
               {errors.amountBTC && <span className="error-text">Amount BTC is required</span>}
             </div>
-
             <div className="form-group">
               <label>Fee (USD):</label>
               <input
@@ -607,7 +585,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 {...register("account")}
               />
             </div>
-
             <div className="form-group">
               <label>Amount BTC:</label>
               <input
@@ -618,7 +595,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               />
               {errors.amountBTC && <span className="error-text">Amount BTC is required</span>}
             </div>
-
             <div className="form-group">
               <label>Amount USD:</label>
               <input
@@ -629,7 +605,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               />
               {errors.amountUSD && <span className="error-text">Amount USD is required</span>}
             </div>
-
             <div className="form-group">
               <label>Fee (USD):</label>
               <input
@@ -647,11 +622,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   };
 
-  // (G) Return the JSX form
-  // If your panel has its own "Save" button, you can remove the form submit button below.
+  // (G) Final Rendering: now we put the dynamic fields inside .form-fields-grid
   return (
     <form className="transaction-form" onSubmit={handleSubmit(onSubmit)}>
-      {/* Transaction Type */}
+      {/* Basic fields above the grid */}
       <div className="form-group">
         <label>Transaction Type:</label>
         <select
@@ -669,7 +643,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         </select>
       </div>
 
-      {/* Date & Time */}
       <div className="form-group">
         <label>Date & Time:</label>
         <input
@@ -682,10 +655,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         )}
       </div>
 
-      {/* Render fields specific to the chosen transaction type */}
-      {renderDynamicFields()}
+      {/* Put all dynamic form fields in a grid wrapper */}
+      <div className="form-fields-grid">
+        {renderDynamicFields()}
+      </div>
 
-      {/* Optional submit if not using panel's button */}
+      {/* Optionally keep or remove this 'Submit' if your panel has "Save" */}
       <button type="submit" className="submit-button">
         Submit Transaction
       </button>
