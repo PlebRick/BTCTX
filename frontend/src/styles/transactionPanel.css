@@ -45,6 +45,7 @@
     flex: 1; /* fill remaining space */
     padding: 1rem;
     color: var(--color-text);
+    overflow-y: auto;
   }
   
   .panel-body label {

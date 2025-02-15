@@ -1,49 +1,77 @@
 /* transactionForm.css */
 
-/* The overall form container */
+/* Top-level form container */
 .transaction-form {
     display: flex;
     flex-direction: column;
-    gap: 1rem; /* spacing between sections or rows */
-    color: var(--color-text); /* if you have a variable for text color */
+    gap: 1rem; /* spacing between sections of the form */
+    color: var(--color-text);
+    font-size: 0.75rem;
   }
   
-  /* Each field grouping (label + input) */
+  /* Each field: label + input/select + error message */
   .form-group {
     display: flex;
     flex-direction: column;
-    margin-bottom: 0.75rem; /* vertical spacing between groups */
+    margin-bottom: 0.5rem; /* vertical space between groups */
   }
   
-  /* The label */
+  /* The label above each input */
   .form-group label {
     font-weight: 500;
     margin-bottom: 0.25rem;
   }
   
-  /* The input or select styling */
+  /* The actual inputs and selects */
   .form-control {
-    padding: 0.5rem;
+    padding: 0.3rem;
+    background-color: #1a1a1a; /* or var(--color-bg) / var(--color-panel) */
+    color: var(--color-text);
     border: 1px solid #444;
     border-radius: 4px;
-    background-color: #1a1a1a; /* or var(--color-bg) if you prefer */
-    color: var(--color-text);
-    font-size: 0.95rem;
-  }
-  
-  /* On focus, highlight slightly */
-  .form-control:focus {
+    font-size: 0.75rem;
     outline: none;
-    border-color: var(--color-accent); /* your gold accent, if desired */
+    transition: border-color 0.2s;
+    max-width: 280px;
   }
   
-  /* Error text styling */
+  /* Focus effect for input fields */
+  .form-control:focus {
+    border-color: var(--color-accent);
+    background-color: #2a2a2a; /* slight highlight on focus */
+  }
+  
+  /* For side-by-side layout (optional) */
+  .form-row {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .form-row .form-group {
+    flex: 1;
+  }
+  
+  /* The error text for invalid fields */
   .error-text {
-    color: #e74c3c; /* a red color for errors */
+    color: #e74c3c;  /* or something like var(--color-error) */
     font-size: 0.85rem;
     margin-top: 0.25rem;
   }
   
-  /* If you have multi-column layouts, you can define additional classes or media queries.
-     For example, if you want to display "Account" and "Currency" side by side, you can
-     wrap them in a .form-row and style with flex or grid. */
+  /* If you keep the built-in form button (instead of the panel's button) */
+  .submit-button {
+    align-self: flex-start; /* or flex-end */
+    background-color: var(--color-accent);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    padding: 0.75rem 1.25rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  /* Hover effect for .submit-button */
+  .submit-button:hover {
+    background-color: var(--color-accent-hover);
+  }
