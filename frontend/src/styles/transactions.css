@@ -1,194 +1,219 @@
-/* frontend/src/styles/transactions.css */
+/* ------------------------------------------------------------------
+   transactions.css
+   ------------------------------------------------------------------
+   This stylesheet defines the visual presentation of your 
+   Transactions page, including date-group headings, transaction 
+   rows, hover effects, and buttons.
 
-/* Overall container for the Transactions page */
+   It pairs with your updated `Transactions.tsx`, where each 
+   transaction is displayed in a single horizontal row:
+   (Time) | (Type) | (Account) | (Amount) | (Fee) | (Extra) | (Edit)
+------------------------------------------------------------------ */
+
+/* 1) Overall page container for the Transactions page */
 .transactions-page {
-    padding: 1rem;
-    color: #fff; /* main text color */
-    font-family: 'Roboto', sans-serif; /* or whatever you prefer */
-    background-color: transparent; /* assume parent sets dark background */
-  }
+  padding: 1rem;
+  color: #fff;
+  font-family: "Roboto", sans-serif;
+  background-color: transparent; /* The parent or global styling can handle the main bg */
+}
+
+/* 2) Optional page title class if you want to label "Transactions" */
+.transactions-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+/* 3) Accent button (used for "Add Transaction") */
+.accent-btn {
+  background-color: #c49b31; /* gold shade */
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.accent-btn:hover {
+  background-color: #e1b84b; /* lighter gold on hover */
+}
+
+/* 4) Transactions header area (if you have sort controls, etc.) */
+.transactions-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+/* 4a) Sort select dropdown */
+.transactions-header select {
+  background-color: #1b1b1b;
+  color: #fff;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  outline: none;
+}
+.transactions-header select:focus {
+  border-color: #c49b31;
+}
+
+/* 5) Error text (e.g., "Failed to load transactions") */
+.error-text {
+  color: #e74c3c;
+}
+
+/* 6) Container for the date groups (each day’s transactions) */
+.transactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem; /* spacing between day groups */
+}
+
+/* 7) Each date group (e.g., "Feb 15, 2025") container */
+.transactions-day-group {
+  /* optional border or background if desired */
+}
+
+/* 8) Heading for the date group */
+.date-heading {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #c6c6c6;
+}
+
+/* 
+  9) Single-line transaction row 
+  - Replaces the older "card" style that used column layout. 
+  - We now assume you want a single horizontal row for: 
+    Time | Type | Account | Amount | Fee | Extra | [Edit Button]
+*/
+.transaction-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; 
+  gap: 1rem; /* spacing between columns */
   
-  /* The top heading, e.g. "Transactions" */
-  .transactions-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-  }
-  
-  /* The "Add Transaction" button might already have .accent-btn or other styles */
-  .accent-btn {
-    background-color: #c49b31; /* a gold shade */
-    color: #000;
-    border: none;
-    border-radius: 4px;
-    padding: 0.25rem .75rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-  .accent-btn:hover {
-    background-color: #e1b84b; /* a lighter gold on hover */
-  }
-  
-  /* Header area for the sort dropdown, etc. */
-  .transactions-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin: 0.75rem 0;
-  }
-  
-  /* The sort select */
-  .transactions-header select {
-    background-color: #1b1b1b;
-    color: #fff;
-    border: 1px solid #333;
-    border-radius: 4px;
-    padding: 0.4rem 0.6rem;
-    cursor: pointer;
-    outline: none;
-  }
-  .transactions-header select:focus {
-    border-color: #c49b31;
-  }
-  
-  /* Error text or "No transactions" text */
-  .error-text {
-    color: #e74c3c; /* bright red */
-  }
-  
-  /* The container holding all date groups */
-  .transactions-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem; /* space between day groups */
-  }
-  
-  /* Each group of transactions for a single date */
-  .transactions-day-group {
-    /* no major styling yet; can add a border or accent if desired */
-  }
-  
-  .date-heading {
-    font-size: 1.1rem;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
-    color: #c6c6c6; /* slightly lighter text for the date */
-  }
-  
-  /* 
-    Each transaction "card" 
-    - dark background
-    - slight rounding
-    - consistent padding/margins 
-  */
-  .transaction-card {
-    background-color: #1e1e1e;
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    border: 1px solid #2a2a2a;
-    transition: background-color 0.2s;
-  }
-  .transaction-card:hover {
-    background-color: #2a2a2a; /* subtle hover highlight */
-  }
-  
-  /* The main row of info: type/time/amounts */
-  .transaction-main {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  
-  /* The transaction type: Deposit, Transfer, etc. */
-  .transaction-type {
-    font-weight: 600;
-    color: #ffd700; /* bright gold accent for the type label */
-    margin-right: 1rem;
-    text-transform: capitalize; /* optional: "Deposit" -> "Deposit" as is */
-  }
-  /* If you want different colors per type, you can do:
-     .transaction-type.Deposit { color: green; } etc. 
-  */
-  
-  /* The time label (e.g. 11:29 AM) */
-  .transaction-time {
-    font-size: 0.9rem;
-    opacity: 0.8;
-    margin-right: 1rem;
-  }
-  
-  /* The container for amounts, e.g. +$50 or +0.001 BTC */
-  .transaction-amounts {
-    font-size: 0.95rem;
-    display: flex;
-    gap: 0.75rem;
-  }
-  
-  /* For each amount, e.g. +$50 or +0.001 BTC */
-  .fiat-amount,
-  .btc-amount {
-    font-weight: 500;
-  }
-  
-  /* Additional styling for positive vs negative amounts, etc. */
-  .fiat-amount.positive,
-  .btc-amount.positive {
-    color: #50d890; /* a greenish color */
-  }
-  .fiat-amount.negative,
-  .btc-amount.negative {
-    color: #ff6b6b; /* a reddish color */
-  }
-  
-  /* 
-    Additional details row: 
-    - can hold fee, account, source, purpose, etc. 
-  */
-  .transaction-details {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    font-size: 0.9rem;
-    color: #ccc; /* slightly lighter text */
-  }
-  
-  /* account label, if you show e.g. "Bank Account" or "Wallet" */
-  .account-label {
-    padding: 0.2rem 0.4rem;
-    background-color: #2f2f2f;
-    border-radius: 4px;
-    color: #f0f0f0;
-    font-size: 0.8rem;
-  }
-  
-  /* 
-     Fee label 
-     (could also color-code if it's large or small, or show in BTC if you store that info) 
-  */
-  .fee-label {
-    color: #f39c12; /* a golden/orange */
-  }
-  
-  /* The Edit button (placeholder). 
-     You might already have something else for global buttons. 
-  */
-  .edit-button {
-    align-self: flex-end;
-    background-color: transparent;
-    color: #c49b31;
-    border: 1px solid #c49b31;
-    border-radius: 4px;
-    padding: 0.4rem 0.8rem;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-  .edit-button:hover {
-    background-color: #c49b31;
-    color: #000;
-  }
+  background-color: #1e1e1e;
+  color: #fff;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  transition: background-color 0.2s;
+}
+.transaction-card:hover {
+  background-color: #2a2a2a;
+}
+
+/* 
+  9a) If you still want a "main row" concept:
+     Now that it's all in one row, you might not need 
+     .transaction-main or the second row. But we leave 
+     them here in case you expand or rearrange fields later.
+*/
+.transaction-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Not mandatory for single-line, but left here if you need sub-grouping. */
+}
+
+/* 
+  9b) Transaction type in gold. 
+  If you're placing it in a single <span> or <div>, 
+  you can keep this color or do custom logic for each type.
+*/
+.transaction-type {
+  font-weight: 600;
+  color: #ffd700; 
+  margin-right: 1rem;
+  text-transform: capitalize;
+}
+
+/* 9c) Transaction time (HH:MM, etc.) */
+.transaction-time {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  margin-right: 1rem;
+}
+
+/* 9d) Container for amounts 
+   (If you do multiple amounts side by side, e.g. +$50, +0.001 BTC) 
+*/
+.transaction-amounts {
+  font-size: 0.95rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* 9e) Individual amounts 
+   Use .positive or .negative for color-coding 
+*/
+.fiat-amount,
+.btc-amount {
+  font-weight: 500;
+}
+
+/* 9f) Optional color-coding classes */
+.fiat-amount.positive,
+.btc-amount.positive {
+  color: #50d890;
+}
+.fiat-amount.negative,
+.btc-amount.negative {
+  color: #ff6b6b;
+}
+
+/* 9g) Additional details row 
+   (If you decide to show a second line for fee or source/purpose, 
+    but might not be used in a single-line layout) 
+*/
+.transaction-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+/* 9h) Account label, if you want a special style 
+   for "Bank", "Wallet", "Exchange" text 
+*/
+.account-label {
+  padding: 0.2rem 0.4rem;
+  background-color: #2f2f2f;
+  border-radius: 4px;
+  color: #f0f0f0;
+  font-size: 0.8rem;
+}
+
+/* 9i) Fee label, if you want it in an orange color, etc. */
+.fee-label {
+  color: #f39c12;
+}
+
+/* 9j) Edit button 
+   - For a single-line row, you might place it at the end 
+     so the user can click "Edit" without an extra line. 
+*/
+.edit-button {
+  align-self: flex-end;
+  background-color: transparent;
+  color: #c49b31;
+  border: 1px solid #c49b31;
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.edit-button:hover {
+  background-color: #c49b31;
+  color: #000;
+}
