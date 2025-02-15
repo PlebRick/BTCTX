@@ -1,0 +1,49 @@
+/* transactionForm.css */
+
+/* The overall form container */
+.transaction-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; /* spacing between sections or rows */
+    color: var(--color-text); /* if you have a variable for text color */
+  }
+  
+  /* Each field grouping (label + input) */
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.75rem; /* vertical spacing between groups */
+  }
+  
+  /* The label */
+  .form-group label {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+  }
+  
+  /* The input or select styling */
+  .form-control {
+    padding: 0.5rem;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background-color: #1a1a1a; /* or var(--color-bg) if you prefer */
+    color: var(--color-text);
+    font-size: 0.95rem;
+  }
+  
+  /* On focus, highlight slightly */
+  .form-control:focus {
+    outline: none;
+    border-color: var(--color-accent); /* your gold accent, if desired */
+  }
+  
+  /* Error text styling */
+  .error-text {
+    color: #e74c3c; /* a red color for errors */
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+  }
+  
+  /* If you have multi-column layouts, you can define additional classes or media queries.
+     For example, if you want to display "Account" and "Currency" side by side, you can
+     wrap them in a .form-row and style with flex or grid. */

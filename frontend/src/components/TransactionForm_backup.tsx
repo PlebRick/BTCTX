@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import axios from "axios";
+import "../styles/transactionForm.css";
 
 // --------------------------------------------------
 // 1) TypeScript Types & Enums (Matching the Backend)
@@ -73,16 +74,37 @@ function mapAccountToId(account?: AccountType): number {
 }
 
 // --------------------------------------------------
-// 4) TransactionForm Component
+// 4) Props for TransactionForm (Newly Added for Panel Integration)
 // --------------------------------------------------
-const TransactionForm: React.FC = () => {
+interface TransactionFormProps {
+  /**
+   * Optional callback to inform the parent component whether
+   * the form has unsaved changes (i.e., is "dirty").
+   * We'll call it every time `formState.isDirty` changes.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
+
+  /**
+   * Optional callback to signal the parent that
+   * the form was successfully submitted (e.g., to close a panel).
+   */
+  onSubmitSuccess?: () => void;
+}
+
+// --------------------------------------------------
+// 5) TransactionForm Component
+// --------------------------------------------------
+const TransactionForm: React.FC<TransactionFormProps> = ({
+  onDirtyChange,
+  onSubmitSuccess,
+}) => {
   const {
     register,
     handleSubmit,
     watch,
     setValue,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty }, // 'isDirty' tells us if any field changed from default
   } = useForm<TransactionFormData>({
     defaultValues: {
       timestamp: new Date().toISOString().slice(0, 16),
@@ -97,7 +119,16 @@ const TransactionForm: React.FC = () => {
   const account = watch("account");
   const currency = watch("currency");
   const fromAccount = watch("fromAccount");
-  
+
+  // --------------------------------------------------
+  // (NEW) UseEffect: Notify Parent if 'isDirty' changes
+  // --------------------------------------------------
+  useEffect(() => {
+    if (onDirtyChange) {
+      onDirtyChange(isDirty);
+    }
+  }, [isDirty, onDirtyChange]);
+
   // (A) Auto-set currency for deposit/withdrawal
   useEffect(() => {
     if (currentType === "Deposit" || currentType === "Withdrawal") {
@@ -111,64 +142,64 @@ const TransactionForm: React.FC = () => {
   }, [account, currentType, setValue]);
 
   // 1) Create a local variable to store the "fromCurrency" value from the form.
-//    This way, we can reference it easily in our effect below.
-const fromCurrencyVal = watch("fromCurrency");
+  //    This way, we can reference it easily in our effect below.
+  const fromCurrencyVal = watch("fromCurrency");
 
-// 2) Auto-set fromCurrency/toCurrency for Transfers.
-//
-// This effect runs whenever:
-//   - The transaction type (`currentType`) changes
-//   - The "fromAccount" field changes
-//   - The user changes the "fromCurrency" for "Exchange"
-//
-// By watching these dependencies, we ensure that when the user picks
-// "Exchange" and then chooses "USD" or "BTC", the effect re-runs
-// and sets the correct destination (toAccount/toCurrency).
-useEffect(() => {
-  // If the selected transaction type is NOT "Transfer," do nothing.
-  if (currentType !== "Transfer") return;
+  // 2) Auto-set fromCurrency/toCurrency for Transfers.
+  //
+  // This effect runs whenever:
+  //   - The transaction type (`currentType`) changes
+  //   - The "fromAccount" field changes
+  //   - The user changes the "fromCurrency" for "Exchange"
+  //
+  // By watching these dependencies, we ensure that when the user picks
+  // "Exchange" and then chooses "USD" or "BTC", the effect re-runs
+  // and sets the correct destination (toAccount/toCurrency).
+  useEffect(() => {
+    // If the selected transaction type is NOT "Transfer," do nothing.
+    if (currentType !== "Transfer") return;
 
-  // CASE A: User picked "Bank" for fromAccount.
-  //   - The only currency for a bank is USD.
-  //   - The receiving account is always "Exchange" with "USD".
-  if (fromAccount === "Bank") {
-    setValue("fromCurrency", "USD");   // Bank -> fromCurrency=USD
-    setValue("toAccount", "Exchange"); // toAccount=Exchange
-    setValue("toCurrency", "USD");     // Exchange side is also USD
-  }
-
-  // CASE B: User picked "Wallet" for fromAccount.
-  //   - The only currency for a wallet is BTC.
-  //   - The receiving account is always "Exchange" with "BTC".
-  else if (fromAccount === "Wallet") {
-    setValue("fromCurrency", "BTC");   // Wallet -> fromCurrency=BTC
-    setValue("toAccount", "Exchange"); // toAccount=Exchange
-    setValue("toCurrency", "BTC");     // Exchange side is also BTC
-  }
-
-  // CASE C: User picked "Exchange" for fromAccount.
-  //   - We don't *assume* a currency, because the Exchange can do both USD & BTC.
-  //   - The user picks fromCurrency in a dropdown, so we read the current value 
-  //     from our local "fromCurrencyVal".
-  //   - Then we auto-populate the receiving side based on that choice.
-  else if (fromAccount === "Exchange") {
-    if (fromCurrencyVal === "USD") {
-      // If Exchange side is sending USD, the destination is a Bank (USD).
-      setValue("toAccount", "Bank");
-      setValue("toCurrency", "USD");
-    } else if (fromCurrencyVal === "BTC") {
-      // If Exchange side is sending BTC, the destination is a Wallet (BTC).
-      setValue("toAccount", "Wallet");
-      setValue("toCurrency", "BTC");
+    // CASE A: User picked "Bank" for fromAccount.
+    //   - The only currency for a bank is USD.
+    //   - The receiving account is always "Exchange" with "USD".
+    if (fromAccount === "Bank") {
+      setValue("fromCurrency", "USD");   // Bank -> fromCurrency=USD
+      setValue("toAccount", "Exchange"); // toAccount=Exchange
+      setValue("toCurrency", "USD");     // Exchange side is also USD
     }
-  }
-}, [
-  // This is the list of dependencies that re-trigger the effect if any change:
-  currentType,     // If the user changes the transaction type away from Transfer, skip.
-  fromAccount,     // If the user changes the 'fromAccount' select (Bank, Wallet, Exchange).
-  fromCurrencyVal, // If the user changes the 'fromCurrency' while on Exchange, we update toAccount/toCurrency.
-  setValue         // We need setValue in scope to actually set the form fields.
-]);
+
+    // CASE B: User picked "Wallet" for fromAccount.
+    //   - The only currency for a wallet is BTC.
+    //   - The receiving account is always "Exchange" with "BTC".
+    else if (fromAccount === "Wallet") {
+      setValue("fromCurrency", "BTC");   // Wallet -> fromCurrency=BTC
+      setValue("toAccount", "Exchange"); // toAccount=Exchange
+      setValue("toCurrency", "BTC");     // Exchange side is also BTC
+    }
+
+    // CASE C: User picked "Exchange" for fromAccount.
+    //   - We don't *assume* a currency, because the Exchange can do both USD & BTC.
+    //   - The user picks fromCurrency in a dropdown, so we read the current value 
+    //     from our local "fromCurrencyVal".
+    //   - Then we auto-populate the receiving side based on that choice.
+    else if (fromAccount === "Exchange") {
+      if (fromCurrencyVal === "USD") {
+        // If Exchange side is sending USD, the destination is a Bank (USD).
+        setValue("toAccount", "Bank");
+        setValue("toCurrency", "USD");
+      } else if (fromCurrencyVal === "BTC") {
+        // If Exchange side is sending BTC, the destination is a Wallet (BTC).
+        setValue("toAccount", "Wallet");
+        setValue("toCurrency", "BTC");
+      }
+    }
+  }, [
+    // This is the list of dependencies that re-trigger the effect if any change:
+    currentType,     // If the user changes the transaction type away from Transfer, skip.
+    fromAccount,     // If the user changes the 'fromAccount' select (Bank, Wallet, Exchange).
+    fromCurrencyVal, // If the user changes the 'fromCurrency' while on Exchange, we update toAccount/toCurrency.
+    setValue         // We need setValue in scope to actually set the form fields.
+  ]);
 
   // (C) Reset form if user changes the transaction type
   const onTransactionTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -266,9 +297,16 @@ useEffect(() => {
       );
       console.log("Transaction created:", response.data);
 
+      // Reset the form and type after success
       reset();
       setCurrentType("");
+
       alert("Transaction created successfully!");
+
+      // (NEW) If there's a onSubmitSuccess callback, call it now
+      if (onSubmitSuccess) {
+        onSubmitSuccess();
+      }
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         console.error("Axios error creating transaction:", error.response?.data);
@@ -541,6 +579,8 @@ useEffect(() => {
   };
 
   // (G) Return the JSX form
+  // Note: Typically you'd remove any <button type="submit"> if your panel's "Save" button is used.
+  // But you can keep it here if you'd like an internal fallback.
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <div>
@@ -567,6 +607,7 @@ useEffect(() => {
       {/* Render fields specific to the chosen transaction type */}
       {renderDynamicFields()}
 
+      {/* Optionally keep or remove this 'Submit' button if your panel has a separate "Save" button */}
       <button type="submit">Submit Transaction</button>
     </form>
   );

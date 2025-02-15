@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import axios from "axios";
+import "../styles/transactionForm.css";
 
 // --------------------------------------------------
 // 1) TypeScript Types & Enums (Matching the Backend)
