@@ -135,7 +135,6 @@ Currently in an **active development** phase, transitioning from a minimal singl
 * **README** files in the project root and `backend/`.
 * **TODO.md** in the project root for short-term tasks.
 
-
 ---
 
 ## Future Roadmap
@@ -160,5 +159,3 @@ Currently in an **active development** phase, transitioning from a minimal singl
 * **Branching Strategy** : Merges into `main` after feature branches are tested.
 * **Versioning** : Basic semantic versioning (in future).
 * **Security** : Single-user approach, but best practices in encryption, password hashing, and limited external surface area.
-
----
