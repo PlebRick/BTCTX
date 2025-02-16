@@ -1,16 +1,16 @@
 """
 routers/transaction.py
 
-Refined to:
- - Accept and store costBasisUSD via the schemas.
- - Use a single 'fee' field in USD.
- - Mention that timestamps are treated as UTC.
- - Provide basic create/read/update/delete endpoints.
+Refactored for the double-entry Plan B approach:
+  - Instead of a single account_id, the create/update schemas now provide from_account_id and to_account_id.
+  - This router calls service functions (create_transaction_record, etc.) that expect the new schema fields.
+  - Minimal changes here beyond docstrings, since the old code didn't explicitly reference 'transaction.account_id'.
 """
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from typing import List
+
 from backend.database import get_db
 from backend.models.transaction import Transaction
 from backend.schemas.transaction import (
@@ -31,8 +31,10 @@ router = APIRouter()
 @router.get("/", response_model=List[TransactionRead])
 def get_transactions(db: Session = Depends(get_db)):
     """
-    Retrieve all transactions from the database, ordered by timestamp (desc).
-    Timestamps are considered UTC for any historical price lookups or date-based logic.
+    Retrieve all transactions, ordered by timestamp (descending).
+    - Timestamps are treated as UTC for any historical price lookups/date-based logic.
+    - Now returns TransactionRead, which includes from_account_id and to_account_id
+      instead of a single account_id.
     """
     transactions = db.query(Transaction).order_by(Transaction.timestamp.desc()).all()
     return transactions
@@ -43,10 +45,14 @@ def create_transaction(
     db: Session = Depends(get_db)
 ):
     """
-    Create a new transaction.
-    If the type is 'Deposit' and the user enters cost_basis_usd, we store it.
-    Fee is now always in USD, so no fee_currency required.
-    Timestamps are stored as UTC by convention (though we do not forcibly convert naive datetimes here).
+    Create a new transaction under the double-entry model.
+    - The user now provides from_account_id and to_account_id in the request payload
+      (instead of one account_id).
+    - For example, a Deposit might have from_account_id=External, to_account_id=Wallet,
+      a Withdrawal might invert that, etc.
+    - Fee is always in USD (fee=some_value).
+    - cost_basis_usd is stored if relevant (e.g., external BTC deposit).
+    - The service layer checks if from/to accounts are valid and updates balances accordingly.
     """
     db_transaction = create_transaction_record(transaction, db)
     if not db_transaction:
@@ -60,8 +66,10 @@ def update_transaction(
     db: Session = Depends(get_db)
 ):
     """
-    Update an existing transaction.
-    If is_locked is True, future logic might block changes (placeholder).
+    Update an existing transaction with partial fields (TransactionUpdate).
+    - from_account_id, to_account_id, amounts, etc. can be changed if not locked.
+    - If the transaction is locked (is_locked=True) and your business logic forbids changes,
+      the service layer might reject the update.
     """
     db_transaction = update_transaction_record(transaction_id, transaction, db)
     if not db_transaction:
@@ -75,7 +83,7 @@ def delete_transaction(
 ):
     """
     Delete a transaction by its ID.
-    Future logic might forbid deletion if is_locked is True.
+    - The service layer may block deletion if the transaction is locked (is_locked=True).
     """
     success = delete_transaction_record(transaction_id, db)
     if not success:

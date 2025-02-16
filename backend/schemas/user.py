@@ -1,96 +1,41 @@
 """
 backend/schemas/user.py
 
-This module defines the Pydantic schemas for user-related data in BitcoinTX.
-Since BitcoinTX is designed as a one-user application, these schemas are kept
-simple but robust enough for current and future needs.
-
-Schemas included:
-  1. UserRead: Used for outputting user information in API responses.
-  2. UserCreate: Used for accepting data when creating a new user (registration).
-  3. UserUpdate: Used for updating an existing user's information.
-  4. UserAuthResponse: Used for returning authentication details (e.g., JWT token)
-     after login.
-
-Each schema is thoroughly documented with field-level and overall comments.
+Defines Pydantic models (schemas) for user-related data.
+Import only from standard libraries or pydantic—do NOT import from
+routers or services to avoid circular dependencies.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
 
-# --- Schema for Reading User Data (Response Model) ---
-class UserRead(BaseModel):
+class UserBase(BaseModel):
     """
-    UserRead represents the structure of the user data returned by the API.
-
-    Attributes:
-      id (int): Unique identifier for the user.
-      username (str): The username of the user.
-    
-    Note:
-      - In BitcoinTX, which is a one-user application, this schema represents the
-        single user's information.
+    Base user fields. Shared logic or validations can go here.
     """
-    id: int = Field(..., description="Unique identifier for the user")
-    username: str = Field(..., description="Username of the user")
+    username: str
 
-    class Config:
-        # 'from_attributes = True' enables compatibility with ORM objects.
-        from_attributes = True
-
-
-# --- Schema for Creating a New User (Request Model) ---
-class UserCreate(BaseModel):
+class UserCreate(UserBase):
     """
-    UserCreate is used when registering a new user for BitcoinTX.
-
-    Attributes:
-      username (str): The desired unique username for the new user.
-      password_hash (str): The hashed password for secure storage.
-    
-    Note:
-      - As BitcoinTX is a one-user application, this schema will be used only once
-        during the initial registration. After creation, the same record is used for authentication.
+    Schema for creating a new user.
+    Includes the password field (hashed later in the model).
     """
-    username: str = Field(..., description="Unique username for the new user")
-    password_hash: str = Field(..., description="Hashed password for secure storage")
+    password_hash: str
 
-    class Config:
-        from_attributes = True
-
-
-# --- Schema for Updating an Existing User (Request Model) ---
 class UserUpdate(BaseModel):
     """
-    UserUpdate allows for partial updates to the user's information.
-
-    Attributes:
-      username (Optional[str]): The new username, if it is being updated.
-      password_hash (Optional[str]): The new hashed password, if updated.
-    
-    Note:
-      - In a one-user application like BitcoinTX, this schema is used to modify the single user's data.
-      - Fields are optional to allow updating only the desired attributes.
+    Schema for updating user data. The username might be optional if only
+    changing the password, or vice versa.
     """
-    username: Optional[str] = Field(None, description="Updated username")
-    password_hash: Optional[str] = Field(None, description="Updated hashed password")
+    username: Optional[str] = None
+    password_hash: Optional[str] = None
+
+class UserRead(UserBase):
+    """
+    Schema for reading a user's data back to the client.
+    Typically includes an ID and excludes the password hash.
+    """
+    id: int
 
     class Config:
-        from_attributes = True
-
-
-# --- Schema for User Authentication Response ---
-class UserAuthResponse(BaseModel):
-    """
-    UserAuthResponse is used to return authentication details after a successful login.
-
-    Attributes:
-      access_token (str): The JWT access token for the user.
-      token_type (str): The type of token, typically 'bearer'.
-    
-    Note:
-      - This schema is crucial for the authentication flow in BitcoinTX.
-      - The client receives these details and uses the access token for subsequent requests.
-    """
-    access_token: str = Field(..., description="JWT access token")
-    token_type: str = Field(..., description="Type of token, typically 'bearer'")
+        orm_mode = True

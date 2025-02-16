@@ -4,11 +4,16 @@ import TransactionPanel from "../components/TransactionPanel";
 import "../styles/transactions.css";
 
 /**
- * ITransaction: shape of each record from the backend.
+ * -----------------------------------------------------------
+ * 1) ITransaction interface (Double-Entry)
+ * -----------------------------------------------------------
+ * The backend now returns `from_account_id` and `to_account_id`, 
+ * instead of a single 'account_id'. We reflect that below.
  */
 interface ITransaction {
   id: number;
-  account_id: number;
+  from_account_id: number;
+  to_account_id: number;
   type: "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
   amount_usd: number;
   amount_btc: number;
@@ -27,107 +32,125 @@ interface ITransaction {
 type SortMode = "TIMESTAMP_DESC" | "CREATION_DESC";
 
 /**
- * A small helper to convert numeric account_id into a string label
- * for display in the "Account" column. Adjust if you have more IDs.
+ * accountIdToName: 
+ * Convert numeric IDs to a string label.
+ *   1 => Bank
+ *   2 => Wallet
+ *   3 => Exchange
+ *   4 => External
+ * Adjust if your backend uses different IDs.
  */
 function accountIdToName(id: number): string {
   switch (id) {
     case 1: return "Bank";
     case 2: return "Wallet";
     case 3: return "Exchange";
-    default: return `Acct #${id}`; 
-}
+    case 4: return "External";
+    default: return `Acct #${id}`;
+  }
 }
 
 /**
- * A helper to build the single "Amount" column, 
- * depending on transaction type + amounts. 
- * This ensures we do everything in one line for 
- * the "Amount" cell.
+ * resolveDisplayAccount: 
+ * For the "Account" column, we need to choose which side to show
+ * (from_account or to_account) based on the transaction type.
+ */
+function resolveDisplayAccount(tx: ITransaction): string {
+  const { type, from_account_id, to_account_id } = tx;
+  switch (type) {
+    case "Deposit":
+      // user deposit => from=External(4) => to=userAccts
+      return accountIdToName(to_account_id);
+    case "Withdrawal":
+      // user withdrawal => from=userAccts => to=External(4)
+      return accountIdToName(from_account_id);
+    case "Transfer":
+      // a transfer => from -> to
+      const fromLabel = accountIdToName(from_account_id);
+      const toLabel = accountIdToName(to_account_id);
+      return `${fromLabel} -> ${toLabel}`;
+    case "Buy":
+    case "Sell":
+      // typically from=3, to=3 => "Exchange"
+      return "Exchange";
+    default:
+      return "???";
+  }
+}
+
+/**
+ * formatAmount: 
+ * Show a single textual representation of amounts. 
+ * We rely on transaction type:
+ *  - For deposit/withdrawal/transfer: show the USD or BTC that moved. 
+ *  - Buy => show "$X -> BTC Y"
+ *  - Sell => "BTC Y -> $X"
  */
 function formatAmount(tx: ITransaction): string {
   const { type, amount_usd, amount_btc } = tx;
 
-  // For deposit/withdrawal/transfer, we typically show either
-  // "$X" or "BTC X" depending on which is non-zero.
   if (type === "Deposit" || type === "Withdrawal" || type === "Transfer") {
+    // One side is typically external or another account. 
+    // Show whichever is non-zero. If amount_btc != 0 => BTC, else USD
     if (amount_btc !== 0) {
-      // e.g. "BTC 0.005"
       return `BTC ${Math.abs(amount_btc)}`;
-    } else {
-      // e.g. "$500"
-      return `$${Math.abs(amount_usd)}`;
     }
+    return `$${Math.abs(amount_usd)}`;
   }
 
-  // For Buy => "$X -> BTC Y"
   if (type === "Buy") {
     return `$${amount_usd} -> BTC ${amount_btc}`;
   }
-
-  // For Sell => "BTC Y -> $X"
   if (type === "Sell") {
     return `BTC ${amount_btc} -> $${amount_usd}`;
   }
 
-  // Fallback
   return "";
 }
 
 /**
- * Some transactions have an "extra" piece of info:
- * - Deposit => source if not N/A
- * - Withdrawal => purpose if not N/A
- * - Sell => potential future gains
- * etc.
+ * formatExtra:
+ * - Deposit => show 'source' if not "N/A"
+ * - Withdrawal => show 'purpose' if not "N/A"
+ * - Could be extended for Buy/Sell to show cost basis or something else
  */
 function formatExtra(tx: ITransaction): string {
   const { type, source, purpose } = tx;
-
-  // For deposit, show source if not "N/A"
   if (type === "Deposit" && source !== "N/A") {
     return source;
   }
-
-  // For withdrawal, show purpose if not "N/A"
   if (type === "Withdrawal" && purpose !== "N/A") {
     return purpose;
   }
-
-  // For buy/sell, you might eventually show gain/loss or other placeholders
-  // if you track them. For now, we do nothing special for "Buy" or "Sell".
-
-  return ""; // no extra info to display
+  return "";
 }
 
 /**
- * Transactions Component
- * ----------------------
- * Fetches + displays transactions grouped by date. 
- * Presents each transaction in a single horizontal row
- * with columns for Time, Type, Account, Amount, Fee, and Extra. 
+ * Transactions Page
+ * Shows a list of existing transactions, grouped by date, 
+ * plus a button to open TransactionPanel for new transactions.
  */
 const Transactions: React.FC = () => {
-  // Panel open/close
+  // (1) Panel open/close
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
-  // Transaction data + sort mode
+  // (2) Transactions + sort mode
   const [transactions, setTransactions] = useState<ITransaction[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("TIMESTAMP_DESC");
 
-  // Loading + Error states
+  // (3) Loading / error
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * fetchTransactions(): 
-   * Loads the transaction list from the backend. 
+   * fetchTransactions:
+   * Load the double-entry transactions from the backend,
+   * which now have from_account_id / to_account_id in the response.
    */
   async function fetchTransactions() {
     setLoading(true);
     setError(null);
     try {
-      // The trailing slash is important to avoid a redirect:
       const res = await axios.get<ITransaction[]>(
         "http://127.0.0.1:8000/api/transactions/"
       );
@@ -149,7 +172,7 @@ const Transactions: React.FC = () => {
   const openPanel = () => setIsPanelOpen(true);
   const closePanel = () => setIsPanelOpen(false);
 
-  // Called after new transaction is submitted => refresh list + close
+  // After new transaction submitted => refresh
   const handleSubmitSuccess = () => {
     setIsPanelOpen(false);
     fetchTransactions();
@@ -167,7 +190,7 @@ const Transactions: React.FC = () => {
   });
 
   /**
-   * Group by date (e.g., "Feb 15, 2025")
+   * Group by date
    */
   const groupedByDate: Record<string, ITransaction[]> = {};
   for (const tx of sortedTransactions) {
@@ -185,12 +208,12 @@ const Transactions: React.FC = () => {
 
   return (
     <div className="transactions-page" style={{ padding: "1rem" }}>
-      {/* 1) "Add Transaction" button */}
+      {/* Add Transaction button => opens the panel */}
       <button className="accent-btn" onClick={openPanel}>
         Add Transaction
       </button>
 
-      {/* 2) Sort dropdown */}
+      {/* Sort dropdown */}
       <div style={{ marginTop: "1rem" }}>
         <label>Sort by: </label>
         <select
@@ -202,33 +225,25 @@ const Transactions: React.FC = () => {
         </select>
       </div>
 
-      {/* 3) Loading/Error states */}
+      {/* Loading & Error */}
       {loading && <p>Loading transactions...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
       {!loading && !error && dateGroups.length === 0 && (
         <p>No transactions found.</p>
       )}
 
-      {/* 4) Render the grouped transactions */}
+      {/* Render grouped transactions */}
       {!loading && !error && dateGroups.length > 0 && (
         <div className="transactions-list" style={{ marginTop: "1rem" }}>
           {dateGroups.map(([dayLabel, txArray]) => (
-            <div 
-              key={dayLabel} 
-              className="transactions-day-group"
-              style={{ marginBottom: "1rem" }}
-            >
+            <div key={dayLabel} className="transactions-day-group">
               <h3>{dayLabel}</h3>
               {txArray.map((tx) => {
-                // We'll show only the time (HH:MM) in the row,
-                // since the date is already in the heading:
                 const timeStr = new Date(tx.timestamp).toLocaleTimeString(
                   "en-US",
                   { hour: "numeric", minute: "2-digit" }
                 );
-
-                // Build single-line fields:
-                const accountLabel = accountIdToName(tx.account_id);
+                const accountLabel = resolveDisplayAccount(tx);
                 const amountLabel = formatAmount(tx);
                 const feeLabel = tx.fee !== 0 ? `Fee $${tx.fee}` : "";
                 const extraLabel = formatExtra(tx);
@@ -241,23 +256,23 @@ const Transactions: React.FC = () => {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      gap: "1rem", // space between columns
+                      gap: "1rem",
                       padding: "0.5rem 1rem",
                       marginBottom: "0.5rem",
                       borderRadius: "4px",
                       backgroundColor: "#1b1b1b",
-                      color: "#fff"
+                      color: "#fff",
                     }}
                   >
-                    {/*
-                      Single horizontal row, 6 columns:
+                    {/* 
+                      We'll keep the same columns:
                       1) Time
                       2) Type
-                      3) Account
+                      3) Account (now determined by from/to logic)
                       4) Amount
                       5) Fee
                       6) Extra
-                      and a trailing "Edit" button 
+                      7) [Edit button placeholder]
                     */}
                     <span style={{ minWidth: "70px" }}>{timeStr}</span>
                     <span style={{ minWidth: "80px" }}>{tx.type}</span>
@@ -266,13 +281,10 @@ const Transactions: React.FC = () => {
                     <span style={{ minWidth: "80px" }}>{feeLabel}</span>
                     <span style={{ flex: 1 }}>{extraLabel}</span>
 
-                    {/* 
-                      Edit button placeholder. 
-                      In the future, open the panel in an "edit mode".
-                    */}
                     <button
                       onClick={() => {
                         console.log("Edit transaction", tx.id);
+                        // For future: open panel in edit mode
                       }}
                       style={{
                         backgroundColor: "#333",
@@ -280,7 +292,7 @@ const Transactions: React.FC = () => {
                         border: "1px solid #666",
                         borderRadius: "4px",
                         padding: "0.3rem 0.6rem",
-                        cursor: "pointer"
+                        cursor: "pointer",
                       }}
                     >
                       Edit
@@ -293,7 +305,7 @@ const Transactions: React.FC = () => {
         </div>
       )}
 
-      {/* 5) The TransactionPanel (sliding form) */}
+      {/* The sliding TransactionPanel for adding new TXs */}
       <TransactionPanel
         isOpen={isPanelOpen}
         onClose={closePanel}

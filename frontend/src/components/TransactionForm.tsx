@@ -7,41 +7,29 @@ import "../styles/transactionForm.css";
  * -----------------------------------------------------------
  * 1) Enumerations & Types
  * -----------------------------------------------------------
- * 
- * These define:
- * - The allowed transaction/account enums
- * - The shape of the form data (TransactionFormData)
  */
-
-// Possible transaction types recognized by the app.
 type TransactionType = "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
-
-// Possible account types in the system.
 type AccountType = "Bank" | "Wallet" | "Exchange";
 
-// Additional dropdown enumerations for deposit/withdrawal.
+// Additional enumerations (unchanged)
 type DepositSource = "N/A" | "My BTC" | "Gift" | "Income" | "Interest" | "Reward";
 type WithdrawalPurpose = "N/A" | "Spent" | "Gift" | "Donation" | "Lost";
 type Currency = "USD" | "BTC";
 
 /**
- * The full shape of the data we collect from the TransactionForm.
- * Each transaction type reuses a subset of these fields:
- * - Common fields for deposit/withdrawal (account, currency, amount, fee, etc.)
- * - Transfer-only fields (fromAccount, fromCurrency, amountFrom, etc.)
- * - Buy/Sell fields (amountUSD, amountBTC)
+ * The form data shape from react-hook-form
  */
 interface TransactionFormData {
   // Basic
-  type: TransactionType;      
-  timestamp: string;           // local date/time input, converted to ISO on submit
+  type: TransactionType;
+  timestamp: string;
   account?: AccountType;       
-  currency?: Currency;         
+  currency?: Currency;
   amount?: number;             
   source?: DepositSource;      
   purpose?: WithdrawalPurpose; 
-  fee?: number;                
-  costBasisUSD?: number;       // used if depositing BTC
+  fee?: number;
+  costBasisUSD?: number;       
 
   // Transfer
   fromAccount?: AccountType;
@@ -57,8 +45,7 @@ interface TransactionFormData {
 }
 
 /**
- * Label dictionaries for dropdown usage 
- * (transactionTypeLabels, accountLabels).
+ * Label dictionaries for dropdown usage
  */
 const transactionTypeLabels: Record<TransactionType, string> = {
   Deposit: "Deposit",
@@ -74,7 +61,19 @@ const accountLabels: Record<AccountType, string> = {
 };
 
 /**
- * Helper: map an AccountType string to a numeric ID your backend uses.
+ * -----------------------------------------------------------
+ * 2) ID Mappings: 
+ *    Double-Entry approach requires from_account_id & to_account_id
+ * -----------------------------------------------------------
+ * We define two helper functions:
+ *  1) mapAccountToId: returns the numeric ID for Bank=1, Wallet=2, Exchange=3.
+ *  2) mapDoubleEntryAccounts: picks from_account_id / to_account_id 
+ *     for each transaction type.
+ */
+
+/** 
+ * Returns numeric ID for local "Bank", "Wallet", or "Exchange".
+ * You can expand if you have sub-accounts for Exchange.
  */
 function mapAccountToId(account?: AccountType): number {
   switch (account) {
@@ -85,17 +84,62 @@ function mapAccountToId(account?: AccountType): number {
     case "Exchange":
       return 3;
     default:
-      return 0; // fallback if undefined/unknown
+      return 0; // fallback if undefined
+  }
+}
+
+/** 
+ * For deposit/withdrawal, we treat the other side as "External" (ID=4).
+ * For buy/sell with a single Exchange, we do from=3 and to=3, 
+ * letting the backend interpret amounts in different currencies.
+ * For transfer, we use the fromAccount / toAccount chosen by the user.
+ */
+function mapDoubleEntryAccounts(data: TransactionFormData): {
+  from_account_id: number;
+  to_account_id: number;
+} {
+  // We define a fake ID for "External" = 4 (adjust if your backend uses a different ID).
+  const EXTERNAL_ID = 4;
+
+  switch (data.type) {
+    case "Deposit": {
+      // from= external, to= chosen account
+      return {
+        from_account_id: EXTERNAL_ID,
+        to_account_id: mapAccountToId(data.account),
+      };
+    }
+    case "Withdrawal": {
+      // from= chosen account, to= external
+      return {
+        from_account_id: mapAccountToId(data.account),
+        to_account_id: EXTERNAL_ID,
+      };
+    }
+    case "Transfer": {
+      // from= data.fromAccount, to= data.toAccount
+      return {
+        from_account_id: mapAccountToId(data.fromAccount),
+        to_account_id: mapAccountToId(data.toAccount),
+      };
+    }
+    case "Buy":
+    case "Sell": {
+      // single exchange approach => from=3, to=3
+      return {
+        from_account_id: 3,
+        to_account_id: 3,
+      };
+    }
+    default:
+      return { from_account_id: 0, to_account_id: 0 };
   }
 }
 
 /**
  * -----------------------------------------------------------
- * 2) Props for TransactionForm
+ * 3) Props
  * -----------------------------------------------------------
- * - 'id' allows an external <button form=...> to submit this form
- * - 'onDirtyChange' notifies parent if the form is dirty
- * - 'onSubmitSuccess' fires after a successful POST
  */
 interface TransactionFormProps {
   id?: string;
@@ -105,23 +149,14 @@ interface TransactionFormProps {
 
 /**
  * -----------------------------------------------------------
- * 3) TransactionForm Component
+ * 4) TransactionForm
  * -----------------------------------------------------------
- * Manages the UI for creating new transactions or editing existing ones.
- * Uses react-hook-form for data handling and validation.
  */
 const TransactionForm: React.FC<TransactionFormProps> = ({
   id,
   onDirtyChange,
   onSubmitSuccess,
 }) => {
-  /**
-   * -----------------------------------------------------------
-   * 3A) React-Hook-Form Setup
-   * -----------------------------------------------------------
-   * 'defaultValues' sets initial form field values. 
-   * We default 'timestamp' to now, 'fee' and 'costBasisUSD' to 0.
-   */
   const {
     register,
     handleSubmit,
@@ -137,37 +172,18 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     },
   });
 
-  /**
-   * We'll keep track of the chosen transaction type in this local state,
-   * so we can render the correct dynamic fields (Deposit vs Withdrawal, etc.).
-   */
   const [currentType, setCurrentType] = useState<TransactionType | "">("");
-
-  // Watch certain fields to implement dynamic logic:
-  const account = watch("account");          // e.g. Bank, Wallet, Exchange
-  const currency = watch("currency");        // e.g. USD, BTC
-  const fromAccount = watch("fromAccount");  // used in Transfer logic
+  const account = watch("account");
+  const currency = watch("currency");
+  const fromAccount = watch("fromAccount");
   const fromCurrencyVal = watch("fromCurrency");
 
-  /**
-   * -----------------------------------------------------------
-   * 3B) Track dirty state changes
-   * -----------------------------------------------------------
-   * If the form is dirty, notify the parent. 
-   * The parent might show a discard-changes modal, etc.
-   */
+  // Track dirty state in parent
   useEffect(() => {
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
 
-  /**
-   * -----------------------------------------------------------
-   * 3C) Auto-set currency for Deposit/Withdrawal
-   * -----------------------------------------------------------
-   * If user picks 'Bank' for a Deposit, we auto-set currency=USD.
-   * If user picks 'Wallet', currency=BTC. 
-   * For 'Exchange', the user must pick manually.
-   */
+  // Auto-set currency for deposit/withdrawal
   useEffect(() => {
     if (currentType === "Deposit" || currentType === "Withdrawal") {
       if (account === "Bank") {
@@ -175,18 +191,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       } else if (account === "Wallet") {
         setValue("currency", "BTC");
       }
+      // if "Exchange", user picks manually
     }
   }, [account, currentType, setValue]);
 
-  /**
-   * -----------------------------------------------------------
-   * 3D) Auto-set from/to for Transfers
-   * -----------------------------------------------------------
-   * If 'fromAccount' is Bank => fromCurrency=USD => toAccount=Exchange => toCurrency=USD, etc.
-   * If 'fromAccount' is Exchange => we look at fromCurrency to decide toAccount=Bank/Wallet.
-   */
+  // Auto-set from/to for Transfer
   useEffect(() => {
-    if (currentType !== "Transfer") return; 
+    if (currentType !== "Transfer") return;
     if (fromAccount === "Bank") {
       setValue("fromCurrency", "USD");
       setValue("toAccount", "Exchange");
@@ -206,13 +217,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   }, [currentType, fromAccount, fromCurrencyVal, setValue]);
 
-  /**
-   * -----------------------------------------------------------
-   * 3E) onTransactionTypeChange
-   * -----------------------------------------------------------
-   * If the user picks a new transaction type, we reset
-   * the form to default. 
-   */
+  // Reset form on type change
   const onTransactionTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedType = e.target.value as TransactionType;
     setCurrentType(selectedType);
@@ -224,13 +229,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     });
   };
 
-  /**
-   * -----------------------------------------------------------
-   * 3F) showCostBasisField
-   * -----------------------------------------------------------
-   * We only show the cost basis input if it's a BTC deposit 
-   * into a Wallet or Exchange.
-   */
+  // Show costBasis if depositing BTC into a wallet/exchange
   const showCostBasisField =
     currentType === "Deposit" &&
     currency === "BTC" &&
@@ -238,26 +237,23 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   /**
    * -----------------------------------------------------------
-   * 3G) onSubmit
+   * 4A) onSubmit -> new double-entry payload
    * -----------------------------------------------------------
-   * Called when the user submits the form. We build the payload
-   * expected by the backend, then POST to create a new transaction.
    */
   const onSubmit: SubmitHandler<TransactionFormData> = async (data) => {
-    // Convert local date/time to an ISO string
     const isoTimestamp = new Date(data.timestamp).toISOString();
 
-    // We'll calculate amountUSD, amountBTC, source, purpose, accountId based on type
+    // 1) Determine from_account_id / to_account_id
+    const { from_account_id, to_account_id } = mapDoubleEntryAccounts(data);
+
+    // 2) Decide amounts in USD vs BTC
     let amountUSD = 0.0;
     let amountBTC = 0.0;
     let source = "N/A";
     let purpose = "N/A";
-    let accountId = 0;
 
-    // Decide which fields to fill
     switch (data.type) {
       case "Deposit": {
-        accountId = mapAccountToId(data.account);
         if (data.currency === "USD") {
           amountUSD = data.amount || 0;
         } else {
@@ -267,7 +263,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         break;
       }
       case "Withdrawal": {
-        accountId = mapAccountToId(data.account);
         if (data.currency === "USD") {
           amountUSD = data.amount || 0;
         } else {
@@ -277,31 +272,36 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         break;
       }
       case "Transfer": {
-        // For a transfer, the "from" side is tracked in this record
-        accountId = mapAccountToId(data.fromAccount);
+        // "From" side: set amounts for the currency from fromCurrency
         if (data.fromCurrency === "USD") {
           amountUSD = data.amountFrom || 0;
         } else {
           amountBTC = data.amountFrom || 0;
         }
+        // (We ignore data.amountTo, fee is separate)
         break;
       }
-      case "Buy":
-      case "Sell": {
-        // Always Exchange
-        accountId = 3;
+      case "Buy": {
         amountUSD = data.amountUSD || 0;
         amountBTC = data.amountBTC || 0;
         break;
       }
+      case "Sell": {
+        amountBTC = data.amountBTC || 0;
+        amountUSD = data.amountUSD || 0;
+        break;
+      }
+      default:
+        break;
     }
 
-    // If it's a BTC deposit, we might have a cost basis from the user
+    // 3) If it's a BTC deposit with a cost basis
     const finalCostBasis = showCostBasisField ? (data.costBasisUSD || 0) : 0;
 
-    // Build the payload
+    // 4) Build the payload for double-entry
     const transactionPayload = {
-      account_id: accountId,
+      from_account_id,
+      to_account_id,
       type: data.type,
       amount_usd: amountUSD,
       amount_btc: amountBTC,
@@ -313,7 +313,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       is_locked: false,
     };
 
-    // POST to your backend
     try {
       const response = await axios.post(
         "http://127.0.0.1:8000/api/transactions",
@@ -321,18 +320,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       );
       console.log("Transaction created:", response.data);
 
-      // Reset form + notify user
+      // Reset form + notify
       reset();
       setCurrentType("");
       alert("Transaction created successfully!");
-
-      // If parent wants to refresh or close, call it
       onSubmitSuccess?.();
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        const message =
-          error.response?.data?.detail || error.message || "An error occurred";
-        alert(`Failed to create transaction: ${message}`);
+        const msg = error.response?.data?.detail || error.message || "Error";
+        alert(`Failed to create transaction: ${msg}`);
       } else if (error instanceof Error) {
         alert(`Failed to create transaction: ${error.message}`);
       } else {
@@ -343,13 +339,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   /**
    * -----------------------------------------------------------
-   * 3H) renderDynamicFields
+   * 4B) Dynamic Fields
    * -----------------------------------------------------------
-   * Based on currentType, render the appropriate fields:
-   * - Deposit => account, currency, amount, source, fee, etc.
-   * - Withdrawal => account, currency, amount, purpose, fee, etc.
-   * - Transfer => fromAccount, toAccount, etc.
-   * - Buy/Sell => exchange fields for USD + BTC amounts
+   * We keep the same approach but ignore 'account_id' in the final payload,
+   * using from/to IDs instead.
    */
   const renderDynamicFields = () => {
     switch (currentType) {
@@ -612,7 +605,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               )}
             </div>
 
-            {/* To Account (read-only, auto-filled) */}
+            {/* To Account (auto-filled) */}
             <div className="form-group">
               <label>To Account:</label>
               <input
@@ -623,7 +616,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               />
             </div>
 
-            {/* To Currency (read-only, auto-filled) */}
+            {/* To Currency (auto-filled) */}
             <div className="form-group">
               <label>To Currency:</label>
               <input
@@ -648,7 +641,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               )}
             </div>
 
-            {/* Fee in USD */}
+            {/* Fee (USD) */}
             <div className="form-group">
               <label>Fee (USD):</label>
               <input
@@ -664,7 +657,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       case "Buy":
         return (
           <>
-            {/* Account is always Exchange */}
+            {/* Account always Exchange */}
             <div className="form-group">
               <label>Account:</label>
               <input
@@ -676,7 +669,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               />
             </div>
 
-            {/* Amount USD */}
             <div className="form-group">
               <label>Amount USD:</label>
               <input
@@ -690,7 +682,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               )}
             </div>
 
-            {/* Amount BTC */}
             <div className="form-group">
               <label>Amount BTC:</label>
               <input
@@ -704,7 +695,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               )}
             </div>
 
-            {/* Fee (USD) */}
             <div className="form-group">
               <label>Fee (USD):</label>
               <input
@@ -720,7 +710,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       case "Sell":
         return (
           <>
-            {/* Account is always Exchange */}
+            {/* Account always Exchange */}
             <div className="form-group">
               <label>Account:</label>
               <input
@@ -732,7 +722,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               />
             </div>
 
-            {/* Amount BTC */}
             <div className="form-group">
               <label>Amount BTC:</label>
               <input
@@ -746,7 +735,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               )}
             </div>
 
-            {/* Amount USD */}
             <div className="form-group">
               <label>Amount USD:</label>
               <input
@@ -760,7 +748,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               )}
             </div>
 
-            {/* Fee (USD) */}
             <div className="form-group">
               <label>Fee (USD):</label>
               <input
@@ -774,26 +761,21 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         );
 
       default:
-        // If the user hasn't selected a type yet, or it's unknown
         return null;
     }
   };
 
   /**
-   * -----------------------------------------------------------
-   * 3I) Render
-   * -----------------------------------------------------------
-   * We place all form fields in a grid layout (transaction-form + form-fields-grid).
-   * The parent panel can submit this form by referencing id={id}.
+   * 4C) Render
    */
   return (
     <form
-      id={id || "transactionFormId"} // in case the panel's save button uses form="transactionFormId"
+      id={id || "transactionFormId"}
       className="transaction-form"
       onSubmit={handleSubmit(onSubmit)}
     >
       <div className="form-fields-grid">
-        {/* Top row: transaction type + date/time */}
+        {/* Transaction Type + timestamp */}
         <div className="form-group">
           <label>Transaction Type:</label>
           <select
@@ -823,17 +805,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           )}
         </div>
 
-        {/* Dynamic fields for deposit/withdrawal/transfer/buy/sell */}
+        {/* Dynamic fields */}
         {renderDynamicFields()}
-
-        {/*
-          (Optional) If you want an internal submit button:
-          <div className="form-group" style={{ gridColumn: "1 / -1" }}>
-            <button type="submit" className="submit-button">
-              Submit Transaction
-            </button>
-          </div>
-        */}
       </div>
     </form>
   );

@@ -1,82 +1,63 @@
 """
 backend/models/user.py
 
-This module defines the User model for BitcoinTX—a Bitcoin-only portfolio tracker
-and transaction management application.
+Refactored in the context of the new double-entry system.
+No significant changes were required here, since:
+  - The User model itself does not reference Transaction or account_id directly.
+  - The Accounts relationship remains valid in double-entry; each Account can now have
+    transactions_from and transactions_to, but that's handled in Account's model.
 
-BitcoinTX is designed as a one-user application, so typically only a single user record
-will exist. However, the model is built using standard practices to allow for future
-extensions or changes if needed.
-
-Key Features:
-  - Stores a unique user ID, username, and a hashed password.
-  - Uses passlib to securely hash and verify passwords.
-  - Establishes a one-to-many relationship with the Account model (each user can have
-    multiple accounts, such as a bank account, wallet, and exchange account).
-  - Provides helper methods for setting and verifying passwords.
+We merely add comments indicating how User relates to the updated Account structure.
 """
 
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship
-from backend.database import Base
 from passlib.context import CryptContext
 
+from backend.database import Base
+
 # --- Password Hashing Context ---
-# The CryptContext is configured to use bcrypt for hashing passwords.
-# This context allows you to hash passwords securely and verify them later.
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# --- User Model ---
 class User(Base):
+    """
+    Represents a user of the BitcoinTX application.
+
+    Even though the app is primarily single-user, we design this model so it can handle
+    multiple users if needed in the future. Each User can have multiple Account records
+    (like Bank, Wallet, ExchangeUSD, ExchangeBTC, etc.).
+    """
     __tablename__ = 'users'
 
-    # --- Columns ---
-    id = Column(Integer, primary_key=True, index=True)  
-    # 'id' is the unique identifier for the user.
+    # Primary Key
+    id = Column(Integer, primary_key=True, index=True)
 
-    username = Column(String(255), unique=True, nullable=False)  
-    # 'username' is the unique login identifier.
-    
-    password_hash = Column(String(255), nullable=False)  
-    # 'password_hash' stores the securely hashed password.
+    # Unique username
+    username = Column(String(255), unique=True, nullable=False)
 
-    # --- Relationships ---
+    # Bcrypt-hashed password
+    password_hash = Column(String(255), nullable=False)
+
+    # Relationship to Account
+    # 'accounts' is a list of Account objects that belong to this user.
+    # In double-entry, each Account can have transactions_from and transactions_to
+    # referencing the Transaction model, but that doesn't require changes here.
     accounts = relationship("Account", back_populates="user")
-    # The 'accounts' relationship links this user to one or more Account records.
-    # Even though BitcoinTX is a one-user application, this relationship allows the user
-    # to manage multiple accounts (e.g., Bank, Wallet, Exchange).
 
-    # --- Helper Methods ---
-    
     def set_password(self, password: str):
         """
-        Hash and set the user's password.
-
-        This method takes a plain-text password, hashes it using bcrypt (via passlib),
-        and stores the resulting hash in the password_hash column.
-
-        Args:
-            password (str): The plain-text password to be hashed.
+        Hash and store the user's password using passlib (bcrypt).
         """
         self.password_hash = pwd_context.hash(password)
 
     def verify_password(self, password: str) -> bool:
         """
-        Verify the provided plain-text password against the stored hash.
-
-        Args:
-            password (str): The plain-text password to verify.
-
-        Returns:
-            bool: True if the password matches the stored hash; otherwise, False.
+        Verify a plain-text password against the stored hash.
         """
         return pwd_context.verify(password, self.password_hash)
 
     def __repr__(self) -> str:
         """
-        Provide a string representation of the User instance for debugging purposes.
-
-        Returns:
-            str: A string representation of the user, including id and username.
+        Debug-friendly string representation of this User instance.
         """
         return f"<User(id={self.id}, username={self.username})>"

@@ -1,11 +1,16 @@
 """
 models/transaction.py
 
-Defines the Transaction model and related enumerations for BitcoinTX.
-We've updated it to:
-  - Use DECIMAL(12,2) for USD amounts and DECIMAL(16,8) for BTC amounts.
-  - Preserve 'is_locked', 'cost_basis_usd', 'fee', enumerations, etc.
-  - Store timestamps with a default of datetime.utcnow (treated as UTC).
+Refactored to support a single-row double-entry design (Plan B):
+  - Removed account_id in favor of from_account_id and to_account_id.
+  - Each Transaction row now represents one user action (Deposit, Withdrawal, Transfer, Buy, Sell),
+    with a 'from' side and a 'to' side.
+  - The columns amount_usd and amount_btc remain for storing the currency amounts involved.
+    For cross-currency (e.g., Buy), it's possible that from_account uses USD while to_account uses BTC.
+  - cost_basis_usd and fee remain on the Transaction for consistency with prior usage.
+  - is_locked still enforces a locking mechanism (discussed elsewhere).
+  - We preserve enumerations for type, purpose, source.
+  - Timestamps are still DateTime, defaulting to datetime.utcnow (treated as UTC).
 """
 
 import enum
@@ -14,7 +19,6 @@ from sqlalchemy import (
     Column,
     Integer,
     DateTime,
-    String,
     Boolean,
     DECIMAL,
     Enum as SAEnum,
@@ -22,6 +26,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from backend.database import Base
+
+# ----------------------
+#     Enumerations
+# ----------------------
 
 class TransactionType(enum.Enum):
     """
@@ -70,49 +78,108 @@ class TransactionSource(enum.Enum):
     Interest = "Interest"
     Reward = "Reward"
 
+# ----------------------
+#     Transaction
+# ----------------------
+
 class Transaction(Base):
     """
-    SQLAlchemy ORM model for transactions in BitcoinTX.
+    SQLAlchemy ORM model for a single transaction row in BitcoinTX,
+    supporting Plan B for double-entry: a single row with 'from' and 'to' accounts.
 
-    Changes for DECIMAL Precision:
-      - amount_usd: DECIMAL(12,2)
-      - amount_btc: DECIMAL(16,8)
-      - fee: DECIMAL(12,2)
-      - cost_basis_usd: DECIMAL(12,2)
-      - is_locked remains a boolean placeholder for our locking mechanism.
+    Key Changes vs. old design:
+      1. Removed account_id (old single-account reference).
+      2. Added from_account_id and to_account_id (both referencing the 'accounts' table).
+      3. Kept amount_usd, amount_btc, fee, cost_basis_usd, etc. so minimal disruption to rest of code.
+      4. Each transaction can represent:
+         - Deposit (from_account_id=External, to_account_id=some user account),
+         - Withdrawal (from_account_id=user account, to_account_id=External),
+         - Transfer (from_account_id=user account A, to_account_id=user account B),
+         - Buy (from_account_id=ExchangeUSD, to_account_id=ExchangeBTC),
+         - Sell (inverse of Buy).
+      5. is_locked remains for the transaction-locking logic.
+
+    SQLAlchemy Notes:
+      - from_account_id and to_account_id can be nullable=False, or you can allow them to be nullable
+        if certain special cases (like purely external placeholders) appear. For minimal confusion,
+        let's keep them non-nullable so every transaction has a distinct "from" and "to" side.
+
+    Decimal Precision:
+      - amount_usd: DECIMAL(12, 2)
+      - amount_btc: DECIMAL(16, 8)
+      - fee: DECIMAL(12, 2)
+      - cost_basis_usd: DECIMAL(12, 2)
     """
 
     __tablename__ = 'transactions'
 
+    # ----------------------
+    #  Primary Key
+    # ----------------------
     id = Column(Integer, primary_key=True, index=True)
-    account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
 
-    type = Column(SAEnum(TransactionType), nullable=False)
-    
-    # Use DECIMAL(12,2) for USD, DECIMAL(16,8) for BTC
-    amount_usd = Column(DECIMAL(12, 2), default=0, nullable=False)
-    amount_btc = Column(DECIMAL(16, 8), default=0, nullable=False)
+    # ----------------------
+    #  Accounts (New Fields)
+    # ----------------------
+    from_account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False,
+                             doc="Which account funds are moving from.")
+    to_account_id   = Column(Integer, ForeignKey('accounts.id'), nullable=False,
+                             doc="Which account funds are moving to.")
 
-    # cost_basis_usd: cost basis for BTC deposits (optional for other types)
-    cost_basis_usd = Column(DECIMAL(12, 2), nullable=True)
+    # ----------------------
+    #  Transaction Type
+    # ----------------------
+    type = Column(SAEnum(TransactionType), nullable=False, doc="Deposit, Withdrawal, Transfer, Buy, Sell")
 
-    # Single fee column in USD
-    fee = Column(DECIMAL(12, 2), nullable=True)
+    # ----------------------
+    #  Currency Amounts
+    # ----------------------
+    amount_usd = Column(DECIMAL(12, 2), default=0, nullable=False,
+                        doc="Amount of USD involved in this transaction (if any).")
+    amount_btc = Column(DECIMAL(16, 8), default=0, nullable=False,
+                        doc="Amount of BTC involved in this transaction (if any).")
 
-    # Timestamps treated as UTC (though not forcibly converted)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    # ----------------------
+    #  Additional Fields
+    # ----------------------
+    cost_basis_usd = Column(DECIMAL(12, 2), nullable=True,
+                            doc="Optional cost basis in USD for BTC acquisitions (e.g. when depositing external BTC).")
+    fee = Column(DECIMAL(12, 2), nullable=True,
+                 doc="Transaction fee in USD (e.g. a trading fee or withdrawal fee).")
 
-    purpose = Column(SAEnum(TransactionPurpose), nullable=True)
-    source = Column(SAEnum(TransactionSource), nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False,
+                       doc="Creation timestamp. Defaults to UTC at insertion time.")
+    purpose   = Column(SAEnum(TransactionPurpose), nullable=True,
+                       doc="Purpose (mostly relevant for withdrawals).")
+    source    = Column(SAEnum(TransactionSource), nullable=True,
+                       doc="Source (mostly relevant for deposits).")
+    is_locked = Column(Boolean, default=False, nullable=False,
+                       doc="Locking mechanism to prevent edits after year close.")
 
-    is_locked = Column(Boolean, default=False, nullable=False)
-
-    account = relationship("Account", back_populates="transactions")
+    # ----------------------
+    #  Relationships
+    # ----------------------
+    # For convenience, we can define relationships to 'Account' for
+    # from_account and to_account. The 'Account' model must have no
+    # conflicting relationship names. We'll just define them here
+    # if we want easy access to the actual objects:
+    from_account = relationship(
+        "Account",
+        foreign_keys=[from_account_id],
+        back_populates="transactions_from"
+    )
+    to_account = relationship(
+        "Account",
+        foreign_keys=[to_account_id],
+        back_populates="transactions_to"
+    )
 
     def __repr__(self):
         return (
-            f"<Transaction(id={self.id}, account_id={self.account_id}, type={self.type}, "
-            f"amount_usd={self.amount_usd}, amount_btc={self.amount_btc}, timestamp={self.timestamp}, "
-            f"fee={self.fee}, cost_basis_usd={self.cost_basis_usd}, is_locked={self.is_locked}, "
+            f"<Transaction(id={self.id}, "
+            f"from_account_id={self.from_account_id}, to_account_id={self.to_account_id}, "
+            f"type={self.type}, amount_usd={self.amount_usd}, amount_btc={self.amount_btc}, "
+            f"fee={self.fee}, cost_basis_usd={self.cost_basis_usd}, "
+            f"timestamp={self.timestamp}, is_locked={self.is_locked}, "
             f"purpose={self.purpose}, source={self.source})>"
         )
