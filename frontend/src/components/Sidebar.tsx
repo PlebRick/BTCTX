@@ -2,6 +2,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import logo from '../assets/logo.svg';
+import Calculator from './Calculator';
 
 const Sidebar: React.FC = () => {
   return (
@@ -19,6 +20,11 @@ const Sidebar: React.FC = () => {
         <NavLink to="/reports" className="nav-item">Reports</NavLink>
         <NavLink to="/settings" className="nav-item">Settings</NavLink>
       </nav>
+
+      {/* Calculator Section */}
+      <div className="sidebar-calculator">
+        <Calculator />
+      </div>
     </aside>
   );
 };
