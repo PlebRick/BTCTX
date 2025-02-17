@@ -2,79 +2,70 @@
 
 /* The overall form container */
 .transaction-form {
-    /* Vertical layout for the form itself, 
-       but the inner grid will handle columns */
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    color: var(--color-text);
-  
-    /* Slightly smaller font than your original (0.9rem -> 0.85rem) */
-    font-size: 0.85rem;
-  }
-  
-  /* The grid wrapper for all fields */
-  .form-fields-grid {
-    display: grid;
-    gap: 1rem;
-  
-    /* auto-fit with a min width ensures columns only if there's room */
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  }
-  
-  /* Each label + input (or select) pair */
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 0.75rem;
-  }
-  
-  /* The label styling */
-  .form-group label {
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-  }
-  
-  /* Inputs and selects share this .form-control class */
-  .form-control {
-    padding: 0.5rem;
-    background-color: #1a1a1a;
-    color: var(--color-text);
-    border: 1px solid #444;
-    border-radius: 4px;
-  
-    /* Match the overall form font-size (0.85rem) */
-    font-size: 0.85rem;
-    outline: none;
-    transition: border-color 0.2s, background-color 0.2s;
-  }
-  
-  /* Focus styling with your gold accent */
-  .form-control:focus {
-    border-color: var(--color-accent);
-    background-color: #2a2a2a;
-  }
-  
-  /* Error message styling */
-  .error-text {
-    color: #e74c3c;
-    font-size: 0.75rem; /* a bit smaller than 0.85rem */
-    margin-top: 0.25rem;
-  }
-  
-  /* If you keep the form's own button for debugging or fallback */
-  .submit-button {
-    background-color: var(--color-accent);
-    color: #000;
-    border: none;
-    border-radius: 4px;
-    padding: 0.75rem 1.25rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    margin-top: 0.5rem;
-  }
-  
-  .submit-button:hover {
-    background-color: var(--color-accent-hover);
-  }
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+/* The grid wrapper for all fields */
+.form-fields-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* Each label + input (or select) pair */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.75rem;
+}
+
+/* The label styling */
+.form-group label {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+/* Inputs and selects share this .form-control class */
+.form-control {
+  padding: 0.5rem;
+  background-color: #1a1a1a;
+  color: var(--color-text);
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.form-control:focus {
+  border-color: var(--color-accent);
+  background-color: #2a2a2a;
+}
+
+/* Error message styling */
+.error-text {
+  color: #e74c3c;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* If you keep the form's own button for debugging or fallback */
+.submit-button {
+  background-color: var(--color-accent);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-top: 0.5rem;
+}
+
+.submit-button:hover {
+  background-color: var(--color-accent-hover);
+}

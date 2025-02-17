@@ -10,8 +10,6 @@ import "../styles/transactionForm.css";
  */
 type TransactionType = "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
 type AccountType = "Bank" | "Wallet" | "Exchange";
-
-// Additional enumerations (unchanged)
 type DepositSource = "N/A" | "My BTC" | "Gift" | "Income" | "Interest" | "Reward";
 type WithdrawalPurpose = "N/A" | "Spent" | "Gift" | "Donation" | "Lost";
 type Currency = "USD" | "BTC";
@@ -45,7 +43,9 @@ interface TransactionFormData {
 }
 
 /**
- * Label dictionaries for dropdown usage
+ * -----------------------------------------------------------
+ * 2) Label dictionaries (unchanged)
+ * -----------------------------------------------------------
  */
 const transactionTypeLabels: Record<TransactionType, string> = {
   Deposit: "Deposit",
@@ -62,73 +62,77 @@ const accountLabels: Record<AccountType, string> = {
 
 /**
  * -----------------------------------------------------------
- * 2) ID Mappings: 
- *    Double-Entry approach requires from_account_id & to_account_id
+ * 3) ID Mappings for Double-Entry
  * -----------------------------------------------------------
- * We define two helper functions:
- *  1) mapAccountToId: returns the numeric ID for Bank=1, Wallet=2, Exchange=3.
- *  2) mapDoubleEntryAccounts: picks from_account_id / to_account_id 
- *     for each transaction type.
+ * We have: 
+ *   Bank = 1, 
+ *   Wallet = 2, 
+ *   ExchangeUSD = 3, 
+ *   ExchangeBTC = 4, 
+ *   External = 99
  */
 
 /** 
- * Returns numeric ID for local "Bank", "Wallet", or "Exchange".
- * You can expand if you have sub-accounts for Exchange.
+ * We’ll map “Bank” => 1, “Wallet” => 2, 
+ * “Exchange” => 3 or 4, depending on currency.
+ * If no currency is provided (edge case), default to ExchangeUSD=3.
  */
-function mapAccountToId(account?: AccountType): number {
-  switch (account) {
-    case "Bank":
-      return 1;
-    case "Wallet":
-      return 2;
-    case "Exchange":
-      return 3;
-    default:
-      return 0; // fallback if undefined
+function mapAccountToId(account?: AccountType, currency?: Currency): number {
+  if (account === "Bank") return 1;
+  if (account === "Wallet") return 2;
+  if (account === "Exchange") {
+    if (currency === "BTC") return 4;  // ExchangeBTC
+    return 3;                         // ExchangeUSD by default
   }
+  return 0; // fallback
 }
 
+const EXTERNAL_ID = 99; // "External"  
+const EXCHANGE_USD_ID = 3;
+const EXCHANGE_BTC_ID = 4;
+
 /** 
- * For deposit/withdrawal, we treat the other side as "External" (ID=4).
- * For buy/sell with a single Exchange, we do from=3 and to=3, 
- * letting the backend interpret amounts in different currencies.
- * For transfer, we use the fromAccount / toAccount chosen by the user.
+ * mapDoubleEntryAccounts: determines from_account_id / to_account_id
+ * based on transaction type and (optionally) currency.
  */
 function mapDoubleEntryAccounts(data: TransactionFormData): {
   from_account_id: number;
   to_account_id: number;
 } {
-  // We define a fake ID for "External" = 4 (adjust if your backend uses a different ID).
-  const EXTERNAL_ID = 4;
-
   switch (data.type) {
     case "Deposit": {
-      // from= external, to= chosen account
+      // from= EXTERNAL, to= chosen "account" + currency
       return {
         from_account_id: EXTERNAL_ID,
-        to_account_id: mapAccountToId(data.account),
+        to_account_id: mapAccountToId(data.account, data.currency),
       };
     }
     case "Withdrawal": {
-      // from= chosen account, to= external
+      // from= chosen "account" + currency, to= EXTERNAL
       return {
-        from_account_id: mapAccountToId(data.account),
+        from_account_id: mapAccountToId(data.account, data.currency),
         to_account_id: EXTERNAL_ID,
       };
     }
     case "Transfer": {
-      // from= data.fromAccount, to= data.toAccount
+      // from= fromAccount/fromCurrency, to= toAccount/toCurrency
       return {
-        from_account_id: mapAccountToId(data.fromAccount),
-        to_account_id: mapAccountToId(data.toAccount),
+        from_account_id: mapAccountToId(data.fromAccount, data.fromCurrency),
+        to_account_id: mapAccountToId(data.toAccount, data.toCurrency),
       };
     }
-    case "Buy":
-    case "Sell": {
-      // single exchange approach => from=3, to=3
+    case "Buy": {
+      // from= ExchangeUSD=3 => to= ExchangeBTC=4
       return {
-        from_account_id: 3,
-        to_account_id: 3,
+        from_account_id: EXCHANGE_USD_ID,
+        to_account_id: EXCHANGE_BTC_ID,
+      };
+    }
+    case "Sell": {
+      // from= ExchangeBTC=4 => to= ExchangeUSD=3
+      return {
+        from_account_id: EXCHANGE_BTC_ID,
+        to_account_id: EXCHANGE_USD_ID,
       };
     }
     default:
@@ -138,7 +142,7 @@ function mapDoubleEntryAccounts(data: TransactionFormData): {
 
 /**
  * -----------------------------------------------------------
- * 3) Props
+ * 4) Props
  * -----------------------------------------------------------
  */
 interface TransactionFormProps {
@@ -149,7 +153,7 @@ interface TransactionFormProps {
 
 /**
  * -----------------------------------------------------------
- * 4) TransactionForm
+ * 5) TransactionForm
  * -----------------------------------------------------------
  */
 const TransactionForm: React.FC<TransactionFormProps> = ({
@@ -166,7 +170,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     formState: { errors, isDirty },
   } = useForm<TransactionFormData>({
     defaultValues: {
-      timestamp: new Date().toISOString().slice(0, 16), // local datetime
+      timestamp: new Date().toISOString().slice(0, 16), 
       fee: 0,
       costBasisUSD: 0,
     },
@@ -191,7 +195,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       } else if (account === "Wallet") {
         setValue("currency", "BTC");
       }
-      // if "Exchange", user picks manually
+      // if "Exchange", user picks manually => do nothing
     }
   }, [account, currentType, setValue]);
 
@@ -221,6 +225,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const onTransactionTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedType = e.target.value as TransactionType;
     setCurrentType(selectedType);
+
+    // Keep or reset the fields we want
     reset({
       type: selectedType,
       timestamp: new Date().toISOString().slice(0, 16),
@@ -229,7 +235,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     });
   };
 
-  // Show costBasis if depositing BTC into a wallet/exchange
+  // Show costBasis if depositing BTC into wallet/exchange
   const showCostBasisField =
     currentType === "Deposit" &&
     currency === "BTC" &&
@@ -237,13 +243,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   /**
    * -----------------------------------------------------------
-   * 4A) onSubmit -> new double-entry payload
+   * onSubmit -> build new double-entry payload
    * -----------------------------------------------------------
    */
   const onSubmit: SubmitHandler<TransactionFormData> = async (data) => {
     const isoTimestamp = new Date(data.timestamp).toISOString();
 
-    // 1) Determine from_account_id / to_account_id
+    // 1) Determine from_account_id / to_account_id with new function
     const { from_account_id, to_account_id } = mapDoubleEntryAccounts(data);
 
     // 2) Decide amounts in USD vs BTC
@@ -278,15 +284,17 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         } else {
           amountBTC = data.amountFrom || 0;
         }
-        // (We ignore data.amountTo, fee is separate)
+        // (We ignore data.amountTo here; fee is separate)
         break;
       }
       case "Buy": {
+        // from=3 (USD), to=4 (BTC)
         amountUSD = data.amountUSD || 0;
         amountBTC = data.amountBTC || 0;
         break;
       }
       case "Sell": {
+        // from=4 (BTC), to=3 (USD)
         amountBTC = data.amountBTC || 0;
         amountUSD = data.amountUSD || 0;
         break;
@@ -298,7 +306,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     // 3) If it's a BTC deposit with a cost basis
     const finalCostBasis = showCostBasisField ? (data.costBasisUSD || 0) : 0;
 
-    // 4) Build the payload for double-entry
+    // 4) Build the payload
     const transactionPayload = {
       from_account_id,
       to_account_id,
@@ -339,10 +347,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   /**
    * -----------------------------------------------------------
-   * 4B) Dynamic Fields
+   * Dynamic Fields (same UI as original)
    * -----------------------------------------------------------
-   * We keep the same approach but ignore 'account_id' in the final payload,
-   * using from/to IDs instead.
    */
   const renderDynamicFields = () => {
     switch (currentType) {
@@ -657,7 +663,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       case "Buy":
         return (
           <>
-            {/* Account always Exchange */}
+            {/* Account always Exchange (in UI) */}
             <div className="form-group">
               <label>Account:</label>
               <input
@@ -710,7 +716,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       case "Sell":
         return (
           <>
-            {/* Account always Exchange */}
+            {/* Account always Exchange (in UI) */}
             <div className="form-group">
               <label>Account:</label>
               <input
@@ -766,7 +772,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   };
 
   /**
-   * 4C) Render
+   * 6) Render
    */
   return (
     <form
@@ -805,7 +811,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           )}
         </div>
 
-        {/* Dynamic fields */}
+        {/* The rest of the fields are dynamically rendered */}
         {renderDynamicFields()}
       </div>
     </form>

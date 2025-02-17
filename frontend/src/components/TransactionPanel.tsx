@@ -1,13 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import '../styles/transactionPanel.css';
-import TransactionForm from '../components/TransactionForm';
+import React, { useEffect, useState } from "react";
+import "../styles/transactionPanel.css";
+import TransactionForm from "../components/TransactionForm";
 
-/**
- * TransactionPanelProps
- * - isOpen: controls the panel visibility
- * - onClose: callback to close the panel
- * - onSubmitSuccess: optional callback after a successful transaction post
- */
 interface TransactionPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -16,98 +10,89 @@ interface TransactionPanelProps {
 
 /**
  * TransactionPanel
- * Renders a sliding panel with an overlay, showing TransactionForm inside.
- * This panel is agnostic to single or double-entry; the new TransactionForm handles that logic.
+ * Shows a sliding panel with an overlay, containing TransactionForm inside.
  */
 const TransactionPanel: React.FC<TransactionPanelProps> = ({
   isOpen,
   onClose,
   onSubmitSuccess,
 }) => {
-  // Tracks if the form is dirty (user has unsaved changes).
-  const [isFormDirty, setIsFormDirty] = useState(false);
-
   // Whether to show a discard-changes confirmation modal
   const [showDiscardModal, setShowDiscardModal] = useState(false);
+  // Track whether the form is dirty (unsaved changes)
+  const [isFormDirty, setIsFormDirty] = useState(false);
 
-  // Reset everything when panel first opens
+  // Reset everything when panel opens
   useEffect(() => {
     if (isOpen) {
-      setIsFormDirty(false);
       setShowDiscardModal(false);
+      setIsFormDirty(false);
     }
   }, [isOpen]);
 
   /**
-   * Handle clicking the overlay:
-   * If the form is not dirty => close immediately.
-   * If the form is dirty => show discard confirmation.
+   * Clicking the overlay => if form has unsaved changes, show discard modal.
+   * Otherwise close the panel directly.
    */
   const handleOverlayClick = () => {
-    if (!isFormDirty) {
-      onClose();
-    } else {
+    if (isFormDirty) {
       setShowDiscardModal(true);
+    } else {
+      onClose();
     }
   };
 
-  /**
-   * Discard changes => close panel
-   */
+  /** Discard changes => close panel */
   const handleDiscardChanges = () => {
     setShowDiscardModal(false);
     onClose();
   };
 
-  /**
-   * Cancel discard => keep panel open
-   */
+  /** Cancel discard => keep panel open */
   const handleGoBack = () => {
     setShowDiscardModal(false);
   };
 
-  /**
-   * Called after TransactionForm successfully posts a transaction
-   */
+  /** Called after a successful transaction submission in TransactionForm */
   const handleFormSubmitSuccess = () => {
-    // Close the panel
-    onClose();
-    // Notify parent if provided
+    onClose();         // Close panel
     onSubmitSuccess?.();
   };
 
-  // We'll reference the form by this ID
-  const FORM_ID = "transactionFormId";
-
-  // If not open, render nothing
+  // If panel is closed, render nothing
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay (click to discard or close) */}
       <div className="transaction-panel-overlay" onClick={handleOverlayClick}></div>
 
+      {/* Sliding panel */}
       <div className="transaction-panel">
         {/* Header */}
         <div className="panel-header">
           <h2>Add Transaction</h2>
         </div>
 
-        {/* Body: Our double-entry TransactionForm */}
+        {/* Body with TransactionForm */}
         <div className="panel-body">
+          {/* 
+            Pass an `id` prop to TransactionForm so the form has <form id="transaction-form" ...>
+            Also pass onDirtyChange so we can track unsaved changes.
+          */}
           <TransactionForm
-            id={FORM_ID}
+            id="transaction-form"
             onDirtyChange={(dirty) => setIsFormDirty(dirty)}
             onSubmitSuccess={handleFormSubmitSuccess}
           />
         </div>
 
-        {/* Footer with a Save button that submits the form */}
+        {/* Footer with a Save button that submits the form above */}
         <div className="panel-footer">
-          <button 
+          <button
             className="save-button"
-            form={FORM_ID} 
             type="submit"
+            form="transaction-form"
           >
             Save Transaction
           </button>
