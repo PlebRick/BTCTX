@@ -5,8 +5,8 @@
 
     // Target modern JS features (ESNext) and let Vite handle browser compatibility
     "target": "ESNext",
-    // Include modern DOM libs and ES features to fix missing Promise/Iterable
-    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    // Include modern DOM libs and additional ES libraries to fix missing Promise/Iterable issues
+    "lib": ["DOM", "DOM.Iterable", "ESNext", "ES2015"],
     // Use ES modules for bundling (Vite expects this)
     "module": "ESNext",
 

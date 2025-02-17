@@ -51,7 +51,8 @@ const App: React.FC = () => {
       />
 
       {/* Dedicated route to access TransactionForm directly (for dev/testing) */}
-      <Route path="/transactions/new" element={<TransactionForm />} />
+      <Route path="/transactions/new" element={<TransactionForm id="transaction-form" />} />
+
 
       {/* Fallback catch-all: back to dashboard if unknown route */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

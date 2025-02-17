@@ -1,20 +1,13 @@
-"""
-backend/models/user.py
-
-Refactored in the context of the new double-entry system.
-No significant changes were required here, since:
-  - The User model itself does not reference Transaction or account_id directly.
-  - The Accounts relationship remains valid in double-entry; each Account can now have
-    transactions_from and transactions_to, but that's handled in Account's model.
-
-We merely add comments indicating how User relates to the updated Account structure.
-"""
-
+from __future__ import annotations
+from typing import List, TYPE_CHECKING
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from passlib.context import CryptContext
-
 from backend.database import Base
+
+# Conditionally import Account for type checking.
+if TYPE_CHECKING:
+    from backend.models.account import Account
 
 # --- Password Hashing Context ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -23,28 +16,26 @@ class User(Base):
     """
     Represents a user of the BitcoinTX application.
 
-    Even though the app is primarily single-user, we design this model so it can handle
-    multiple users if needed in the future. Each User can have multiple Account records
-    (like Bank, Wallet, ExchangeUSD, ExchangeBTC, etc.).
+    Even though the app is primarily single-user, this model is designed to handle
+    multiple users if needed. Each User can have multiple Account records (e.g.,
+    Bank, Wallet, ExchangeUSD, ExchangeBTC).
     """
     __tablename__ = 'users'
 
-    # Primary Key
-    id = Column(Integer, primary_key=True, index=True)
+    # Primary key.
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
-    # Unique username
-    username = Column(String(255), unique=True, nullable=False)
+    # Unique username.
+    username: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
-    # Bcrypt-hashed password
-    password_hash = Column(String(255), nullable=False)
+    # Bcrypt-hashed password.
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # Relationship to Account
+    # Relationship to Account.
     # 'accounts' is a list of Account objects that belong to this user.
-    # In double-entry, each Account can have transactions_from and transactions_to
-    # referencing the Transaction model, but that doesn't require changes here.
-    accounts = relationship("Account", back_populates="user")
+    accounts: Mapped[List[Account]] = relationship("Account", back_populates="user")
 
-    def set_password(self, password: str):
+    def set_password(self, password: str) -> None:
         """
         Hash and store the user's password using passlib (bcrypt).
         """

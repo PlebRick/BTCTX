@@ -1,208 +1,170 @@
 """
-services/transaction.py
+backend/services/transaction.py
 
-Refactored for Double-Entry (Plan B):
-  - Replaces the single 'account_id' field with 'from_account_id' and 'to_account_id'.
-  - Minimally updates balances in the from/to accounts (if desired).
-  - Preserves fee, cost_basis_usd, and locking placeholders.
-  - Future expansions can handle detailed cost basis recalculations, short/long-term gains, etc.
+Service functions to handle Transaction operations.
+This includes creating transactions with dual entries, updating account balances,
+and performing FIFO cost basis calculations for BTC sales.
 """
 
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
-# Import the updated Transaction model with from_account_id/to_account_id
-from backend.models.transaction import Transaction, TransactionType
-# Import updated schemas that have from_account_id/to_account_id
-from backend.schemas.transaction import TransactionCreate, TransactionUpdate
-# If we plan to adjust balances, we need the Account model
-from backend.models.account import AccountType, Account
+from sqlalchemy import func
+from datetime import datetime
+from backend.models.transaction import Transaction
+from backend.models.account import Account
 
 def get_all_transactions(db: Session):
-    """
-    Fetch all transactions in the database.
-    """
-    return db.query(Transaction).all()
+    """Retrieve all transactions ordered by timestamp descending."""
+    return db.query(Transaction).order_by(Transaction.timestamp.desc()).all()
 
 def get_transaction_by_id(transaction_id: int, db: Session):
-    """
-    Fetch a single transaction by its ID.
-    """
+    """Retrieve a single transaction by its ID."""
     return db.query(Transaction).filter(Transaction.id == transaction_id).first()
 
-def create_transaction_record(transaction_data: TransactionCreate, db: Session):
+def create_transaction_record(tx_data, db: Session):
     """
-    Create a new transaction based on TransactionCreate schema.
-    Key Differences in Double-Entry:
-      - We no longer have 'account_id'; we have 'from_account_id' and 'to_account_id'.
-      - If you want, we can update the from_account's balance (subtract) and the to_account's balance (add).
-      - cost_basis_usd remains relevant for external BTC deposits or trades.
-      - fee is always in USD, so we adjust the from_account's USD if needed.
-
-    Steps:
-      1. Create the Transaction object (with from_account_id and to_account_id).
-      2. Optionally update each account's balance (if from/to are not external placeholders).
-      3. Commit and return the new transaction.
+    Create a new transaction record.
+    
+    tx_data is assumed to be a dict or an object (e.g., Pydantic model) with fields:
+      - from_account_id
+      - to_account_id
+      - type (e.g., "BUY", "SELL", "DEPOSIT", "WITHDRAWAL", "TRANSFER")
+      - amount
+      - fee_amount, fee_currency, external_ref, etc.
+      - proceeds_usd (for SELL/BUY)
+      - cost_basis_usd (for BUY/DEPOSIT)
+    
+    For trade types (BUY/SELL) or transfers, this function may create two related entries,
+    linking them via group_id.
     """
-
-    # 1. Instantiate a new Transaction (the main difference is using from/to accounts)
-    new_transaction = Transaction(
-        from_account_id=transaction_data.from_account_id,
-        to_account_id=transaction_data.to_account_id,
-        type=transaction_data.type,
-        amount_usd=transaction_data.amount_usd,
-        amount_btc=transaction_data.amount_btc,
-        timestamp=transaction_data.timestamp,
-        source=transaction_data.source,
-        purpose=transaction_data.purpose,
-        fee=transaction_data.fee,
-        cost_basis_usd=transaction_data.cost_basis_usd,
-        is_locked=transaction_data.is_locked
+    # Create a new Transaction object from the provided data.
+    new_tx = Transaction(
+        from_account_id = tx_data.get("from_account_id"),
+        to_account_id = tx_data.get("to_account_id"),
+        type = tx_data.get("type"),
+        amount = tx_data.get("amount"),
+        timestamp = tx_data.get("timestamp", datetime.utcnow()),
+        fee_amount = tx_data.get("fee_amount"),
+        fee_currency = tx_data.get("fee_currency"),
+        external_ref = tx_data.get("external_ref"),
+        cost_basis_usd = tx_data.get("cost_basis_usd"),
+        proceeds_usd = tx_data.get("proceeds_usd")
     )
-    db.add(new_transaction)
-
-    # 2. (Optional) Update balances on from/to accounts
-    #    If from_account or to_account is 'External', you might skip. That logic is up to you.
-
-    from_acct = db.query(Account).get(transaction_data.from_account_id)
-    to_acct   = db.query(Account).get(transaction_data.to_account_id)
-
-    if from_acct:
-        # Subtract amounts from the from_acct balance
-        # e.g., if this is a deposit of BTC from an external source, from_acct might be 'External' (skip).
-        # For normal user accounts, we do:
-        usd_out = transaction_data.amount_usd
-        btc_out = transaction_data.amount_btc
-
-        # Also consider the fee if it directly reduces from_acct in USD:
-        if transaction_data.fee and transaction_data.fee > 0:
-            usd_out += transaction_data.fee
-
-        # We pass negative amounts to update_balance if we want to reduce from_acct
-        from_acct.update_balance(amount_usd=-usd_out, amount_btc=-btc_out)
-
-    if to_acct:
-        # Add amounts to the to_acct balance
-        usd_in = transaction_data.amount_usd
-        btc_in = transaction_data.amount_btc
-        # Typically, fee doesn't get added to the to_acct, but if you handle fees differently, adjust logic
-        to_acct.update_balance(amount_usd=usd_in, amount_btc=btc_in)
-
+    
+    # Add the new transaction
+    db.add(new_tx)
+    db.flush()  # Get an ID assigned
+    
+    # For dual-entry transactions (like BUY, SELL, TRANSFER), you might create a paired entry.
+    # For simplicity, if tx_data includes both from_account_id and to_account_id, we treat this single record as the full entry.
+    # (Alternatively, you could create a matching record with swapped account IDs.)
+    
+    # Here we set group_id to the transaction's own ID for grouping.
+    new_tx.group_id = new_tx.id
+    
+    # For SELL transactions, calculate realized gain via FIFO if applicable.
+    if new_tx.type.upper() in ("SELL",):
+        calculate_cost_basis_and_gain(db, new_tx)
+    
     db.commit()
-    db.refresh(new_transaction)
-    # Placeholder: call a recalc function for cost basis if needed
-    return new_transaction
+    db.refresh(new_tx)
+    return new_tx
 
-def update_transaction_record(transaction_id: int, transaction_data: TransactionUpdate, db: Session):
+def calculate_cost_basis_and_gain(db: Session, tx: Transaction):
     """
-    Update an existing transaction with partial fields from TransactionUpdate.
-    If the transaction is locked, skip or return None.
-
-    With double-entry:
-      - Potentially allow changing from_account_id and to_account_id
-        (though real systems rarely let you do that post-creation).
-      - If from/to accounts/amounts change, we might need to
-        revert the old balances and apply the new balances.
-        For simplicity, we won't do that here — we can just show how
-        you might handle it if needed.
+    For a SELL transaction, allocate sold BTC from prior BUY/DEPOSIT lots (FIFO)
+    and compute the cost basis, proceeds, realized gain, and holding period.
+    
+    This function queries prior BTC inflow transactions (of type BUY or DEPOSIT)
+    for the same account (assumed to be the BTC account from which the sale occurs),
+    then allocates the sold amount from the oldest available lots.
+    
+    For simplicity, this example assumes that each inflow transaction is fully available
+    until a sale uses it, and that a sale may consume one or more lots.
+    
+    Note: In production, you might store a remaining amount on each lot or split the sale into multiple records.
     """
-    db_transaction = get_transaction_by_id(transaction_id, db)
-    if not db_transaction:
+    # Ensure this is a SELL transaction.
+    if tx.type.upper() != "SELL":
+        return
+
+    btc_to_sell = float(tx.amount)
+    cost_basis_total = 0.0
+    lots_consumed = []  # To record details for audit
+
+    # Query for previous BTC inflow transactions (BUY or DEPOSIT) for the same BTC account.
+    # We assume the BTC account is the one from which funds are sold (from_account_id).
+    lots = db.query(Transaction).filter(
+        Transaction.to_account_id == tx.from_account_id,
+        Transaction.type.in_(["BUY", "DEPOSIT"]),
+        Transaction.cost_basis_usd != None
+    ).order_by(Transaction.timestamp).all()
+
+    for lot in lots:
+        # For this example, assume the full lot amount is available (i.e. no partial consumption is tracked).
+        available = float(lot.amount)
+        if btc_to_sell <= 0:
+            break
+        use_amount = min(available, btc_to_sell)
+        lot_fraction = use_amount / available
+        cost_basis_portion = float(lot.cost_basis_usd) * lot_fraction
+        cost_basis_total += cost_basis_portion
+        lots_consumed.append((lot.id, use_amount, cost_basis_portion))
+        btc_to_sell -= use_amount
+
+    # If more BTC is sold than available, raise an error (should be validated beforehand).
+    if btc_to_sell > 0:
+        raise Exception("Insufficient BTC in lots to cover sale")
+
+    # Set cost_basis and realized gain on the sale transaction.
+    tx.cost_basis_usd = round(cost_basis_total, 2)
+    proceeds = float(tx.proceeds_usd) if tx.proceeds_usd is not None else 0.0
+    tx.realized_gain_usd = round(proceeds - cost_basis_total, 2)
+
+    # Determine holding period based on the oldest lot used.
+    if lots_consumed:
+        first_lot_id = lots_consumed[0][0]
+        first_lot = db.query(Transaction).filter(Transaction.id == first_lot_id).first()
+        if first_lot:
+            days_held = (tx.timestamp.date() - first_lot.timestamp.date()).days
+            tx.holding_period = "LONG" if days_held > 365 else "SHORT"
+        else:
+            tx.holding_period = None
+    else:
+        tx.holding_period = None
+
+def update_transaction_record(transaction_id: int, tx_data, db: Session):
+    """
+    Update an existing transaction.
+    For simplicity, this function does not automatically recalculate account balances.
+    In a complete system, reversing the original transaction and applying the new one would be required.
+    """
+    tx = get_transaction_by_id(transaction_id, db)
+    if not tx or tx.is_locked:
         return None
-
-    # If is_locked is True, skip or raise error
-    if db_transaction.is_locked:
-        return None
-
-    # Reverting old amounts from the old from/to accounts is complicated
-    # We'll do a minimal approach: we only adjust balances if from/to or amounts changed,
-    # ignoring complexities. For a robust approach, you'd do the following steps:
-    #   1. Subtract the old amounts from old accounts
-    #   2. Add the new amounts to the new accounts
-    # For now, let's skip that unless you specifically want it.
-
-    old_from_id = db_transaction.from_account_id
-    old_to_id   = db_transaction.to_account_id
-    old_usd     = float(db_transaction.amount_usd or 0.0)
-    old_btc     = float(db_transaction.amount_btc or 0.0)
-    old_fee     = float(db_transaction.fee or 0.0)
-
-    # 1. Apply partial updates
-    if transaction_data.from_account_id is not None:
-        db_transaction.from_account_id = transaction_data.from_account_id
-    if transaction_data.to_account_id is not None:
-        db_transaction.to_account_id = transaction_data.to_account_id
-    if transaction_data.type is not None:
-        db_transaction.type = transaction_data.type
-    if transaction_data.amount_usd is not None:
-        db_transaction.amount_usd = transaction_data.amount_usd
-    if transaction_data.amount_btc is not None:
-        db_transaction.amount_btc = transaction_data.amount_btc
-    if transaction_data.timestamp is not None:
-        db_transaction.timestamp = transaction_data.timestamp
-    if transaction_data.source is not None:
-        db_transaction.source = transaction_data.source
-    if transaction_data.purpose is not None:
-        db_transaction.purpose = transaction_data.purpose
-    if transaction_data.fee is not None:
-        db_transaction.fee = transaction_data.fee
-    if transaction_data.cost_basis_usd is not None:
-        db_transaction.cost_basis_usd = transaction_data.cost_basis_usd
-    if transaction_data.is_locked is not None:
-        db_transaction.is_locked = transaction_data.is_locked
-
-    # 2. Minimal approach to re-balancing (this is optional and simplistic):
-    #    If from_account_id / to_account_id or amounts changed, we can attempt to correct balances.
-    #    For a thorough approach, you'd do:
-    #       - Revert old_from_acct/update_balance(+old amounts)
-    #       - Revert old_to_acct/update_balance(-old amounts)
-    #       - Apply new_from_acct/update_balance(-new amounts)
-    #       - Apply new_to_acct/update_balance(+new amounts)
-    #    Here, we won't do it all unless you want it. We'll just do a placeholder.
-
+    # Update allowed fields.
+    if "amount" in tx_data:
+        tx.amount = tx_data["amount"]
+    if "type" in tx_data:
+        tx.type = tx_data["type"]
+    if "fee_amount" in tx_data:
+        tx.fee_amount = tx_data["fee_amount"]
+    if "fee_currency" in tx_data:
+        tx.fee_currency = tx_data["fee_currency"]
+    if "external_ref" in tx_data:
+        tx.external_ref = tx_data["external_ref"]
+    # Additional fields can be updated as needed.
     db.commit()
-    db.refresh(db_transaction)
-    # Placeholder: re-run cost basis recalc if needed
-    return db_transaction
+    db.refresh(tx)
+    return tx
 
 def delete_transaction_record(transaction_id: int, db: Session):
     """
-    Delete a transaction by its ID.
-    If locked, skip deletion.
-
-    For double-entry, you'd also want to revert the old from/to balances
-    if you allow transaction deletion. For now, we skip that step
-    (or assume you rarely delete real transactions).
+    Delete a transaction if it is not locked.
+    Note: In a proper double-entry system, deletion should reverse account balances or be disallowed.
     """
-    db_transaction = get_transaction_by_id(transaction_id, db)
-    if not db_transaction:
+    tx = get_transaction_by_id(transaction_id, db)
+    if not tx or tx.is_locked:
         return False
-
-    if db_transaction.is_locked:
-        return False
-
-    db.delete(db_transaction)
+    db.delete(tx)
     db.commit()
     return True
-
-# --- Recalculation & Short/Long-Term Gains Stubs ---
-
-def recalc_cost_basis_after_edit(db: Session):
-    """
-    Placeholder for cost basis recalculation logic.
-    You might:
-      1. Find earliest unlocked transaction date
-      2. Re-run FIFO logic for each subsequent deposit/withdrawal
-      3. Update cost basis or gain/loss fields.
-    """
-    pass
-
-def determine_short_or_long_term(acquired_date: datetime, disposed_date: datetime) -> str:
-    """
-    Simple function to determine if the holding is short-term or long-term.
-    If the difference is > 365 days, we consider it long-term; otherwise short-term.
-    """
-    holding_period = disposed_date - acquired_date
-    if holding_period > timedelta(days=365):
-        return "long-term"
-    else:
-        return "short-term"
