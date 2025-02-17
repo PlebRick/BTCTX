@@ -1,50 +1,56 @@
-/* Add this to your existing calculator.css or create a new file for sidebar styling */
-.sidebar-calculator {
+/* Container that holds the calculator inside the sidebar.*/
+
+   .sidebar-calculator {
+    margin-top: 1rem;
     display: flex;
-    justify-content: center; /* Centers the calculator horizontally */
-    padding-bottom: 20px; /* Adds padding at the bottom */
-    width: 100%; /* Ensures the container takes full width of the sidebar */
+    justify-content: center;
+    padding-bottom: 20px;
+    width: 100%;
   }
   
+  /* Calculator box */
   .calculator {
-    width: 180px; /* Reduced to make it smaller */
-    border: .5px solid var(--color-accent); /* Gold trim */
-    padding: 15px; /* Increased padding */
-    background: #1e1e1e; /* Dark background to match the mockup */
-    border-radius: 8px; /* Rounded corners for a modern look */
+    width: 180px; 
+    height: 300px;
+    border: 0.5px solid var(--color-accent);
+    padding: 15px;
+    background: #1e1e1e;
+    border-radius: 8px;
   }
   
+  /* The display screen at the top */
   .display {
     text-align: right;
     margin-bottom: 10px;
-    padding: 10px; /* Reduced padding for a smaller display */
-    border: 1px solid #444; /* Slightly lighter border for contrast */
-    background: #2a2a2a; /* Darker display background */
-    font-size: 1em; /* Smaller font size */
-    color: #d4d4d4; /* Light text color for visibility on dark background */
+    padding: 10px;
+    border: 1px solid #444;
+    background: #2a2a2a;
+    font-size: 1em;
+    color: #d4d4d4;
   }
   
+  /* Button grid layout */
   .buttons {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 5px;
   }
   
+  /* Individual buttons */
   .buttons button {
-    padding: 10px; /* Reduced padding for smaller buttons */
-    font-size: 1em; /* Smaller font size */
-    background: #333; /* Dark button background */
-    color: #d4d4d4; /* Light text for visibility */
-    border: 1px solid #444; /* Border for each button */
-    border-radius: 4px; /* Slightly rounded buttons */
+    padding: 10px;
+    font-size: 1em;
+    background: #333;
+    color: #d4d4d4;
+    border: 1px solid #444;
+    border-radius: 4px;
     cursor: pointer;
-    transition: background 0.3s; /* Smooth transition for hover effect */
+    transition: background 0.3s;
   }
-  
   .buttons button:hover {
-    background: #4a4a4a; /* Slightly lighter on hover for interaction feedback */
+    background: #4a4a4a;
+  }
+  .buttons button:active {
+    background: #555;
   }
   
-  .buttons button:active {
-    background: #555; /* Even lighter when clicked for a press effect */
-  }
