@@ -64,11 +64,14 @@ function resolveDisplayAccount(tx: ITransaction): string {
     case "Withdrawal":
       // user withdrawal => from=userAccts => to=External(4)
       return accountIdToName(from_account_id);
-    case "Transfer":
+  
       // a transfer => from -> to
-      const fromLabel = accountIdToName(from_account_id);
-      const toLabel = accountIdToName(to_account_id);
-      return `${fromLabel} -> ${toLabel}`;
+      case "Transfer": {
+        const fromLabel = accountIdToName(from_account_id);
+        const toLabel = accountIdToName(to_account_id);
+        return `${fromLabel} -> ${toLabel}`;
+      }
+      
     case "Buy":
     case "Sell":
       // typically from=3, to=3 => "Exchange"

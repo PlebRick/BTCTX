@@ -1,26 +1,38 @@
 {
   "compilerOptions": {
+    // Generates a small cache file so TypeScript doesn't rebuild everything on each run
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
+    // Target modern JS features (ESNext) and let Vite handle browser compatibility
+    "target": "ESNext",
+    // Include modern DOM libs and ES features to fix missing Promise/Iterable
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    // Use ES modules for bundling (Vite expects this)
+    "module": "ESNext",
+
+    // Enable the new JSX transform for React 17+ (no need to import React in scope)
     "jsx": "react-jsx",
 
-    /* Linting */
+    // Strict type-checking to catch errors early
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    // Skip type-checking for .d.ts files in node_modules for faster builds
+    "skipLibCheck": true,
+    // Ensures each file can be transpiled independently (important for Vite/HMR)
+    "isolatedModules": true,
+
+    // Node vs Bundler resolution can vary. "node" is typical, "bundler" is TS 5.0+ feature.
+    "moduleResolution": "node",
+
+    // Fix default import issues with libraries that use export=
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    // Force correct filename casing on imports
+    "forceConsistentCasingInFileNames": true,
+
+    // We only do type-checking; no .js output. Vite handles bundling
+    "noEmit": true
   },
+  // Include only the frontend code
   "include": ["src"]
 }

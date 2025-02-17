@@ -1,4 +1,6 @@
 {
+  // This file references the other two configs, so TypeScript knows
+  // about both "projects" (the app and the node/vite config).
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },

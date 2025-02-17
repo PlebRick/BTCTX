@@ -9,3 +9,10 @@ export default defineConfig({
     emptyOutDir: true,  // Remove old files before building
   },
 });
+// (Optional) If you use Vitest for unit tests:
+  // test: {
+  //   environment: 'jsdom',
+  //   setupFiles: './src/setupTests.ts',
+  //   globals: true
+  // },
+//});
