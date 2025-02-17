@@ -1,78 +1,131 @@
-/**
- * TransactionPanel.tsx
- *
- * This component renders a sliding panel for adding a transaction.
- * It includes an overlay, header, body (with the TransactionForm component), 
- * and footer. It also displays a modal to confirm discarding changes.
- *
- * Make sure your tsconfig (specifically tsconfig.app.json) includes:
- *   "jsx": "react-jsx",
- *   "esModuleInterop": true,
- *   "lib": ["DOM", "DOM.Iterable", "ESNext"],
- * so that JSX and global types like Promise and Iterable are recognized.
- */
-
-import * as React from 'react';
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import '../styles/transactionPanel.css';
 import TransactionForm from '../components/TransactionForm';
-import "../styles/transactionPanel.css";
 
-// A constant for the form element's id, used for associating the submit button.
-const FORM_ID = "transaction-form";
+/**
+ * TransactionPanelProps
+ * - isOpen: controls the panel visibility
+ * - onClose: callback to close the panel
+ * - onSubmitSuccess: optional callback after a successful transaction post
+ */
+interface TransactionPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmitSuccess?: () => void;
+}
 
-const TransactionPanel: React.FC = () => {
-  // State to control visibility of the panel and discard modal.
-  const [showPanel, setShowPanel] = useState<boolean>(true);
-  const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
+/**
+ * TransactionPanel
+ * Renders a sliding panel with an overlay, showing TransactionForm inside.
+ * This panel is agnostic to single or double-entry; the new TransactionForm handles that logic.
+ */
+const TransactionPanel: React.FC<TransactionPanelProps> = ({
+  isOpen,
+  onClose,
+  onSubmitSuccess,
+}) => {
+  // Tracks if the form is dirty (user has unsaved changes).
+  const [isFormDirty, setIsFormDirty] = useState(false);
 
-  // Handler for when the overlay is clicked to trigger discard confirmation.
+  // Whether to show a discard-changes confirmation modal
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
+
+  // Reset everything when panel first opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsFormDirty(false);
+      setShowDiscardModal(false);
+    }
+  }, [isOpen]);
+
+  /**
+   * Handle clicking the overlay:
+   * If the form is not dirty => close immediately.
+   * If the form is dirty => show discard confirmation.
+   */
   const handleOverlayClick = () => {
-    setShowDiscardModal(true);
+    if (!isFormDirty) {
+      onClose();
+    } else {
+      setShowDiscardModal(true);
+    }
   };
 
-  // Handler to cancel discarding changes.
+  /**
+   * Discard changes => close panel
+   */
+  const handleDiscardChanges = () => {
+    setShowDiscardModal(false);
+    onClose();
+  };
+
+  /**
+   * Cancel discard => keep panel open
+   */
   const handleGoBack = () => {
     setShowDiscardModal(false);
   };
 
-  // Handler to confirm discarding changes and close the panel.
-  const handleDiscardChanges = () => {
-    setShowDiscardModal(false);
-    setShowPanel(false);
-  };
-
-  // Handler called when the TransactionForm is successfully submitted.
+  /**
+   * Called after TransactionForm successfully posts a transaction
+   */
   const handleFormSubmitSuccess = () => {
-    setShowPanel(false);
+    // Close the panel
+    onClose();
+    // Notify parent if provided
+    onSubmitSuccess?.();
   };
 
-  if (!showPanel) return null;
+  // We'll reference the form by this ID
+  const FORM_ID = "transactionFormId";
+
+  // If not open, render nothing
+  if (!isOpen) return null;
 
   return (
     <>
+      {/* Overlay */}
       <div className="transaction-panel-overlay" onClick={handleOverlayClick}></div>
+
       <div className="transaction-panel">
+        {/* Header */}
         <div className="panel-header">
           <h2>Add Transaction</h2>
         </div>
+
+        {/* Body: Our double-entry TransactionForm */}
         <div className="panel-body">
-          <TransactionForm id={FORM_ID} onSubmitSuccess={handleFormSubmitSuccess} />
+          <TransactionForm
+            id={FORM_ID}
+            onDirtyChange={(dirty) => setIsFormDirty(dirty)}
+            onSubmitSuccess={handleFormSubmitSuccess}
+          />
         </div>
+
+        {/* Footer with a Save button that submits the form */}
         <div className="panel-footer">
-          <button className="save-button" type="submit" form={FORM_ID}>
+          <button 
+            className="save-button"
+            form={FORM_ID} 
+            type="submit"
+          >
             Save Transaction
           </button>
         </div>
       </div>
+
+      {/* Discard-changes modal */}
       {showDiscardModal && (
         <div className="discard-modal">
           <div className="discard-modal-content">
             <h3>Discard changes?</h3>
-            <p>Are you sure you want to discard your changes?</p>
+            <p>
+              Your changes have not been saved and will be discarded if you close this panel.
+            </p>
             <div className="discard-modal-actions">
               <button onClick={handleGoBack}>Go back</button>
               <button onClick={handleDiscardChanges} className="danger">
-                Discard
+                Discard changes
               </button>
             </div>
           </div>
