@@ -91,9 +91,9 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
 from backend.routers import transaction, user, account
 
 # The transaction router (Plan B: from_account_id/to_account_id) is included here.
-app.include_router(transaction.router, prefix="/api/transactions", tags=["Transactions"])
-app.include_router(user.router, prefix="/api/users", tags=["Users"])
-app.include_router(account.router, prefix="/api/accounts", tags=["Accounts"])
+app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
+app.include_router(user.router, prefix="/api/users", tags=["users"])
+app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
 
 # --- Protected Route Example ---
 @app.get("/protected")
