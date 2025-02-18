@@ -11,7 +11,8 @@ from backend.schemas.transaction import TransactionCreate, TransactionUpdate, Tr
 from backend.services import transaction as tx_service
 from backend.database import get_db
 
-router = APIRouter(prefix="/transactions", tags=["transactions"])
+# --- Initialize Router ---
+router = APIRouter(tags=["transactions"])
 
 @router.get("/", response_model=List[TransactionRead])
 def list_transactions(db = Depends(get_db)):

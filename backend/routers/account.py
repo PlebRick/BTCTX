@@ -11,7 +11,8 @@ from backend.schemas.account import AccountCreate, AccountUpdate, AccountRead
 from backend.services import account as account_service
 from backend.database import get_db
 
-router = APIRouter(prefix="/accounts", tags=["accounts"])
+# --- Initialize Router ---
+router = APIRouter(tags=["accounts"])
 
 @router.get("/", response_model=List[AccountRead])
 def list_accounts(db = Depends(get_db)):

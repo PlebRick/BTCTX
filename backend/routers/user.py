@@ -22,7 +22,7 @@ from backend.utils.auth import create_access_token  # JWT function from utils
 from backend.database import SessionLocal
 
 # --- Initialize Router ---
-router = APIRouter()
+router = APIRouter(tags=["users"])
 
 def get_db():
     """

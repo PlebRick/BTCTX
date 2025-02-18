@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "autoflush",
+        "condecimal",
         "dotenv",
         "fastapi",
         "passlib",
