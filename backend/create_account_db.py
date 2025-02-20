@@ -10,7 +10,7 @@ A minimal script to:
 
 Uses the refactored 'test4' code where:
  - AccountCreate requires user_id
- - Transaction enums use "MyBTC" (no space).
+ - Transaction enums use "My BTC" (with space).
 
 Usage:
   python -m backend.create_account_db
@@ -76,7 +76,7 @@ def main():
             "timestamp": datetime.utcnow(),
             "fee_amount": Decimal("0.00"),
             "fee_currency": "USD",
-            "source": "Income"  # For USD deposit, it's just an example
+            "source": "Income"  # For USD deposit, just an example
         }
         new_bank_tx = create_transaction_record(bank_deposit, db)
 
@@ -88,7 +88,7 @@ def main():
             "timestamp": datetime.utcnow(),
             "fee_amount": Decimal("0.0001"),
             "fee_currency": "BTC",
-            "source": "MyBTC",             # Matches your enum exactly
+            "source": "My BTC",             # Spaced version
             "cost_basis_usd": Decimal("12000")  # e.g. 0.5 BTC total basis
         }
         new_wallet_tx = create_transaction_record(wallet_deposit, db)
@@ -113,7 +113,7 @@ def main():
             "timestamp": datetime.utcnow(),
             "fee_amount": Decimal("0.0002"),
             "fee_currency": "BTC",
-            "source": "MyBTC",            # Also "MyBTC", no space
+            "source": "My BTC",            # Spaced version
             "cost_basis_usd": Decimal("24000")
         }
         new_ex_btc_tx = create_transaction_record(exch_btc_deposit, db)
