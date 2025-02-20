@@ -113,7 +113,7 @@ def main():
             "timestamp": datetime.utcnow(),
             "fee_amount": Decimal("0.0002"),
             "fee_currency": "BTC",
-            "source": "My BTC",            # Spaced version
+            "source": "My BTC",
             "cost_basis_usd": Decimal("24000")
         }
         new_ex_btc_tx = create_transaction_record(exch_btc_deposit, db)
