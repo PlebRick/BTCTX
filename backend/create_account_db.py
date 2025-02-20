@@ -2,14 +2,16 @@
 """
 create_account_db.py
 
-A script to seed the database with:
-  - One sample user
-  - Four accounts (Bank=USD, Wallet=BTC, ExchangeUSD=USD, ExchangeBTC=BTC)
-  - A few deposit transactions to give each account a starting balance.
+Seeds the database with:
+  1) One sample user (with hashed password).
+  2) Four accounts (Bank=USD, Wallet=BTC, ExchangeUSD=USD, ExchangeBTC=BTC)
+     linked to that user.
+  3) Some "Deposit" transactions to give each account an initial balance,
+     following the new double-entry model and single-amount approach.
 
 Usage:
     From the project root, run:
-      python -m backend.create_account_db
+        python -m backend.create_account_db
 """
 
 import sys
@@ -21,97 +23,132 @@ from decimal import Decimal
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
+    print(f"Project root added to sys.path: {PROJECT_ROOT}")
 
-# 2) Import create_tables and DB session
+# 2) Import create_tables, DB session, and required models/services
 try:
     from backend.database import create_tables, SessionLocal
 except ImportError as e:
     print("Error importing from backend.database:", e)
     sys.exit(1)
 
-# 3) Import models & services
-# If you have a backend.models.user, adjust accordingly
 try:
-    from backend.models.user import User
+    # Import your user creation logic
+    from backend.schemas.user import UserCreate
+    from backend.services.user import create_user, get_user_by_username
+
+    # Import account logic
+    from backend.schemas.account import AccountCreate
     from backend.services.account import create_account
+
+    # Import transaction logic
     from backend.services.transaction import create_transaction_record
 except ImportError as e:
-    print("Error importing models/services:", e)
+    print("Error importing models/services/schemas:", e)
     sys.exit(1)
+
 
 def main():
     """
-    1) Create all tables.
-    2) Insert a test user.
-    3) Create four accounts (Bank, Wallet, ExchangeUSD, ExchangeBTC).
-    4) Perform deposit transactions to seed balances.
+    1) Create all tables (if not existing).
+    2) Insert a test user with a hashed password.
+    3) Create four accounts for that user (Bank, Wallet, ExchangeUSD, ExchangeBTC).
+    4) Seed each account with an initial 'Deposit' transaction from External=99.
     """
-    print("Creating all tables (if not existing)...")
+    print("Creating all tables if they do not exist...")
     create_tables()
 
     db = SessionLocal()
     try:
+        # --------------------------------------------------------------------
         # 1) Create or find a test user
-        #    If your system doesn't require a user, omit this.
-        user = User(username="testuser", email="test@example.com")
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        print(f"Created test user (ID={user.id}).")
+        #    "UserCreate" expects a plain-text password in the "password_hash" field.
+        #    We will pass "mysecretpass" as an example. The user model will re-hash it.
+        # --------------------------------------------------------------------
+        username = "testuser"
+        existing_user = get_user_by_username(username, db)
+        if existing_user:
+            print(f"User '{username}' already exists. Using that user.")
+            user = existing_user
+        else:
+            user_data = UserCreate(
+                username=username,
+                password_hash="mysecretpass"  # Plain text that gets hashed by set_password
+            )
+            user = create_user(user_data, db)
+            if not user:
+                raise ValueError("Failed to create new test user.")
+            print(f"Created new user (ID={user.id}, username={user.username}).")
 
+        # --------------------------------------------------------------------
         # 2) Create some accounts for that user
-        #    We'll use the 'create_account' service function
-        #    that expects an AccountCreate schema-like object.
-        bank_data = {"name": "Bank", "currency": "USD"}
-        wallet_data = {"name": "Wallet", "currency": "BTC"}
-        exchange_usd_data = {"name": "ExchangeUSD", "currency": "USD"}
-        exchange_btc_data = {"name": "ExchangeBTC", "currency": "BTC"}
+        #    We'll use the 'create_account' service function,
+        #    passing an AccountCreate dict. We also must ensure 'user_id' is set!
+        # --------------------------------------------------------------------
+        bank_data = AccountCreate(name="Bank", currency="USD")
+        wallet_data = AccountCreate(name="Wallet", currency="BTC")
+        exchange_usd_data = AccountCreate(name="ExchangeUSD", currency="USD")
+        exchange_btc_data = AccountCreate(name="ExchangeBTC", currency="BTC")
+
+        # We need to add user_id to each AccountCreate if your account model requires it
+        # (Check your account model for a user_id = Column(ForeignKey('users.id'))
+        # If so, let's add that:
+        bank_data_dict = bank_data.dict()
+        bank_data_dict["user_id"] = user.id
+
+        wallet_data_dict = wallet_data.dict()
+        wallet_data_dict["user_id"] = user.id
+
+        exchange_usd_data_dict = exchange_usd_data.dict()
+        exchange_usd_data_dict["user_id"] = user.id
+
+        exchange_btc_data_dict = exchange_btc_data.dict()
+        exchange_btc_data_dict["user_id"] = user.id
 
         # Create each account
-        bank_acct = create_account(bank_data, db)
-        wallet_acct = create_account(wallet_data, db)
-        exch_usd_acct = create_account(exchange_usd_data, db)
-        exch_btc_acct = create_account(exchange_btc_data, db)
+        bank_acct = create_account(bank_data_dict, db)
+        wallet_acct = create_account(wallet_data_dict, db)
+        exch_usd_acct = create_account(exchange_usd_data_dict, db)
+        exch_btc_acct = create_account(exchange_btc_data_dict, db)
 
-        print(f"Created accounts (IDs): Bank={bank_acct.id}, "
-              f"Wallet={wallet_acct.id}, ExchangeUSD={exch_usd_acct.id}, ExchangeBTC={exch_btc_acct.id}")
+        print(f"Created accounts (IDs):")
+        print(f"  Bank => {bank_acct.id} (USD)")
+        print(f"  Wallet => {wallet_acct.id} (BTC)")
+        print(f"  ExchangeUSD => {exch_usd_acct.id} (USD)")
+        print(f"  ExchangeBTC => {exch_btc_acct.id} (BTC)")
 
-        # 3) Seed some balances with 'Deposit' transactions
-        #    Because we have a single `amount` field, we do e.g. 1000 USD to Bank, 0.5 BTC to Wallet, etc.
-        #    from_account_id = 99 => "External"
-        #    to_account_id   = bank_acct.id => deposit to Bank
-        #    type = 'Deposit', amount in the account's currency
+        # --------------------------------------------------------------------
+        # 3) Seed balances with 'Deposit' transactions from External=99
+        # --------------------------------------------------------------------
 
-        # Deposit 1000 USD into Bank
+        # 3a) Deposit $1000 to Bank
         tx_data_bank = {
-            "from_account_id": 99,    # External
+            "from_account_id": 99,   # External
             "to_account_id": bank_acct.id,
             "type": "Deposit",
             "amount": Decimal("1000.00"),
             "timestamp": datetime.utcnow(),
             "fee_amount": Decimal("0.00"),
             "fee_currency": "USD",
-            "source": "Income",      # For BTC deposit, you'd track cost_basis, but here it's USD
-            "is_locked": False
+            "source": "Income",  # For USD deposit, not strictly necessary
         }
         new_bank_tx = create_transaction_record(tx_data_bank, db)
 
-        # Deposit 0.5 BTC into Wallet
+        # 3b) Deposit 0.5 BTC to Wallet (with cost basis)
         tx_data_wallet = {
-            "from_account_id": 99,     # External
+            "from_account_id": 99,
             "to_account_id": wallet_acct.id,
             "type": "Deposit",
             "amount": Decimal("0.5"),
             "timestamp": datetime.utcnow(),
             "fee_amount": Decimal("0.0001"),
             "fee_currency": "BTC",
-            "source": "My BTC",       # BTC deposit
-            "cost_basis_usd": Decimal("12000.00"),  # If we consider 0.5 BTC worth $12k total
-            "is_locked": False
+            "source": "My BTC",
+            "cost_basis_usd": Decimal("12000.00"),  # e.g. 0.5 BTC was worth $12k total
         }
         new_wallet_tx = create_transaction_record(tx_data_wallet, db)
 
-        # Deposit 500 USD into ExchangeUSD
+        # 3c) Deposit $500 to ExchangeUSD
         tx_data_exch_usd = {
             "from_account_id": 99,
             "to_account_id": exch_usd_acct.id,
@@ -121,11 +158,10 @@ def main():
             "fee_amount": Decimal("0.00"),
             "fee_currency": "USD",
             "source": "Income",
-            "is_locked": False
         }
         new_ex_usd_tx = create_transaction_record(tx_data_exch_usd, db)
 
-        # Deposit 1.0 BTC into ExchangeBTC
+        # 3d) Deposit 1.0 BTC to ExchangeBTC (with cost basis)
         tx_data_exch_btc = {
             "from_account_id": 99,
             "to_account_id": exch_btc_acct.id,
@@ -135,16 +171,15 @@ def main():
             "fee_amount": Decimal("0.0002"),
             "fee_currency": "BTC",
             "source": "My BTC",
-            "cost_basis_usd": Decimal("24000.00"),  # for 1 BTC
-            "is_locked": False
+            "cost_basis_usd": Decimal("24000.00"),
         }
         new_ex_btc_tx = create_transaction_record(tx_data_exch_btc, db)
 
-        print("Seed data created successfully!")
-        print(f"Bank deposit TX ID = {new_bank_tx.id}")
-        print(f"Wallet deposit TX ID = {new_wallet_tx.id}")
-        print(f"ExchangeUSD deposit TX ID = {new_ex_usd_tx.id}")
-        print(f"ExchangeBTC deposit TX ID = {new_ex_btc_tx.id}")
+        print("All seed data inserted successfully!")
+        print(f"  Bank deposit TX => ID={new_bank_tx.id}")
+        print(f"  Wallet deposit TX => ID={new_wallet_tx.id}")
+        print(f"  ExchangeUSD deposit TX => ID={new_ex_usd_tx.id}")
+        print(f"  ExchangeBTC deposit TX => ID={new_ex_btc_tx.id}")
 
     except Exception as e:
         db.rollback()
