@@ -2,7 +2,7 @@
 backend/models/transaction.py
 
 Updated to reintroduce `source` and `purpose` for deposits/withdrawals:
- - source: e.g., "Gift", "Income", "My BTC"
+ - source: e.g., "Gift", "Income", "MyBTC"
  - purpose: e.g., "Spent", "Donation", "Lost"
 
 We store them as SQLAlchemy Enums using the existing TransactionSource and
@@ -56,10 +56,10 @@ class TransactionPurpose(enum.Enum):
 class TransactionSource(enum.Enum):
     """
     Used mainly for BTC deposits:
-      - "N/A", "My BTC", "Gift", "Income", "Interest", "Reward"
+      - "N/A", "MyBTC", "Gift", "Income", "Interest", "Reward"
     """
     NA = "N/A"
-    MyBTC = "My BTC"
+    MyBTC = "MyBTC"
     Gift = "Gift"
     Income = "Income"
     Interest = "Interest"
