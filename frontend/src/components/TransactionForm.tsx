@@ -13,7 +13,7 @@ import "../styles/transactionForm.css";
  */
 type TransactionType = "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
 type AccountType = "Bank" | "Wallet" | "Exchange";
-type DepositSource = "N/A" | "My BTC" | "Gift" | "Income" | "Interest" | "Reward";
+type DepositSource = "N/A" | "MyBTC" | "Gift" | "Income" | "Interest" | "Reward";
 type WithdrawalPurpose = "N/A" | "Spent" | "Gift" | "Donation" | "Lost";
 type Currency = "USD" | "BTC";
 
@@ -401,7 +401,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 {...register("source", { required: true })}
               >
                 <option value="N/A">N/A</option>
-                <option value="My BTC">My BTC</option>
+                <option value="MyBTC">MyBTC</option>
                 <option value="Gift">Gift</option>
                 <option value="Income">Income</option>
                 <option value="Interest">Interest</option>
