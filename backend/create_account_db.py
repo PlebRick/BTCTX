@@ -21,6 +21,17 @@ import os
 from datetime import datetime
 from decimal import Decimal
 
+from backend.models.transaction import TransactionSource
+print("DEBUG: TransactionSource is loaded from module:", TransactionSource.__module__)
+print("DEBUG: MyBTC string value is:", TransactionSource.MyBTC.value)
+
+def main():
+    print("Creating database tables if they do not exist...")
+    create_tables()  # This calls Base.metadata.create_all(bind=engine)
+
+    # You can add a second debug to confirm the enum is still the same
+    print("DEBUG (after create_tables): MyBTC string value is:", TransactionSource.MyBTC.value)
+
 # Ensure project root is in sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
