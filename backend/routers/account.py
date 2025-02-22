@@ -1,9 +1,12 @@
 """
 backend/routers/account.py
 
-FastAPI router for Account endpoints.
-We can optionally ensure that only authorized users can create accounts,
-but for now, we simply expect the user_id to be passed in the payload.
+FastAPI router handling Account endpoints. In a double-entry system,
+each Account may appear in many LedgerEntry lines, but the user typically
+manages Accounts (create/update/delete) separately from transactions.
+
+No major changes are required specifically for double-entry logic here,
+since the ledger references are handled in transaction or ledger services.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,17 +20,15 @@ router = APIRouter(tags=["accounts"])
 @router.get("/", response_model=List[AccountRead])
 def list_accounts(db = Depends(get_db)):
     """
-    Retrieve all accounts in the system.
-    For a single-user system, this might be all accounts for that user,
-    or just a single account if you want an immediate filter.
+    Retrieve all Accounts in the system. For a single-user scenario,
+    you might filter by that user's ID, but here we show them all.
     """
     return account_service.get_all_accounts(db)
 
 @router.get("/{account_id}", response_model=AccountRead)
 def get_account(account_id: int, db = Depends(get_db)):
     """
-    Retrieve a specific account by ID.
-    Raises 404 if the account doesn't exist.
+    Retrieve a specific Account by its ID, or return 404 if not found.
     """
     account = account_service.get_account_by_id(account_id, db)
     if not account:
@@ -37,13 +38,12 @@ def get_account(account_id: int, db = Depends(get_db)):
 @router.post("/", response_model=AccountRead)
 def create_account(account: AccountCreate, db = Depends(get_db)):
     """
-    Create a new account.
-    The request body must include:
-      {
-        "user_id": 1,    # The user that owns the account
-        "name": "Bank",
-        "currency": "USD"
-      }
+    Create a new Account. The request body (AccountCreate) includes:
+      - user_id: the owner
+      - name: e.g. "Bank", "BTC Fees", "Wallet"
+      - currency: "USD" or "BTC"
+
+    The service layer handles the actual DB insertion.
     """
     new_account = account_service.create_account(account, db)
     return new_account
@@ -51,9 +51,8 @@ def create_account(account: AccountCreate, db = Depends(get_db)):
 @router.put("/{account_id}", response_model=AccountRead)
 def update_account(account_id: int, account: AccountUpdate, db = Depends(get_db)):
     """
-    Update an existing account by its ID.
-    For example, change its 'name' or 'currency'.
-    Raises 404 if not found.
+    Update an existing Account's 'name' or 'currency' (both optional).
+    Returns 404 if no such account exists.
     """
     updated_account = account_service.update_account(account_id, account, db)
     if not updated_account:
@@ -63,8 +62,9 @@ def update_account(account_id: int, account: AccountUpdate, db = Depends(get_db)
 @router.delete("/{account_id}", status_code=204)
 def delete_account(account_id: int, db = Depends(get_db)):
     """
-    Delete an existing account by its ID.
-    Raises 404 if not found.
+    Delete an existing Account by ID, returning 204 on success.
+    If the account doesn't exist or cannot be deleted (e.g. has references),
+    return 404.
     """
     success = account_service.delete_account(account_id, db)
     if not success:

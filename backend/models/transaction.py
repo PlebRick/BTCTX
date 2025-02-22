@@ -1,13 +1,21 @@
 """
-backend/models/transaction.py
+transaction.py
 
-Updated to reintroduce `source` and `purpose` for deposits/withdrawals:
- - source: e.g., "Gift", "Income", "MyBTC"
- - purpose: e.g., "Spent", "Donation", "Lost"
+Refactored to incorporate the full double-entry design with separate models:
+1) Transaction (header record)
+2) LedgerEntry (individual debit/credit lines)
+3) BitcoinLot (tracking BTC acquired for FIFO)
+4) LotDisposal (partial usage of BitcoinLots on disposal)
 
-We store them as SQLAlchemy Enums using the existing TransactionSource and
-TransactionPurpose enums. Both are nullable so they can be omitted for
-transaction types that don't require them (e.g., Transfer, Buy, Sell).
+We keep everything in one file to maintain your 3-file approach:
+(transaction.py, account.py, user.py). Extensive comments clarify each model and its fields.
+
+CHANGES:
+- Removed 'account_id' and 'account' from LotDisposal. 
+- Added a 'account = relationship("Account", back_populates="ledger_entries")' in LedgerEntry
+  so it matches account.py's 'ledger_entries = relationship(..., back_populates="account")'.
+This resolves the "Mapper ... has no property 'account'" error and adheres to 
+standard double-entry design.
 """
 
 import enum
@@ -17,217 +25,379 @@ from sqlalchemy import (
     Integer,
     String,
     DateTime,
-    Numeric,
     Boolean,
-    ForeignKey,
-    Enum as SAEnum  # <-- Added so we can store Python enums as SQL enums in the DB
+    Numeric,
+    ForeignKey
 )
 from sqlalchemy.orm import relationship
+
 from backend.database import Base
 
-# -------------------------------------------------------------------
-# Enums for transaction classification
-# -------------------------------------------------------------------
+# ========================================================================
+# (Optional) ENUM CLASSES
+# If you want to store transaction types, sources, or purposes as Enums,
+# uncomment or adapt them. For now, we rely on a string-based 'type'.
+# ========================================================================
+# class TransactionType(enum.Enum):
+#     Deposit = "Deposit"
+#     Withdrawal = "Withdrawal"
+#     Transfer = "Transfer"
+#     Buy = "Buy"
+#     Sell = "Sell"
 
-class TransactionType(enum.Enum):
-    """
-    Used to classify the overall transaction nature:
-      - Deposit, Withdrawal, Transfer, Buy, Sell
-    """
-    Deposit = "Deposit"
-    Withdrawal = "Withdrawal"
-    Transfer = "Transfer"
-    Buy = "Buy"
-    Sell = "Sell"
-
-
-class TransactionPurpose(enum.Enum):
-    """
-    Used mainly for BTC withdrawals:
-      - "N/A", "Spent", "Gift", "Donation", "Lost"
-    """
-    NA = "N/A"
-    Spent = "Spent"
-    Gift = "Gift"
-    Donation = "Donation"
-    Lost = "Lost"
-
-
-class TransactionSource(enum.Enum):
-    """
-    Used mainly for BTC deposits:
-      - "N/A", "MyBTC", "Gift", "Income", "Interest", "Reward"
-    """
-    NA = "N/A"
-    MyBTC = "MyBTC"
-    Gift = "Gift"
-    Income = "Income"
-    Interest = "Interest"
-    Reward = "Reward"
-
-
-# -------------------------------------------------------------------
-# Transaction Model
-# -------------------------------------------------------------------
+# ------------------------------------------------------------------------
+# TRANSACTION (Header)
+# ------------------------------------------------------------------------
 
 class Transaction(Base):
+    """
+    'Transaction' is the high-level "header" record in the double-entry system.
+    Each Transaction can have multiple LedgerEntries (line items) that
+    record actual debits/credits. It can also create BitcoinLot(s) if acquiring BTC,
+    or create LotDisposal(s) if disposing of previously acquired BTC.
+
+    This model no longer depends on single-entry columns like amount or fee_amount
+    for the final ledger amounts, since those live in LedgerEntry now. However,
+    we keep optional 'from_account_id', 'to_account_id', 'amount', etc. as LEGACY
+    fields for backward compatibility or user-facing convenience.
+
+    cost_basis_usd, proceeds_usd, realized_gain_usd, and holding_period can be updated
+    after the FIFO disposal logic calculates partial usage from multiple lots.
+    """
+
     __tablename__ = "transactions"
-    
-    # ----------------------------
+
     # Primary key
-    # ----------------------------
     id = Column(Integer, primary_key=True, index=True)
-    
-    # ----------------------------
-    # Double-entry: from/to
-    # ----------------------------
-    from_account_id = Column(
-        Integer,
-        ForeignKey("accounts.id"),
-        nullable=True,
-        doc="Source account ID (debit side). For example, user wallet or external."
-    )
-    to_account_id = Column(
-        Integer,
-        ForeignKey("accounts.id"),
-        nullable=True,
-        doc="Destination account ID (credit side)."
-    )
-    
-    # ----------------------------
-    # Amount & Type
-    # ----------------------------
-    amount = Column(
-        Numeric(precision=18, scale=8),
-        nullable=False,
-        doc="Main transaction amount (in the from_account's currency)."
-    )
-    type = Column(
-        String,
-        nullable=False,
-        doc="Transaction type, e.g., 'Deposit', 'Withdrawal', 'Transfer', 'Buy', 'Sell'."
-    )
-    
-    # ----------------------------
-    # Timestamp & Audit
-    # ----------------------------
+
+    # Example transaction type: "Deposit", "Withdrawal", "Buy", "Sell", etc.
+    # If you prefer an Enum, you can adapt or store as string.
+    type = Column(String, nullable=False, doc="Transaction type: e.g. 'Deposit', 'Buy', 'Sell'")
+
+    # When the user says this transaction occurred
     timestamp = Column(
         DateTime,
         default=datetime.utcnow,
         nullable=False,
-        doc="Datetime the transaction occurred."
+        doc="When the transaction actually occurred (user-facing)."
     )
+
+    # Lock to prevent edits after finalizing a period (e.g. year-end).
+    is_locked = Column(
+        Boolean,
+        default=False,
+        nullable=False,
+        doc="Once locked, no further updates or deletion allowed."
+    )
+
+    # Audit fields
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
         nullable=False,
-        doc="Record creation time (auto-set)."
+        doc="Auto-set creation time."
     )
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
         nullable=False,
-        doc="Time of last record update (auto-set)."
+        doc="Auto-set last update time."
     )
-    is_locked = Column(
-        Boolean,
-        default=False,
-        doc="Prevents edits/deletion if True."
-    )
-    
-    # ----------------------------
-    # Grouping (optional)
-    # ----------------------------
-    group_id = Column(
+
+    # -------------------------------------------------------------------
+    # LEGACY single-entry columns (Optional)
+    # -------------------------------------------------------------------
+    from_account_id = Column(
         Integer,
-        index=True,
+        ForeignKey("accounts.id"),
         nullable=True,
-        doc="Group ID to link multiple transaction rows if needed."
+        doc="(LEGACY) from account, used in the old single-entry approach."
     )
-    
-    # ----------------------------
-    # Tax fields (optional usage)
-    # ----------------------------
-    cost_basis_usd = Column(
-        Numeric(precision=18, scale=2),
+    to_account_id = Column(
+        Integer,
+        ForeignKey("accounts.id"),
         nullable=True,
-        doc="USD cost basis for acquired BTC (e.g., external deposit or buy)."
+        doc="(LEGACY) to account, used in the old single-entry approach."
     )
-    proceeds_usd = Column(
-        Numeric(precision=18, scale=2),
+    amount = Column(
+        Numeric(18, 8),
         nullable=True,
-        doc="USD proceeds for disposed BTC (e.g., sell)."
+        doc="(LEGACY) single main transaction amount."
     )
-    realized_gain_usd = Column(
-        Numeric(precision=18, scale=2),
-        nullable=True,
-        doc="Realized gain/loss in USD if proceeds - cost_basis."
-    )
-    holding_period = Column(
-        String,
-        nullable=True,
-        doc="Holding period classification: 'SHORT' or 'LONG'."
-    )
-    
-    # ----------------------------
-    # Fee (amount, currency)
-    # ----------------------------
     fee_amount = Column(
-        Numeric(precision=18, scale=8),
+        Numeric(18, 8),
         nullable=True,
-        doc="Transaction fee amount, in fee_currency units."
+        doc="(LEGACY) single fee in the old system."
     )
     fee_currency = Column(
         String,
         nullable=True,
-        doc="Currency of the fee (e.g. 'USD' or 'BTC')."
+        doc="(LEGACY) currency of the single fee, e.g. 'BTC' or 'USD'."
     )
-    
-    # ----------------------------
-    # External reference
-    # ----------------------------
-    external_ref = Column(
+
+    # -------------------------------------------------------------------
+    # OPTIONAL FIELDS FOR TAX SUMMARIES
+    # -------------------------------------------------------------------
+    cost_basis_usd = Column(
+        Numeric(18, 2),
+        nullable=True,
+        doc="Summarized cost basis for the entire transaction (if relevant)."
+    )
+    proceeds_usd = Column(
+        Numeric(18, 2),
+        nullable=True,
+        doc="Summarized proceeds for the entire transaction (if relevant)."
+    )
+    realized_gain_usd = Column(
+        Numeric(18, 2),
+        nullable=True,
+        doc="Summarized realized gain for the entire transaction (if any)."
+    )
+    holding_period = Column(
         String,
         nullable=True,
-        doc="Any external reference or identifier (e.g. exchange name, address)."
+        doc="E.g. 'SHORT' or 'LONG' for partial disposal. Optional usage."
     )
-    
-    # ----------------------------
-    # Reintroduced Fields
-    # ----------------------------
+
+    # For deposit/withdrawal scenarios
     source = Column(
-        SAEnum(TransactionSource),
+        String,
         nullable=True,
-        doc=(
-            "Deposit source: e.g. 'Gift', 'Income'. "
-            "Primarily relevant if type='Deposit' and currency=BTC."
-        )
+        doc="(Optional) deposit source, e.g. 'Gift', 'Income'"
     )
     purpose = Column(
-        SAEnum(TransactionPurpose),
+        String,
         nullable=True,
-        doc=(
-            "Withdrawal purpose: e.g. 'Spent', 'Donation'. "
-            "Primarily relevant if type='Withdrawal' and currency=BTC."
-        )
+        doc="(Optional) withdrawal purpose, e.g. 'Spent', 'Donation'"
     )
-    
-    # ----------------------------
-    # Relationships
-    # ----------------------------
-    from_account = relationship(
-        "Account",
-        foreign_keys=[from_account_id]
+
+    # -------------------------------------------------------------------
+    # RELATIONSHIPS
+    # -------------------------------------------------------------------
+    ledger_entries = relationship(
+        "LedgerEntry",
+        back_populates="transaction",
+        cascade="all, delete-orphan",
+        doc="All the line items (debits/credits) for this transaction."
     )
-    to_account = relationship(
-        "Account",
-        foreign_keys=[to_account_id]
+
+    bitcoin_lots_created = relationship(
+        "BitcoinLot",
+        back_populates="created_transaction",
+        cascade="all, delete-orphan",
+        doc="If this transaction acquired BTC, we store one or more lots here."
     )
-    
+
+    lot_disposals = relationship(
+        "LotDisposal",
+        back_populates="transaction",
+        cascade="all, delete-orphan",
+        doc="If this transaction disposed some BTC, partial usage is logged here."
+    )
+
     def __repr__(self):
         return (
-            f"<Transaction(id={self.id}, type={self.type}, amount={self.amount}, "
-            f"from={self.from_account_id}, to={self.to_account_id}, source={self.source}, "
-            f"purpose={self.purpose}, group_id={self.group_id})>"
+            f"<Transaction(id={self.id}, type={self.type}, "
+            f"timestamp={self.timestamp}, locked={self.is_locked})>"
+        )
+
+
+class LedgerEntry(Base):
+    """
+    Represents a single line item (debit or credit) in the double-entry ledger.
+    For example:
+      - If user does a Transfer with a fee, you might have 3 lines:
+         1) from wallet => -1.001 BTC
+         2) to another wallet => +1.0 BTC
+         3) fee account => +0.001 BTC
+
+    The 'transaction_id' links to the Transaction (header).
+    The 'account_id' tells which Account is debited/credited.
+    'amount' can be negative or positive based on your chosen sign convention.
+    """
+
+    __tablename__ = "ledger_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Link to the Transaction header
+    transaction_id = Column(Integer, ForeignKey("transactions.id"), nullable=False)
+    # Which account is this line referencing
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+
+    amount = Column(
+        Numeric(18, 8),
+        nullable=False,
+        doc="Signed amount for this ledger line (e.g. -1.0 => outflow)."
+    )
+    currency = Column(
+        String,
+        nullable=False,
+        default="BTC",
+        doc="Currency for this line, e.g. 'BTC' or 'USD'."
+    )
+    entry_type = Column(
+        String,
+        nullable=True,
+        doc="Optional label: 'FEE', 'TRANSFER_IN', 'BUY', etc."
+    )
+
+    # Relationship to the Transaction
+    transaction = relationship(
+        "Transaction",
+        back_populates="ledger_entries",
+        doc="The parent Transaction 'header' this line belongs to."
+    )
+
+    # Relationship to the Account
+    # This is crucial if Account.ledger_entries uses back_populates="account"
+    account = relationship(
+        "Account",
+        back_populates="ledger_entries",
+        doc="Which account is impacted by this ledger entry."
+    )
+
+    def __repr__(self):
+        return (
+            f"<LedgerEntry(id={self.id}, tx={self.transaction_id}, acct={self.account_id}, "
+            f"amount={self.amount}, currency={self.currency}, entry_type={self.entry_type})>"
+        )
+
+
+class BitcoinLot(Base):
+    """
+    Whenever BTC is acquired (a 'Buy' or 'Deposit'), you create a BitcoinLot to
+    represent that chunk of BTC. 'remaining_btc' gets reduced as partial sells
+    or withdrawals occur (see LotDisposal).
+    cost_basis_usd is the total cost for the entire lot, possibly including fees.
+    """
+
+    __tablename__ = "bitcoin_lots"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    created_txn_id = Column(
+        Integer,
+        ForeignKey("transactions.id"),
+        nullable=False,
+        doc="Points to the Transaction where the user acquired this BTC."
+    )
+
+    acquired_date = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+        doc="When the BTC was acquired. Usually equals transaction's timestamp."
+    )
+
+    total_btc = Column(
+        Numeric(18, 8),
+        nullable=False,
+        doc="How many BTC were originally acquired in this lot."
+    )
+    remaining_btc = Column(
+        Numeric(18, 8),
+        nullable=False,
+        doc="How many BTC remain un-disposed from this lot after partial sells."
+    )
+    cost_basis_usd = Column(
+        Numeric(18, 2),
+        nullable=False,
+        doc="Total USD cost basis for the entire lot (including fees)."
+    )
+
+    created_transaction = relationship(
+        "Transaction",
+        back_populates="bitcoin_lots_created",
+        doc="Transaction that introduced these BTC into the system."
+    )
+
+    lot_disposals = relationship(
+        "LotDisposal",
+        back_populates="lot",
+        cascade="all, delete-orphan",
+        doc="Tracks how this lot is consumed by future sells/withdrawals."
+    )
+
+    def __repr__(self):
+        return (
+            f"<BitcoinLot(id={self.id}, total_btc={self.total_btc}, "
+            f"remaining_btc={self.remaining_btc}, cost_basis_usd={self.cost_basis_usd}, "
+            f"acquired_date={self.acquired_date})>"
+        )
+
+
+class LotDisposal(Base):
+    """
+    Logs how a specific disposal transaction consumed part of a BitcoinLot.
+    For example, if user sells 0.5 BTC but the oldest lot has 0.3 left,
+    we create one LotDisposal for 0.3 from that lot, then another for 0.2
+    from the next lot, etc. disposal_basis_usd, proceeds_usd_for_that_portion,
+    realized_gain_usd can store partial calculations if you want to see
+    exact results for each chunk.
+
+    CHANGED: We removed 'account_id' and 'account' from this model, since
+    the double-entry logic references accounts via LedgerEntry. A disposal
+    references only which lot is used and which transaction triggers it.
+    """
+
+    __tablename__ = "lot_disposals"
+
+    id = Column(Integer, primary_key=True)
+
+    lot_id = Column(
+        Integer,
+        ForeignKey("bitcoin_lots.id"),
+        nullable=False,
+        doc="ID of the BitcoinLot from which we are removing BTC."
+    )
+
+    transaction_id = Column(
+        Integer,
+        ForeignKey("transactions.id"),
+        nullable=False,
+        doc="Which transaction is disposing these BTC."
+    )
+
+    disposed_btc = Column(
+        Numeric(18, 8),
+        nullable=False,
+        doc="How many BTC from this lot were applied to this disposal."
+    )
+
+    # Optional partial gain fields
+    realized_gain_usd = Column(
+        Numeric(18, 2),
+        nullable=True,
+        doc="Realized gain for this partial chunk alone, if computed."
+    )
+    disposal_basis_usd = Column(
+        Numeric(18, 2),
+        nullable=True,
+        doc="Portion of the lot's basis allocated to this disposal."
+    )
+    proceeds_usd_for_that_portion = Column(
+        Numeric(18, 2),
+        nullable=True,
+        doc="Slice of total proceeds allocated to this partial disposal."
+    )
+
+    # Relationship to the lot from which BTC is disposed
+    lot = relationship(
+        "BitcoinLot",
+        back_populates="lot_disposals",
+        doc="The parent BitcoinLot from which these BTC are taken."
+    )
+    # Relationship to the disposing transaction
+    transaction = relationship(
+        "Transaction",
+        back_populates="lot_disposals",
+        doc="The disposal transaction (Sell/Withdraw) that uses this portion of the lot."
+    )
+
+    def __repr__(self):
+        return (
+            f"<LotDisposal(id={self.id}, lot_id={self.lot_id}, txn_id={self.transaction_id}, "
+            f"disposed_btc={self.disposed_btc}, realized_gain_usd={self.realized_gain_usd})>"
         )

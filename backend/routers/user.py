@@ -1,10 +1,10 @@
 """
-routers/user.py
+backend/routers/user.py
 
-Refactored to confirm compatibility with the double-entry system.
- - This router handles user registration, authentication, and listing.
- - No direct references to single-account logic or transaction fields,
-   so no structural updates are required.
+Handles user-related endpoints (registration, listing users, login).
+No direct references to double-entry logic here, as user accounts 
+are managed in 'account.py'. This remains nearly unchanged from 
+the simpler approach.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,16 +18,16 @@ from backend.services.user import (
     create_user,
     get_all_users
 )
-from backend.utils.auth import create_access_token  # JWT function from utils
+from backend.utils.auth import create_access_token
 from backend.database import SessionLocal
 
-# --- Initialize Router ---
 router = APIRouter(tags=["users"])
 
 def get_db():
     """
-    Provides a database session for dependency injection.
-    Yields a SQLAlchemy session and closes it afterward.
+    Provide a DB session for user endpoints.
+    Typically you might use 'get_db' from database.py,
+    but here we define it inline if desired.
     """
     db = SessionLocal()
     try:
@@ -35,18 +35,14 @@ def get_db():
     finally:
         db.close()
 
-# -------------------------------------------------------------------
-#  Login / Token Endpoint
-# -------------------------------------------------------------------
-
 @router.post("/token")
 def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     """
-    Authenticate the user and issue a JWT access token.
-    Unaffected by double-entry; user verification remains unchanged.
+    Authenticate user credentials and return a JWT token if valid.
+    The user logic is separate from double-entry ledger concerns.
     """
     user = get_user_by_username(form_data.username, db)
     if not user or not user.verify_password(form_data.password):
@@ -55,28 +51,21 @@ def login_for_access_token(
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
-# -------------------------------------------------------------------
-#  Register Endpoint
-# -------------------------------------------------------------------
-
 @router.post("/register", response_model=UserRead)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
     """
-    Register a new user. No changes needed for double-entry.
-    If the username already exists, return error 400.
+    Register a new User. If username is already taken, return 400.
+    This does not directly affect ledger logic, but each user 
+    can later own multiple accounts.
     """
     if get_user_by_username(user.username, db):
         raise HTTPException(status_code=400, detail="Username already registered")
     return create_user(user, db)
 
-# -------------------------------------------------------------------
-#  List Users Endpoint
-# -------------------------------------------------------------------
-
 @router.get("/", response_model=List[UserRead])
 def get_users(db: Session = Depends(get_db)):
     """
-    Retrieve all users for development/debugging.
-    Still valid in double-entry; no transaction references here.
+    Retrieve all registered users in the system, for debugging or admin usage.
+    Still not directly referencing double-entry logic.
     """
     return get_all_users(db)

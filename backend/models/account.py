@@ -1,8 +1,18 @@
 """
 backend/models/account.py
 
-This module defines the Account model for BitcoinTX.
-Each Account references a single User via user_id (NOT NULL).
+Defines the Account model in a full double-entry environment. Each Account
+can appear in many LedgerEntry records (credit/debit lines) referencing
+'account_id'. We also keep references to any single-row usage in Transaction
+via 'transactions_from' and 'transactions_to' for backward compatibility.
+
+User => One-to-many => Account
+Account => One-to-many => LedgerEntry (or part of single-row Transaction usage)
+
+CHANGES:
+- No need to reference LotDisposal here, since the disposal-level referencing
+  is done at the Transaction/LedgerEntry level. We'll keep the existing
+  ledger_entries relationship, which matches LedgerEntry.account.
 """
 
 from enum import Enum
@@ -10,11 +20,11 @@ from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from backend.database import Base
 
+# Optional legacy enum if you want, or you can remove it.
 class AccountType(Enum):
     """
-    Older design referencing "Bank", "Wallet", "ExchangeUSD", "ExchangeBTC".
-    In the current design, we store 'name' and 'currency' directly,
-    so you may or may not use this enum at runtime.
+    (LEGACY) If you once distinguished account types like "Bank", "Wallet",
+    or "ExchangeUSD", etc. We now typically store just 'name' and 'currency'.
     """
     Bank = "Bank"
     Wallet = "Wallet"
@@ -24,24 +34,57 @@ class AccountType(Enum):
 class Account(Base):
     __tablename__ = "accounts"
 
-    # Primary key
+    # ---------------------------------------------------------------------
+    # Primary Key & Fields
+    # ---------------------------------------------------------------------
     id = Column(Integer, primary_key=True, index=True)
 
-    # Link to user (cannot be null)
+    # Each Account belongs to one User, enforced by user_id (NOT NULL)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    # A unique name for the account, e.g. "Bank", "Wallet", "ExchangeUSD"...
+    # A unique name, e.g. "Bank", "Wallet", "BTC Fees"
     name = Column(String, unique=True, nullable=False)
 
-    # The currency this account holds: "USD" or "BTC"
+    # The currency: "USD" or "BTC" (extend if needed)
     currency = Column(String, nullable=False, default="USD")
 
-    # Relationship to the owning User
-    user = relationship("User", back_populates="accounts")
+    # ---------------------------------------------------------------------
+    # Relationships
+    # ---------------------------------------------------------------------
 
-    # These relationships track transactions where this account is the 'from' or 'to' side
-    transactions_from = relationship("Transaction", foreign_keys="[Transaction.from_account_id]")
-    transactions_to   = relationship("Transaction", foreign_keys="[Transaction.to_account_id]")
+    # The User that owns this account
+    user = relationship(
+        "User",
+        back_populates="accounts",
+        doc="The user that owns this account."
+    )
 
+    # If you still keep single-row references in Transaction:
+    # (LEGACY) 'transactions_from' references where this account is the 'from' side
+    transactions_from = relationship(
+        "Transaction",
+        foreign_keys="[Transaction.from_account_id]",
+        doc="(LEGACY) Single-row approach: transactions listing this account as 'from'"
+    )
+    transactions_to = relationship(
+        "Transaction",
+        foreign_keys="[Transaction.to_account_id]",
+        doc="(LEGACY) Single-row approach: transactions listing this account as 'to'"
+    )
+
+    # True double-entry lines: 'LedgerEntry' referencing account_id
+    ledger_entries = relationship(
+        "LedgerEntry",
+        back_populates="account",
+        cascade="all, delete-orphan",
+        doc="All ledger lines (debit/credit) pointing to this account."
+    )
+
+    # ---------------------------------------------------------------------
+    # Representation
+    # ---------------------------------------------------------------------
     def __repr__(self):
-        return f"<Account(id={self.id}, user_id={self.user_id}, name={self.name}, currency={self.currency})>"
+        return (
+            f"<Account(id={self.id}, user_id={self.user_id}, "
+            f"name={self.name}, currency={self.currency})>"
+        )

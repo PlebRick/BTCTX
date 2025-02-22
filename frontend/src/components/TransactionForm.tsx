@@ -4,19 +4,26 @@ import axios from "axios";
 import "../styles/transactionForm.css";
 
 /**
- * -----------
- * 1) Types
- * -----------
- * Keeping them the same, but we'll add a new field "feeInUsdDisplay"
- * in the component state for optional display of the BTC fee in USD.
+ * ------------------------------------------------------------
+ * 1) Enumerations & Types for Frontend
+ * ------------------------------------------------------------
+ * We keep the same type definitions for a simpler user-facing UI.
+ * Even though the backend uses multiple ledger lines, we only
+ * display single 'amount' or 'fee' fields here. The services
+ * handle the multi-line splitting automatically.
  */
-
 type TransactionType = "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
 type AccountType = "Bank" | "Wallet" | "Exchange";
 type DepositSource = "N/A" | "MyBTC" | "Gift" | "Income" | "Interest" | "Reward";
 type WithdrawalPurpose = "N/A" | "Spent" | "Gift" | "Donation" | "Lost";
 type Currency = "USD" | "BTC";
 
+/**
+ * TransactionFormData:
+ * Reflects the legacy single-entry fields. The user sees a single
+ * 'amount' or 'fee' field, which the new double-entry backend will
+ * transform into multiple ledger lines as needed.
+ */
 interface TransactionFormData {
   type: TransactionType;
   timestamp: string;
@@ -25,29 +32,42 @@ interface TransactionFormData {
   account?: AccountType;
   currency?: Currency;
   amount?: number;
-  source?: DepositSource;     // BTC deposit
-  purpose?: WithdrawalPurpose; // BTC withdrawal
-  fee?: number;               // the numeric fee, which might be BTC or USD
-  costBasisUSD?: number;
+  source?: DepositSource;     // For BTC deposit
+  purpose?: WithdrawalPurpose; // For BTC withdrawal
+  fee?: number;               // We unify the numeric fee (BTC or USD)
+  costBasisUSD?: number;      // For external BTC deposit or "Buy"
 
   // Transfer
   fromAccount?: AccountType;
   fromCurrency?: Currency;
   toAccount?: AccountType;
   toCurrency?: Currency;
-  amountFrom?: number;  // BTC or USD
-  amountTo?: number;    // BTC or USD
+  amountFrom?: number;  // from side (BTC or USD)
+  amountTo?: number;    // to side (BTC or USD)
 
   // Buy/Sell
   amountUSD?: number;
   amountBTC?: number;
 }
 
-/** Hardcoded account -> ID mappings */
+/**
+ * ------------------------------------------------------------
+ * 2) Hardcoded account ID mappings for demonstration
+ * ------------------------------------------------------------
+ * The new double-entry backend no longer depends on single-entry,
+ * but we can still do these mappings for the user to choose.
+ */
 const EXTERNAL_ID = 99; // "External"
 const EXCHANGE_USD_ID = 3;
 const EXCHANGE_BTC_ID = 4;
 
+/**
+ * mapAccountToId:
+ * For the user, we keep "Bank", "Wallet", "Exchange". The backend
+ * uses numeric IDs. This function helps convert the UI selection
+ * to a numeric ID. The new backend is flexible, but we keep these
+ * mappings for a simpler UI approach.
+ */
 function mapAccountToId(account?: AccountType, currency?: Currency): number {
   if (account === "Bank") return 1;
   if (account === "Wallet") return 2;
@@ -59,6 +79,12 @@ function mapAccountToId(account?: AccountType, currency?: Currency): number {
   return 0;
 }
 
+/**
+ * mapDoubleEntryAccounts:
+ * Convert the user-chosen type ("Deposit", "Withdrawal", etc.)
+ * plus optional UI fields (account, currency) into from_account_id
+ * and to_account_id for the new transaction payload.
+ */
 function mapDoubleEntryAccounts(data: TransactionFormData): {
   from_account_id: number;
   to_account_id: number;
@@ -94,17 +120,37 @@ function mapDoubleEntryAccounts(data: TransactionFormData): {
   }
 }
 
+/**
+ * ------------------------------------------------------------
+ * 3) Component Props
+ * ------------------------------------------------------------
+ * Optional props for hooking into parent states or
+ * success callbacks.
+ */
 interface TransactionFormProps {
   id?: string;
   onDirtyChange?: (dirty: boolean) => void;
   onSubmitSuccess?: () => void;
 }
 
+/**
+ * ------------------------------------------------------------
+ * 4) TransactionForm
+ * ------------------------------------------------------------
+ * The main form for recording transactions. We keep single-entry
+ * style, letting the user pick "from" or "to" accounts, "amount",
+ * "fee", etc. The final backend service splits these into ledger
+ * lines and possibly updates BTC lots (if Buy/Sell).
+ */
 const TransactionForm: React.FC<TransactionFormProps> = ({
   id,
   onDirtyChange,
   onSubmitSuccess,
 }) => {
+  /**
+   * useForm => track fields like 'type', 'timestamp', 'fee', etc.
+   * We default the timestamp to "now" and fee to 0 for convenience.
+   */
   const {
     register,
     handleSubmit,
@@ -120,20 +166,18 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     },
   });
 
-  // A local state to store the type, to reset form on changes
+  // The currently selected type of transaction
   const [currentType, setCurrentType] = useState<TransactionType | "">("");
 
-  // We'll store a local state for optional "feeInUsdDisplay" so we can show
-  // an approximate USD cost for the BTC fee. In real code, we'd fetch from an API.
+  // A local state for displaying an approximate fee in USD
   const [feeInUsdDisplay, setFeeInUsdDisplay] = useState<number>(0);
 
-  /** 
-   * Watches for dynamic fields relevant to "Transfer" 
-   * We'll recalc fee = amountFrom - amountTo for BTC transfers.
+  /**
+   * We watch certain fields for dynamic logic, especially for Transfers.
    */
   const amountFromVal = watch("amountFrom") || 0;
   const amountToVal = watch("amountTo") || 0;
-  const fromCurrencyVal = watch("fromCurrency"); // could be BTC or USD
+  const fromCurrencyVal = watch("fromCurrency");
 
   // For deposit/withdrawal logic
   const account = watch("account");
@@ -143,21 +187,28 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const amountUsdVal = watch("amountUSD") || 0;
   const amountBtcVal = watch("amountBTC") || 0;
 
+  /**
+   * NEW SNIPPETS:
+   * These useEffects log user inputs for debugging. 
+   * They do not affect the double-entry logic; they are
+   * simply ensuring TypeScript handles the watch variables.
+   */
   useEffect(() => {
     console.log("User typed in amountUSD:", amountUsdVal);
   }, [amountUsdVal]);
 
   useEffect(() => {
     console.log("User typed in amountBTC:", amountBtcVal);
-  }, [amountBtcVal]);  
+  }, [amountBtcVal]);
 
-  // track dirty state in parent
+  // Let the parent know if the form is dirty.
   useEffect(() => {
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
 
   /**
-   * If user chooses Deposit or Withdrawal, auto-set currency based on account
+   * If user picks "Deposit" or "Withdrawal",
+   * auto-set currency if they choose "Bank" or "Wallet".
    */
   useEffect(() => {
     if (currentType === "Deposit" || currentType === "Withdrawal") {
@@ -166,12 +217,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       } else if (account === "Wallet") {
         setValue("currency", "BTC");
       }
+      // if they choose "Exchange", we let them pick manually
     }
-    // if Exchange, user picks
   }, [account, currentType, setValue]);
 
   /**
-   * Transfer logic: fromAccount => toAccount
+   * Transfer logic: picking fromAccount => we auto-pick toAccount
+   * and their corresponding currency.
    */
   const fromAccount = watch("fromAccount");
   useEffect(() => {
@@ -196,7 +248,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   }, [currentType, fromAccount, fromCurrencyVal, setValue]);
 
   /**
-   * If user changes transaction type, reset form except for the type and timestamp
+   * If user changes transaction type, we reset the form
+   * (but keep the new type).
    */
   const onTransactionTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedType = e.target.value as TransactionType;
@@ -210,7 +263,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   };
 
   /**
-   * Show costBasis only if deposit => BTC => wallet or exchange
+   * Show costBasis only if user chooses:
+   *   type=Deposit, currency=BTC, and account=Wallet or Exchange
    */
   const showCostBasisField =
     currentType === "Deposit" &&
@@ -218,44 +272,43 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     (account === "Wallet" || account === "Exchange");
 
   /**
-   * Auto-calculate fee for BTC Transfers, read-only
-   * If negative, clamp to 0 & optionally show an error
+   * Auto-calc fee for "Transfer" if fromCurrency is BTC.
+   * If negative, clamp it to 0. Also show an approximate USD display
+   * using a mock price.
    */
   useEffect(() => {
     if (currentType === "Transfer") {
-      // only do this for BTC transfers
       if (fromCurrencyVal !== "BTC") {
-        // If from is not BTC, we won't auto-calc fee. 
-        // Possibly the user does a USD transfer? You can adapt as needed.
+        // If it's not BTC, we won't auto-calc fee.
         return;
       }
       const calcFee = amountFromVal - amountToVal;
       if (calcFee < 0) {
-        // clamp to 0
         setValue("fee", 0);
       } else {
-        // round to 8 decimals
         const feeBtc = Number(calcFee.toFixed(8));
         setValue("fee", feeBtc);
 
-        // If we want to show ~USD, we do a mock conversion for now (e.g. 1 BTC = $30k)
-        // In real code, fetch from an API with the transaction timestamp.
-        const btcPrice = 30000; // mock
-        const approxUsd = feeBtc * btcPrice;
+        // approximate USD for user display
+        const mockBtcPrice = 30000; // in real code, fetch from an API
+        const approxUsd = feeBtc * mockBtcPrice;
         setFeeInUsdDisplay(Number(approxUsd.toFixed(2)));
       }
     }
   }, [currentType, fromCurrencyVal, amountFromVal, amountToVal, setValue]);
 
   /**
-   * onSubmit => build final payload
+   * onSubmit => build final payload to pass to the new double-entry backend
+   * where it becomes multiple ledger entries, plus optional BTC lot usage.
    */
   const onSubmit: SubmitHandler<TransactionFormData> = async (data) => {
+    // 1) from/to IDs
     const { from_account_id, to_account_id } = mapDoubleEntryAccounts(data);
     const isoTimestamp = new Date(data.timestamp).toISOString();
 
+    // 2) We unify legacy fields for the final request
     let amount = 0;
-    let feeCurrency = "USD"; // fallback
+    let feeCurrency = "USD";
     let source: string | undefined = undefined;
     let purpose: string | undefined = undefined;
     let cost_basis_usd = 0;
@@ -264,6 +317,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     switch (data.type) {
       case "Deposit": {
         amount = data.amount || 0;
+        // If deposit is BTC => feeCurrency = "BTC"; otherwise "USD"
         feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
         source = data.source && data.source !== "N/A" ? data.source : "N/A";
         if (showCostBasisField) {
@@ -278,19 +332,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         break;
       }
       case "Transfer": {
-        amount = data.amountFrom || 0; // from side
-        // we assume it's BTC if fromCurrency is BTC
+        amount = data.amountFrom || 0;
         if (data.fromCurrency === "BTC") feeCurrency = "BTC";
-        else feeCurrency = "USD"; // or do some logic
+        else feeCurrency = "USD";
         break;
       }
       case "Buy": {
+        // from= ExchangeUSD => to= ExchangeBTC
         amount = data.amountUSD || 0;
         feeCurrency = "USD";
-        cost_basis_usd = amount;
+        cost_basis_usd = amount; // how much USD you spent
         break;
       }
       case "Sell": {
+        // from= ExchangeBTC => to= ExchangeUSD
         amount = data.amountBTC || 0;
         feeCurrency = "USD";
         proceeds_usd = data.amountUSD || 0;
@@ -298,6 +353,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       }
     }
 
+    // 3) Build final payload
     const transactionPayload = {
       from_account_id,
       to_account_id,
@@ -313,6 +369,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       is_locked: false,
     };
 
+    // 4) POST to backend
     try {
       const response = await axios.post(
         "http://127.0.0.1:8000/api/transactions",
@@ -337,7 +394,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   };
 
   /**
-   * Renders dynamic fields based on transaction type
+   * -----------------------------------------------------------
+   * 5) Dynamic Fields
+   * -----------------------------------------------------------
+   * Renders different inputs based on the selected transaction type.
+   * The new double-entry backend doesn't require separate forms,
+   * but we keep them for better UX clarity.
    */
   const renderDynamicFields = () => {
     switch (currentType) {
@@ -355,7 +417,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <option value="Wallet">Bitcoin Wallet</option>
                 <option value="Exchange">Exchange</option>
               </select>
-              {errors.account && <span className="error-text">Please select an account</span>}
+              {errors.account && (
+                <span className="error-text">Please select an account</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -377,7 +441,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   readOnly
                 />
               )}
-              {errors.currency && <span className="error-text">Currency is required</span>}
+              {errors.currency && (
+                <span className="error-text">Currency is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -388,7 +454,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 className="form-control"
                 {...register("amount", { required: true, valueAsNumber: true })}
               />
-              {errors.amount && <span className="error-text">Amount is required</span>}
+              {errors.amount && (
+                <span className="error-text">Amount is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -444,7 +512,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <option value="Wallet">Bitcoin Wallet</option>
                 <option value="Exchange">Exchange</option>
               </select>
-              {errors.account && <span className="error-text">Please select an account</span>}
+              {errors.account && (
+                <span className="error-text">Please select an account</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -466,7 +536,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   readOnly
                 />
               )}
-              {errors.currency && <span className="error-text">Currency is required</span>}
+              {errors.currency && (
+                <span className="error-text">Currency is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -477,7 +549,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 className="form-control"
                 {...register("amount", { required: true, valueAsNumber: true })}
               />
-              {errors.amount && <span className="error-text">Amount is required</span>}
+              {errors.amount && (
+                <span className="error-text">Amount is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -507,7 +581,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         );
 
       case "Transfer":
-        // The main place we do auto-fee in BTC
+        /**
+         * The main scenario we do auto-calc for a BTC transfer fee:
+         * fee = (amountFrom - amountTo). The user sees a read-only
+         * "Fee (BTC)" field plus an approximate USD label.
+         */
         return (
           <>
             <div className="form-group">
@@ -521,19 +599,22 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <option value="Wallet">Bitcoin Wallet</option>
                 <option value="Exchange">Exchange</option>
               </select>
-              {errors.fromAccount && <span className="error-text">From Account is required</span>}
+              {errors.fromAccount && (
+                <span className="error-text">From Account is required</span>
+              )}
             </div>
 
             <div className="form-group">
               <label>From Currency:</label>
-              {/* If fromAccount=Exchange => user picks BTC or USD */}
               <input
                 type="text"
                 className="form-control"
                 {...register("fromCurrency")}
                 readOnly={fromAccount !== "Exchange"}
               />
-              {errors.fromCurrency && <span className="error-text">From Currency is required</span>}
+              {errors.fromCurrency && (
+                <span className="error-text">From Currency is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -542,9 +623,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 type="number"
                 step="0.00000001"
                 className="form-control"
-                {...register("amountFrom", { required: true, valueAsNumber: true })}
+                {...register("amountFrom", {
+                  required: true,
+                  valueAsNumber: true,
+                })}
               />
-              {errors.amountFrom && <span className="error-text">Amount (From) is required</span>}
+              {errors.amountFrom && (
+                <span className="error-text">Amount (From) is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -573,9 +659,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 type="number"
                 step="0.00000001"
                 className="form-control"
-                {...register("amountTo", { required: true, valueAsNumber: true })}
+                {...register("amountTo", {
+                  required: true,
+                  valueAsNumber: true,
+                })}
               />
-              {errors.amountTo && <span className="error-text">Amount (To) is required</span>}
+              {errors.amountTo && (
+                <span className="error-text">Amount (To) is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -587,7 +678,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 {...register("fee", { valueAsNumber: true })}
                 readOnly
               />
-              {/* Optional label to show approximate USD */}
               {feeInUsdDisplay > 0 && (
                 <small style={{ color: "#bbb" }}>
                   (~ ${feeInUsdDisplay} USD)
@@ -617,9 +707,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 type="number"
                 step="0.01"
                 className="form-control"
-                {...register("amountUSD", { required: true, valueAsNumber: true })}
+                {...register("amountUSD", {
+                  required: true,
+                  valueAsNumber: true,
+                })}
               />
-              {errors.amountUSD && <span className="error-text">Amount USD is required</span>}
+              {errors.amountUSD && (
+                <span className="error-text">Amount USD is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -628,9 +723,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 type="number"
                 step="0.00000001"
                 className="form-control"
-                {...register("amountBTC", { required: true, valueAsNumber: true })}
+                {...register("amountBTC", {
+                  required: true,
+                  valueAsNumber: true,
+                })}
               />
-              {errors.amountBTC && <span className="error-text">Amount BTC is required</span>}
+              {errors.amountBTC && (
+                <span className="error-text">Amount BTC is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -665,9 +765,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 type="number"
                 step="0.00000001"
                 className="form-control"
-                {...register("amountBTC", { required: true, valueAsNumber: true })}
+                {...register("amountBTC", {
+                  required: true,
+                  valueAsNumber: true,
+                })}
               />
-              {errors.amountBTC && <span className="error-text">Amount BTC is required</span>}
+              {errors.amountBTC && (
+                <span className="error-text">Amount BTC is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -676,9 +781,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 type="number"
                 step="0.01"
                 className="form-control"
-                {...register("amountUSD", { required: true, valueAsNumber: true })}
+                {...register("amountUSD", {
+                  required: true,
+                  valueAsNumber: true,
+                })}
               />
-              {errors.amountUSD && <span className="error-text">Amount USD is required</span>}
+              {errors.amountUSD && (
+                <span className="error-text">Amount USD is required</span>
+              )}
             </div>
 
             <div className="form-group">
@@ -694,10 +804,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         );
 
       default:
+        // No type selected yet
         return null;
     }
   };
 
+  /**
+   * -----------------------------------------------------------
+   * 6) Render
+   * -----------------------------------------------------------
+   * The main form includes a dropdown for transaction type
+   * and dynamic fields based on that type. Submitting calls
+   * onSubmit to POST to the new double-entry backend.
+   */
   return (
     <form
       id={id || "transaction-form"}
@@ -735,7 +854,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           )}
         </div>
 
-        {/* Render dynamic fields */}
+        {/* Render dynamic fields for each transaction type */}
         {renderDynamicFields()}
       </div>
     </form>

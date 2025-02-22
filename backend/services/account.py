@@ -1,8 +1,12 @@
 """
 backend/services/account.py
 
-Refactored to handle user_id in the AccountCreate schema.
-Each Account is linked to exactly one User via user_id.
+Manages creation, update, deletion, and retrieval of Accounts.
+In a double-entry environment, each Account can appear in many LedgerEntry lines
+(e.g. for 'MAIN_IN', 'MAIN_OUT', 'FEE'). The user typically calls these endpoints
+via account.py router.
+
+We do NOT handle ledger logic here; that belongs to transaction or ledger services.
 """
 
 from sqlalchemy.orm import Session
@@ -10,22 +14,28 @@ from backend.models.account import Account
 from backend.schemas.account import AccountCreate, AccountUpdate
 
 def get_all_accounts(db: Session):
-    """Retrieve all accounts from the DB."""
+    """
+    Fetch all accounts in the system. 
+    For a single-user scenario, you might filter by user_id if desired.
+    """
     return db.query(Account).all()
 
 def get_account_by_id(account_id: int, db: Session):
-    """Retrieve a single account by its ID, or None if not found."""
+    """
+    Return the Account with the specified ID, or None if it doesn't exist.
+    """
     return db.query(Account).filter(Account.id == account_id).first()
 
 def create_account(account_data: AccountCreate, db: Session):
     """
-    Create a new account using data from AccountCreate.
-    The DB schema requires user_id, name, and currency to be non-null.
-
-    account_data.user_id must point to an existing user, or you'll get an FK error.
+    Create a new Account. The user must supply:
+      - user_id: an existing User
+      - name: e.g. "Bank", "BTC Wallet", "BTC Fees"
+      - currency: "USD" or "BTC"
+    The DB enforces user_id not null, so user must exist or an FK error occurs.
     """
     new_account = Account(
-        user_id=account_data.user_id,  # Now we set user_id from the schema
+        user_id=account_data.user_id,
         name=account_data.name,
         currency=account_data.currency,
     )
@@ -36,8 +46,9 @@ def create_account(account_data: AccountCreate, db: Session):
 
 def update_account(account_id: int, account_data: AccountUpdate, db: Session):
     """
-    Update an existing account's name/currency (if provided).
-    If you need to allow changing user_id, add that logic here.
+    Update an existing account's fields (name/currency). 
+    If account doesn't exist, return None. 
+    If you want to allow changing user_id, you can handle that as well.
     """
     account = get_account_by_id(account_id, db)
     if not account:
@@ -47,9 +58,6 @@ def update_account(account_id: int, account_data: AccountUpdate, db: Session):
         account.name = account_data.name
     if account_data.currency is not None:
         account.currency = account_data.currency
-    # If you decide to allow user_id changes:
-    # if account_data.user_id is not None:
-    #     account.user_id = account_data.user_id
 
     db.commit()
     db.refresh(account)
@@ -57,9 +65,10 @@ def update_account(account_id: int, account_data: AccountUpdate, db: Session):
 
 def delete_account(account_id: int, db: Session):
     """
-    Delete an account by its ID.
-    Real systems often archive accounts instead of deleting them,
-    especially if they have transaction history.
+    Delete the account by ID if it exists. 
+    For double-entry, consider if the account has ledger history. 
+    Often you'd archive instead of a hard delete to preserve records,
+    but that's an application decision.
     """
     account = get_account_by_id(account_id, db)
     if not account:

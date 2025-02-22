@@ -1,8 +1,12 @@
 """
 backend/schemas/account.py
 
-Refactored to retain user_id in the Account model.
-We need user_id in AccountCreate, because the DB requires it (NOT NULL).
+Defines Pydantic schemas for creating, updating, and reading Account objects.
+Since the double-entry logic primarily lives in LedgerEntry or Transaction,
+we typically don't embed ledger info in the Account schemas directly, but
+you can if you want to show related ledger_entries.
+
+We include user_id in AccountCreate because each Account belongs to a specific User.
 """
 
 from pydantic import BaseModel
@@ -10,41 +14,38 @@ from typing import Optional
 
 class AccountBase(BaseModel):
     """
-    Common fields shared by create/read/update.
-    'name' is a human-readable label (e.g. "Bank", "Wallet"),
-    'currency' must be "USD" or "BTC" in this system.
+    Common fields for an Account, used by create/read/update.
+    - 'name': a label like "Bank", "BTC Wallet", "BTC Fees"
+    - 'currency': "USD" or "BTC" in typical usage
     """
     name: str
     currency: str
 
 class AccountCreate(AccountBase):
     """
-    Fields required to create a new Account.
-    We must include user_id because the DB schema has
-    user_id = Column(..., nullable=False).
+    Schema for creating a new Account. We require user_id because
+    the DB schema has user_id as NOT NULL, referencing which user owns it.
     """
     user_id: int
 
 class AccountUpdate(BaseModel):
     """
-    Fields optional for updating an existing Account.
+    Schema for updating an existing Account record.
+    Currently only 'name' or 'currency' can be updated, both optional.
     """
     name: Optional[str] = None
     currency: Optional[str] = None
-    # In most cases, user_id isn't updated after creation, so we omit it here.
-    # If you do want to allow changing which user owns the account,
-    # you could add `user_id: Optional[int] = None`.
 
 class AccountRead(AccountBase):
     """
-    Returned after retrieving an Account.
-    Includes the DB-generated 'id' and also which user owns it.
+    Schema returned after fetching an Account.
+    Includes the DB-generated 'id' and the 'user_id' that references
+    which user owns this account.
     """
     id: int
     user_id: int
 
     class Config:
-        # pydantic v2 uses 'from_attributes' instead of 'orm_mode'
-        # but if you are under pydantic v2, you might see a deprecation warning.
-        # For backward compatibility, you can keep it as 'orm_mode = True'
+        # For returning data from ORM, ensure we convert properly
+        # pydantic v2 uses 'from_attributes' or 'orm_mode' for model conversion
         from_attributes = True
