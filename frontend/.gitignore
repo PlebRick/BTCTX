@@ -7,6 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node.js
 node_modules
 dist
 dist-ssr
@@ -17,6 +18,13 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.env
+*.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
 # Editor directories and files
 .vscode/*
@@ -28,3 +36,16 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# IDEs and editors
+*.iml
+*.ipr
+*.iws
+*.idea/
+*.vscode/

@@ -3,6 +3,7 @@
         "autoflush",
         "condecimal",
         "dotenv",
+        "ehthumbs",
         "fastapi",
         "njsproj",
         "ntvs",
@@ -14,7 +15,8 @@
         "sqlalchemy",
         "starlette",
         "typer",
-        "uvicorn"
+        "uvicorn",
+        "venv"
     ],
     "python.pythonPath": "/opt/homebrew/Caskroom/miniforge/base/envs/bitcoin-tx/bin/python",
     "python.envFile": "${workspaceFolder}/backend/.env",
