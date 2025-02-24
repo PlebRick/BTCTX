@@ -1,5 +1,5 @@
 """
-backend/routers/calculation.api.py
+backend/routers/calculation.py
 
 This module defines API endpoints for portfolio calculations in BitcoinTX.
 It exposes endpoints for:
@@ -7,38 +7,51 @@ It exposes endpoints for:
   - Retrieving all accounts' balances.
   - Retrieving gains and losses calculations.
 
-The underlying logic is implemented in backend/services/calculation.api.
-This modular design lets you display each category (or totals) in your frontend.
+The underlying logic is implemented in backend/services/calculation.py.
+This modular design lets you display each calculation category (or totals) in your frontend.
 """
 
+# Import necessary FastAPI components.
 from fastapi import APIRouter, Depends, HTTPException
+# Import type hints.
 from typing import List, Dict
+# Import SQLAlchemy's Session for database operations.
 from sqlalchemy.orm import Session
+# Import Decimal for precise numeric conversions.
 from decimal import Decimal
 
-# Import calculation functions from the new calculation module.
-from backend.services.calculation.api import (
+# Import calculation functions from our service file.
+from backend.services.calculation import (
     get_account_balance,
     get_all_account_balances,
     get_gains_and_losses
 )
 
-# Dependency to provide a database session.
+# Import the database session dependency.
 from backend.database import get_db
 
-router = APIRouter(prefix="/calculations", tags=["calculations"])
+# Create an APIRouter instance without an internal prefix.
+# We let main.py define the final URL prefix (e.g. "/api/calculations")
+router = APIRouter(tags=["calculations"])
 
 @router.get("/account/{account_id}/balance")
 def api_get_account_balance(account_id: int, db: Session = Depends(get_db)) -> Dict:
     """
     API endpoint to retrieve the balance for a specific account.
     
+    This endpoint:
+      1. Receives an account ID as a path parameter.
+      2. Uses the injected database session to call get_account_balance.
+      3. Converts the resulting Decimal balance to a float for JSON serialization.
+      4. Returns a dictionary with the account ID and its balance.
+    
     Args:
-      account_id (int): The ID of the account.
-      db (Session): Database session (injected).
+      account_id (int): The unique identifier of the account.
+      db (Session): The SQLAlchemy database session provided via dependency injection.
     
     Returns:
-      dict: Contains the account_id and its balance as a float.
+      dict: A dictionary in the format:
+            { "account_id": <int>, "balance": <float> }
     """
     balance = get_account_balance(db, account_id)
     return {"account_id": account_id, "balance": float(balance)}
@@ -46,13 +59,19 @@ def api_get_account_balance(account_id: int, db: Session = Depends(get_db)) -> D
 @router.get("/accounts/balances")
 def api_get_all_account_balances(db: Session = Depends(get_db)) -> List[Dict]:
     """
-    API endpoint to retrieve balances for all accounts.
+    API endpoint to retrieve balances for all accounts in the system.
+    
+    This endpoint:
+      1. Uses the database session to call get_all_account_balances, which returns a list of dictionaries.
+      2. Iterates over the results and converts each account's balance from Decimal to float.
+      3. Returns the updated list for JSON serialization.
     
     Returns:
-      List[dict]: Each dictionary includes account_id, name, currency, and balance (as a float).
+      List[dict]: Each dictionary includes:
+                  { "account_id": <int>, "name": <str>, "currency": <str>, "balance": <float> }
     """
     results = get_all_account_balances(db)
-    # Convert Decimal balances to float for JSON serialization.
+    # Convert each Decimal balance to float for JSON output.
     for item in results:
         item["balance"] = float(item["balance"])
     return results
@@ -62,22 +81,35 @@ def api_get_gains_and_losses(db: Session = Depends(get_db)) -> Dict:
     """
     API endpoint to retrieve gains and losses calculations.
     
-    This includes:
+    This endpoint calculates:
       - Sells proceeds (from Sell transactions)
       - Withdrawals spent proceeds (from Withdrawal transactions with purpose "Spent")
       - Income earned (from Deposit transactions with source "Income")
       - Interest earned (from Deposit transactions with source "Interest")
-      - Aggregated fees by currency
-      - Total gains and total losses
+      - Aggregated fees by currency (e.g., USD, BTC)
+      - Total gains (sum of proceeds, income, and interest)
+      - Total losses (sum of withdrawals spent)
+    
+    The function:
+      1. Calls get_gains_and_losses to compute these values (returned as Decimals).
+      2. Uses a helper function to recursively convert any Decimal values into floats.
+      3. Returns the final dictionary suitable for JSON serialization.
     
     Returns:
-      dict: A dictionary with each category, with Decimal values converted to float.
+      dict: A dictionary with keys such as "sells_proceeds", "withdrawals_spent", "income_earned",
+            "interest_earned", "fees", "total_gains", and "total_losses", with all numeric values as floats.
     """
     calculations = get_gains_and_losses(db)
 
     def convert_decimal(item):
         """
         Recursively convert Decimal values in a data structure to float.
+        
+        Args:
+          item: A value or data structure (dict, list) potentially containing Decimal values.
+        
+        Returns:
+          The same structure with all Decimal values converted to float.
         """
         if isinstance(item, Decimal):
             return float(item)

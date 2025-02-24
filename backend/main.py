@@ -117,6 +117,8 @@ from backend.routers import transaction, user, account
 app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
 app.include_router(user.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
+from backend.routers import calculation
+app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"])
 
 # ---------------------------------------------------------
 # Protected Route Example
