@@ -2,29 +2,35 @@
 backend/schemas/account.py
 
 Defines Pydantic schemas for creating, updating, and reading Account objects.
-Since the double-entry logic primarily lives in LedgerEntry or Transaction,
-we typically don't embed ledger info in the Account schemas directly, but
-you can if you want to show related ledger_entries.
-
-We include user_id in AccountCreate because each Account belongs to a specific User.
+We add optional validators to ensure 'currency' is one of ["USD","BTC"].
+(Though we already have the main logic in the service layer.)
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import Optional
+from fastapi import HTTPException
+
+VALID_CURRENCIES = {"USD", "BTC"}
 
 class AccountBase(BaseModel):
     """
     Common fields for an Account, used by create/read/update.
-    - 'name': a label like "Bank", "BTC Wallet", "BTC Fees"
-    - 'currency': "USD" or "BTC" in typical usage
+    - 'name': a label like "Bank", "Wallet", "BTC Fees"
+    - 'currency': "USD" or "BTC"
     """
     name: str
     currency: str
 
+    @validator("currency")
+    def currency_must_be_valid(cls, v):
+        if v not in VALID_CURRENCIES:
+            raise ValueError("currency must be 'USD' or 'BTC'")
+        return v
+
 class AccountCreate(AccountBase):
     """
     Schema for creating a new Account. We require user_id because
-    the DB schema has user_id as NOT NULL, referencing which user owns it.
+    the DB schema has user_id as NOT NULL, referencing which user owns this account.
     """
     user_id: int
 
@@ -32,9 +38,16 @@ class AccountUpdate(BaseModel):
     """
     Schema for updating an existing Account record.
     Currently only 'name' or 'currency' can be updated, both optional.
+    We also ensure currency is "USD"/"BTC" if provided.
     """
     name: Optional[str] = None
     currency: Optional[str] = None
+
+    @validator("currency")
+    def currency_must_be_valid(cls, v):
+        if v is not None and v not in VALID_CURRENCIES:
+            raise ValueError("currency must be 'USD' or 'BTC'")
+        return v
 
 class AccountRead(AccountBase):
     """
@@ -46,6 +59,4 @@ class AccountRead(AccountBase):
     user_id: int
 
     class Config:
-        # For returning data from ORM, ensure we convert properly
-        # pydantic v2 uses 'from_attributes' or 'orm_mode' for model conversion
         from_attributes = True
