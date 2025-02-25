@@ -270,7 +270,7 @@ const Transactions: React.FC = () => {
                 const extraLabel = formatExtra(tx);
 
                 return (
-                  <<|control702|>
+                  <div // Fixed: Changed from <tsx> to <div>
                     key={tx.id}
                     className="transaction-card"
                     style={{
