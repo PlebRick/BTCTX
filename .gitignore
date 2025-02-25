@@ -61,4 +61,6 @@ backend/create_db.py        # Temporary or test database scripts (if not needed)
 
 # --- Additional Notes ---
 # If there are any other temporary or sensitive directories/files specific to your development setup,
-# you can add them here.
+# you can add them here.commands.md
+commands.md
+frontend/temp_frontend/
