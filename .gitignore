@@ -13,6 +13,7 @@ env/                        # Alternative virtual environment folder name
 # --- SQLite Database ---
 *.db                        # SQLite database files
 *.sqlite3                   # SQLite backup/alternative file types
+backend/bitcoin_tracker.db
 
 # --- Environment Variables ---
 .env                        # Environment variable file for secrets (root, backend, frontend)
