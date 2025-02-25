@@ -1,6 +1,6 @@
-// src/pages/Settings.tsx
 import React, { useState } from 'react';
 import axios from 'axios';
+import api from '../api'; // Centralized API client
 
 const Settings: React.FC = () => {
   // Local state for loading and displaying a message (success or error)
@@ -28,9 +28,8 @@ const Settings: React.FC = () => {
     setMessage("");
     
     try {
-      // Send a DELETE request to the backend endpoint.
-      // Adjust the URL as needed to match your backend configuration.
-      await axios.delete("http://127.0.0.1:8000/api/transactions/delete_all");
+      // Send a DELETE request to the backend endpoint using the centralized API client.
+      await api.delete('/transactions/delete_all'); // Fixed: uses api instance with corrected path
       
       // If successful, set a success message.
       setMessage("All transactions have been successfully deleted.");
