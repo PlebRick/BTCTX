@@ -9,6 +9,7 @@ Key Roles:
  - Add CORS middleware for frontend integration
  - Include the 'transaction', 'account', and 'user' routers
    which now implement multi-line ledger entries, BTC lot tracking, etc.
+ - Serve the Vite frontend static files for SPA routing
 
 Because our double-entry logic is in the services and routers, no special
 changes are needed here beyond referencing them. This file is the entry
@@ -22,6 +23,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
+from starlette.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import FileResponse
 
 # Load environment variables from a .env file at the project root
 load_dotenv()
@@ -110,20 +114,19 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
 # ---------------------------------------------------------
 # Include Routers
 # ---------------------------------------------------------
-# We import the transaction, user, and account routers,
+# We import the transaction, user, account, and calculation routers,
 # each referencing the multi-line ledger or user/account logic.
-from backend.routers import transaction, user, account
+from backend.routers import transaction, user, account, calculation
 
 app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
 app.include_router(user.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
-from backend.routers import calculation
 app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"])
 
 # ---------------------------------------------------------
 # Protected Route Example
 # ---------------------------------------------------------
-@app.get("/protected")
+@app.get("/api/protected")
 def read_protected_route(current_user: str = Depends(get_current_user)):
     """
     Demonstration of a JWT-protected endpoint. The double-entry system
@@ -131,6 +134,24 @@ def read_protected_route(current_user: str = Depends(get_current_user)):
     creation to authenticated users only, for example.
     """
     return {"message": f"Hello, {current_user}. You have access to this route!"}
+
+# ---------------------------------------------------------
+# Serve Vite Frontend Static Files with SPA Routing
+# ---------------------------------------------------------
+# Custom StaticFiles class to serve index.html for SPA routes
+class SPAStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as ex:
+            if ex.status_code == 404:
+                # Serve index.html for any 404 (unmatched routes)
+                return FileResponse(os.path.join(self.directory, "index.html"))
+            else:
+                raise
+
+# Mount the frontend static files at the root
+app.mount("/", SPAStaticFiles(directory="frontend/dist", html=True), name="static")
 
 # ---------------------------------------------------------
 # Root Route

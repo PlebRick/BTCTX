@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import api from '../api'; // Centralized API client
 import '../styles/dashboard.css';
 
 // Define the interface for account balance data returned by the API.
@@ -48,14 +49,9 @@ const Dashboard: React.FC = () => {
   // -----------------------------
   useEffect(() => {
     // Fetch account balances from our calculation API endpoint.
-    fetch('http://localhost:8000/api/calculations/accounts/balances')
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((data: unknown) => {
+    api.get('api/calculations/accounts/balances')
+      .then((response) => {
+        const data = response.data;
         console.log('Fetched balances data:', data);
         if (!Array.isArray(data)) {
           throw new Error('Data is not an array. Received: ' + JSON.stringify(data));
@@ -121,14 +117,9 @@ const Dashboard: React.FC = () => {
   // -----------------------------
   useEffect(() => {
     // Fetch gains and losses data from our calculation API endpoint.
-    fetch('http://localhost:8000/api/calculations/gains-and-losses')
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((data: unknown) => {
+    api.get('api/calculations/gains-and-losses')
+      .then((response) => {
+        const data = response.data;
         console.log('Fetched gains and losses data:', data);
         setGainsAndLosses(data as GainsAndLosses);
       })

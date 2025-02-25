@@ -8,9 +8,9 @@
  */
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import TransactionPanel from "../components/TransactionPanel";
 import "../styles/transactions.css";
+import api from '../api';  // Centralized API client
 
 /**
  * ITransaction interface:
@@ -168,9 +168,7 @@ const Transactions: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get<ITransaction[]>(
-        "http://127.0.0.1:8000/api/transactions/"
-      );
+      const res = await api.get<ITransaction[]>('api/transactions/');
       setTransactions(res.data);
     } catch (err) {
       console.error(err);

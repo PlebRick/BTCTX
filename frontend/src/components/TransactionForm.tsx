@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
-import axios from "axios";
+import axios from "axios";  // Import axios for isAxiosError
+import api from '../api';    // Centralized API client
 import "../styles/transactionForm.css";
 
 /**
@@ -380,12 +381,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       is_locked: false,
     };
 
-    // 4) POST to backend
+    // 4) POST to backend using the centralized api client
     try {
-      const response = await axios.post(
-        "http://127.0.0.1:8000/api/transactions",
-        transactionPayload
-      );
+      const response = await api.post('api/transactions', transactionPayload);
       console.log("Transaction created:", response.data);
 
       reset();
@@ -393,7 +391,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       alert("Transaction created successfully!");
       onSubmitSuccess?.();
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
+      if (axios.isAxiosError(error)) {  // Use axios.isAxiosError instead of api.isAxiosError
         const msg = error.response?.data?.detail || error.message || "Error";
         alert(`Failed to create transaction: ${msg}`);
       } else if (error instanceof Error) {

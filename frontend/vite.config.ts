@@ -8,11 +8,18 @@ export default defineConfig({
     outDir: 'dist',  // Specify output directory for build artifacts
     emptyOutDir: true,  // Remove old files before building
   },
-});
-// (Optional) If you use Vitest for unit tests:
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
+  },
+  // (Optional) If you use Vitest for unit tests:
   // test: {
   //   environment: 'jsdom',
   //   setupFiles: './src/setupTests.ts',
   //   globals: true
   // },
-//});
+});
