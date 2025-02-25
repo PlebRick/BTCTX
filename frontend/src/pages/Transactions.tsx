@@ -159,7 +159,7 @@ const Transactions: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * fetchTransactions => GET /api/transactions 
+   * fetchTransactions => GET /transactions 
    * The new backend returns "Transaction" objects that might 
    * have multiple ledger entries behind the scenes, but we 
    * only see the single-row data here.
@@ -168,7 +168,7 @@ const Transactions: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<ITransaction[]>('api/transactions/');
+      const res = await api.get<ITransaction[]>('/transactions/'); // Fixed path: removed 'api/'
       setTransactions(res.data);
     } catch (err) {
       console.error(err);
@@ -270,7 +270,7 @@ const Transactions: React.FC = () => {
                 const extraLabel = formatExtra(tx);
 
                 return (
-                  <div
+                  <<|control702|>
                     key={tx.id}
                     className="transaction-card"
                     style={{
