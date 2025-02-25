@@ -49,7 +49,7 @@ const Dashboard: React.FC = () => {
   // -----------------------------
   useEffect(() => {
     // Fetch account balances from our calculation API endpoint.
-    api.get('api/calculations/accounts/balances')
+    api.get('/calculations/accounts/balances') // Fixed path: removed redundant 'api/' prefix
       .then((response) => {
         const data = response.data;
         console.log('Fetched balances data:', data);
@@ -117,7 +117,7 @@ const Dashboard: React.FC = () => {
   // -----------------------------
   useEffect(() => {
     // Fetch gains and losses data from our calculation API endpoint.
-    api.get('api/calculations/gains-and-losses')
+    api.get('/calculations/gains-and-losses') // Fixed path: removed redundant 'api/' prefix
       .then((response) => {
         const data = response.data;
         console.log('Fetched gains and losses data:', data);
