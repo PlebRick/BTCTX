@@ -381,9 +381,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       is_locked: false,
     };
 
-    // 4) POST to backend using the centralized api client
+    // 4) POST to backend using the centralized api client with corrected path
     try {
-      const response = await api.post('api/transactions', transactionPayload);
+      const response = await api.post('/transactions', transactionPayload);  // Fixed: Changed from 'api/transactions' to '/transactions'
       console.log("Transaction created:", response.data);
 
       reset();
