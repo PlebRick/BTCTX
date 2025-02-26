@@ -11,13 +11,9 @@ The underlying logic is implemented in backend/services/calculation.py.
 This modular design lets you display each calculation category (or totals) in your frontend.
 """
 
-# Import necessary FastAPI components.
 from fastapi import APIRouter, Depends, HTTPException
-# Import type hints.
 from typing import List, Dict
-# Import SQLAlchemy's Session for database operations.
 from sqlalchemy.orm import Session
-# Import Decimal for precise numeric conversions.
 from decimal import Decimal
 
 # Import calculation functions from our service file.
@@ -31,8 +27,9 @@ from backend.services.calculation import (
 from backend.database import get_db
 
 # Create an APIRouter instance without an internal prefix.
-# We let main.py define the final URL prefix (e.g. "/api/calculations")
+# main.py sets the final prefix ("/api/calculations") and tags.
 router = APIRouter(tags=["calculations"])
+
 
 @router.get("/account/{account_id}/balance")
 def api_get_account_balance(account_id: int, db: Session = Depends(get_db)) -> Dict:
@@ -56,6 +53,7 @@ def api_get_account_balance(account_id: int, db: Session = Depends(get_db)) -> D
     balance = get_account_balance(db, account_id)
     return {"account_id": account_id, "balance": float(balance)}
 
+
 @router.get("/accounts/balances")
 def api_get_all_account_balances(db: Session = Depends(get_db)) -> List[Dict]:
     """
@@ -75,6 +73,7 @@ def api_get_all_account_balances(db: Session = Depends(get_db)) -> List[Dict]:
     for item in results:
         item["balance"] = float(item["balance"])
     return results
+
 
 @router.get("/gains-and-losses")
 def api_get_gains_and_losses(db: Session = Depends(get_db)) -> Dict:
@@ -102,15 +101,6 @@ def api_get_gains_and_losses(db: Session = Depends(get_db)) -> Dict:
     calculations = get_gains_and_losses(db)
 
     def convert_decimal(item):
-        """
-        Recursively convert Decimal values in a data structure to float.
-        
-        Args:
-          item: A value or data structure (dict, list) potentially containing Decimal values.
-        
-        Returns:
-          The same structure with all Decimal values converted to float.
-        """
         if isinstance(item, Decimal):
             return float(item)
         if isinstance(item, dict):

@@ -37,7 +37,7 @@ from backend.database import get_db
 # Create a router instance
 router = APIRouter(tags=["transactions"])
 
-@router.get("/", response_model=List[TransactionRead])
+@router.get("", response_model=List[TransactionRead])
 def list_transactions(db: Session = Depends(get_db)):
     """
     List all transactions, typically in descending order by timestamp.
@@ -49,7 +49,7 @@ def list_transactions(db: Session = Depends(get_db)):
     return tx_service.get_all_transactions(db)
 
 
-@router.post("/", response_model=TransactionRead)
+@router.post("", response_model=TransactionRead)
 def create_transaction(tx: TransactionCreate, db: Session = Depends(get_db)):
     """
     Create a new transaction in the double-entry system.
