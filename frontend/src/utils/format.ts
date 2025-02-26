@@ -1,4 +1,4 @@
-/* utils/format.ts */
+/* FILE: src/utils/format.ts */
 
 /**
  * --------------------------------------------------------------------------
@@ -27,8 +27,6 @@ export function parseDecimal(value?: string | number): number {
 
 /**
  * Format a number as USD with 2 decimals.
- * e.g. 50 -> "$50.00"
- *      50.1234 -> "$50.12" (rounded)
  */
 export function formatUsd(amount: number): string {
   return `$${amount.toFixed(2)}`;
@@ -36,8 +34,6 @@ export function formatUsd(amount: number): string {
 
 /**
  * Format a number as BTC with up to 8 decimals.
- * e.g. 0.0001 -> "0.00010000 BTC"
- *      1.23456789 -> "1.23456789 BTC"
  */
 export function formatBtc(amount: number): string {
   return `${amount.toFixed(8)} BTC`;
@@ -48,18 +44,10 @@ export function formatBtc(amount: number): string {
  * 3) Date/Time Formatting
  * --------------------------------------------------------------------------
  */
-
-/**
- * Format an ISO8601 timestamp into a more user-friendly string
- * with no seconds, e.g. "Sep 10, 2025, 12:34 PM".
- * If invalid, returns "Invalid Date".
- */
 export function formatTimestamp(isoString: string): string {
   if (!isoString) return "Invalid Date";
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return "Invalid Date";
-
-  // Example: "Sep 10, 2025, 12:34 PM"
   return d.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -76,27 +64,25 @@ export function formatTimestamp(isoString: string): string {
  *
  * We define minimal interfaces so TypeScript knows which fields might be
  * string-based decimals. Then we create parseTransaction/parseGainsAndLosses
- * with generics so they accept any object that "extends" these base interfaces.
- * This way, we avoid `any` and keep the code flexible and typed.
+ * so they convert those fields to real numbers.
  */
 
-/**
- * RawTransaction:
- * Minimally describes fields that might be decimal strings on a Transaction.
- * If your actual backend has more fields, that's fine—any extra fields will
- * be preserved by using a generic type T.
- */
+// STEP A) Include realized_gain_usd in RawTransaction
 interface RawTransaction {
   amount?: string | number;
   fee_amount?: string | number;
   cost_basis_usd?: string | number;
   proceeds_usd?: string | number;
-  // ... add more if needed
+
+  // NEW: realized_gain_usd might come back as string or number
+  realized_gain_usd?: string | number;
+
+  // ... other fields if needed (id, type, timestamp, etc.)
 }
 
 /**
  * parseTransaction<T>:
- * - T extends RawTransaction => T must at least have the fields above,
+ * - T extends RawTransaction => T must at least have the decimal fields,
  *   but can have more (id, type, timestamp, etc.).
  * - Returns T with those decimal-like fields replaced by real numbers.
  */
@@ -105,13 +91,18 @@ export function parseTransaction<T extends RawTransaction>(rawTx: T): T & {
   fee_amount: number;
   cost_basis_usd: number;
   proceeds_usd: number;
+  realized_gain_usd: number; // PARSED FIELD
 } {
   return {
     ...rawTx,
+
     amount: parseDecimal(rawTx.amount),
     fee_amount: parseDecimal(rawTx.fee_amount),
     cost_basis_usd: parseDecimal(rawTx.cost_basis_usd),
     proceeds_usd: parseDecimal(rawTx.proceeds_usd),
+
+    // STEP B) parse realized_gain_usd to ensure it's numeric
+    realized_gain_usd: parseDecimal(rawTx.realized_gain_usd),
   };
 }
 
@@ -130,7 +121,6 @@ interface RawGainsAndLosses {
     USD?: string | number;
     BTC?: string | number;
   };
-  // ... add more if needed
 }
 
 /**

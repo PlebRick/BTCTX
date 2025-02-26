@@ -20,14 +20,14 @@ import "../styles/transactionForm.css";
 // ------------------------------
 //  1) IMPORTING HELPERS
 // ------------------------------
-// (We remove the broken import of `localDatetimeToIso`, 
-//  since it's not actually exported from ../utils/format.)
+// We only import parseDecimal here; localDatetimeToIso is a small local function
+// defined below. parseDecimal ensures that user-typed numeric fields are 
+// properly converted from string to number in the final payload.
 
 import {
   parseDecimal
   // parseDecimal => ensures numeric fields like amount/fee 
   //   are consistently parsed from user input.
-  // localDatetimeToIso => Moved to a local function below.
 } from "../utils/format";
 
 /**
@@ -344,6 +344,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   /**
    * onSubmit => build final payload to pass to the new double-entry backend
    * where it becomes multiple ledger entries, plus optional BTC lot usage.
+   *
+   * Notice how we use parseDecimal(...) to ensure user-typed fields (which 
+   * come in as strings or partial decimals) become real numeric fields 
+   * in the final transactionPayload. That prevents issues if the user 
+   * typed "50.00010000" or something similar.
    */
   const onSubmit: SubmitHandler<TransactionFormData> = async (data) => {
     // Added: if BTC Withdrawal => ensure proceeds_usd is a real number (default 0)
@@ -422,7 +427,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       type: data.type,
       amount,
       timestamp: isoTimestamp,
-      fee_amount: parseDecimal(data.fee), // parse fee
+      // parseDecimal => ensures fee is also converted if user typed partial decimals
+      fee_amount: parseDecimal(data.fee), 
       fee_currency: feeCurrency,
       cost_basis_usd,
       proceeds_usd, // includes your new "Withdrawal" assignment

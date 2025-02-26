@@ -13,30 +13,46 @@ import "../styles/dashboard.css";
 // ------------------------------
 // 1) IMPORTING HELPER UTILS
 // ------------------------------
-// Suppose we have these in `utils/format.ts`
 import {
-  parseDecimal,
+  parseDecimal, // We'll use this to parse account balances, etc.
   formatUsd,
   formatBtc,
-  // optionally: parseGainsAndLosses,
+  // parseGainsAndLosses, // (Optional) We demonstrate calling it if needed.
 } from "../utils/format";
 
 /**
- * Define the interface for account balance data returned by the API.
- * We keep 'balance' as string|number because the backend might return
- * decimals as strings, or you might parse them. We do the final parse in the UI.
+ * Define an interface for account balance data returned by the API.
+ * The server might return 'balance' as a string (e.g. "50.00000000")
+ * or as a number, so we accept both. We'll parse it with parseDecimal.
  */
 interface AccountBalance {
   account_id: number;
   name: string;
   currency: string;
-  balance: number | string; // We'll convert this to a number if it's a string.
+  balance: number | string; // We'll parseDecimal it in the UI to get a real number.
 }
 
 /**
- * Define the interface for gains and losses data returned by the API.
- * We can do string|number if the backend returns decimals as strings, then parse them.
- * Or we assume they're already numeric. We'll parse/format at display time anyway.
+ * If your backend returns GainsAndLosses fields as strings, you can define
+ * an interface with string|number, then parse them. We'll show that approach below.
+ */
+interface GainsAndLossesRaw {
+  sells_proceeds: string | number;
+  withdrawals_spent: string | number;
+  income_earned: string | number;
+  interest_earned: string | number;
+  fees: {
+    USD: string | number;
+    BTC: string | number;
+  };
+  total_gains: string | number;
+  total_losses: string | number;
+}
+
+/**
+ * GainsAndLosses (final shape):
+ * After parsing, you store them as real numbers. If your backend
+ * already sends numeric fields, you can skip the 'Raw' approach.
  */
 interface GainsAndLosses {
   sells_proceeds: number;
@@ -84,8 +100,12 @@ const Dashboard: React.FC = () => {
         const data = response.data;
         console.log("Fetched balances data:", data);
         if (!Array.isArray(data)) {
-          throw new Error("Data is not an array. Received: " + JSON.stringify(data));
+          throw new Error(
+            "Data is not an array. Received: " + JSON.stringify(data)
+          );
         }
+        // We store them as is (AccountBalance[]).
+        // We'll parseDecimal each balance in the next useEffect.
         setBalances(data as AccountBalance[]);
       })
       .catch((err) => {
@@ -106,8 +126,8 @@ const Dashboard: React.FC = () => {
     let totalUsdTemp = 0;
 
     balances.forEach((acc) => {
-      // Convert the balance to a real number if it's a string.
-      // We can use parseDecimal from our utils:
+      // Convert the balance to a real number if it's a string,
+      // using parseDecimal from our utils:
       const numericBalance = parseDecimal(acc.balance);
 
       if (Number.isNaN(numericBalance)) {
@@ -147,15 +167,26 @@ const Dashboard: React.FC = () => {
   // -----------------------------
   useEffect(() => {
     api
-      .get("/calculations/gains-and-losses") // No 'api/' prefix needed
+      .get<GainsAndLossesRaw>("/calculations/gains-and-losses") // No 'api/' prefix needed
       .then((response) => {
-        const data = response.data;
-        console.log("Fetched gains and losses data:", data);
+        const raw = response.data;
+        console.log("Fetched gains and losses data:", raw);
 
-        // Optionally, parse fields with parseDecimal if needed:
-        // if data might be strings, do a parseGainsAndLosses(data) helper
-        // or parse them individually. For now, we assume they're numeric:
-        setGainsAndLosses(data as GainsAndLosses);
+        // You could do something like parseGainsAndLosses(raw), if you had
+        // a parseGainsAndLosses(...) in your utils. Alternatively, parse them individually:
+        const parsed: GainsAndLosses = {
+          sells_proceeds: parseDecimal(raw.sells_proceeds),
+          withdrawals_spent: parseDecimal(raw.withdrawals_spent),
+          income_earned: parseDecimal(raw.income_earned),
+          interest_earned: parseDecimal(raw.interest_earned),
+          fees: {
+            USD: parseDecimal(raw.fees.USD),
+            BTC: parseDecimal(raw.fees.BTC),
+          },
+          total_gains: parseDecimal(raw.total_gains),
+          total_losses: parseDecimal(raw.total_losses),
+        };
+        setGainsAndLosses(parsed);
       })
       .catch((err) => {
         console.error("Error fetching gains and losses:", err);
@@ -165,7 +196,7 @@ const Dashboard: React.FC = () => {
 
   // -----------------------------
   // Define placeholders for values not computed here.
-  // For instance, unrealized gains and portfolio chart are still placeholders.
+  // For instance, unrealized gains and portfolio chart are placeholders.
   // -----------------------------
   const unrealizedGains = 0;
   const portfolioChartPlaceholder = "(Chart Placeholder)";

@@ -10,38 +10,72 @@
 import React, { useEffect, useState } from "react";
 import TransactionPanel from "../components/TransactionPanel";
 import "../styles/transactions.css";
-import api from "../api";  // Centralized API client
+import api from "../api"; // Centralized API client
 
 // ------------------------------
 //  1) IMPORTING HELPER UTILS
 // ------------------------------
 import {
-  // parseTransaction,   // Optional: If you want to parse transactions upon fetch
-  formatTimestamp,       // For date/time display
+  parseTransaction,      // We'll call this after fetching the raw data
+  formatTimestamp,       // For date/time display if we want to
   formatUsd,             // For USD fields
   formatBtc,             // For BTC amounts
   parseDecimal           // For any direct decimal parsing if needed
 } from "../utils/format";
 
 /*
-  We do a dummy usage to avoid TS/ESLint "unused variable" errors
+  We do a dummy usage for formatTimestamp / parseDecimal 
+  to avoid TS/ESLint "unused variable" errors, 
   while still preserving future availability and comments.
 */
 void formatTimestamp;
 void parseDecimal;
 
 /**
+ * ITransactionRaw:
+ * If your backend returns decimals as strings ("50.00000000"),
+ * define a minimal interface for the "raw" data shape. 
+ * Then we can parse them into real numbers via parseTransaction().
+ *
+ * Because your final code uses ITransaction with numeric fields,
+ * we'll transform from ITransactionRaw -> ITransaction in fetchTransactions.
+ */
+interface ITransactionRaw {
+  id: number;
+  from_account_id: number | null;
+  to_account_id: number | null;
+  type: "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
+
+  // The backend returns these numeric fields as strings, e.g. "50.00000000"
+  amount?: string | number;
+  fee_amount?: string | number;
+  cost_basis_usd?: string | number;
+  proceeds_usd?: string | number;
+
+  // NEW: realized_gain_usd might come back as string or number
+  realized_gain_usd?: string | number;
+
+  // Timestamps are strings, so that part is fine
+  timestamp: string;
+  is_locked: boolean;
+
+  // Additional optional fields
+  holding_period?: string | null;
+  external_ref?: string | null;
+  source?: string | null;
+  purpose?: string | null;
+  fee_currency?: string;
+
+  // For debug or advanced usage
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
  * ITransaction interface:
- * Reflects the final backend's Transaction model, which might have
- * cost_basis_usd, proceeds_usd, realized_gain_usd, etc., plus
- * legacy single-entry fields like 'amount' or 'fee_amount'.
- *
- * If your backend is returning decimals as strings, you can:
- *  (A) Keep them as strings here, parse in the UI on the fly, or
- *  (B) Use parseTransaction() at fetch-time to store them as numbers.
- *
- * For now, let's assume they are already numbers. If they're strings,
- * you can define them as `string` or `string | number`.
+ * Reflects the final, parsed Transaction model after parseTransaction(),
+ * so all decimal fields (amount, fee_amount, proceeds_usd, realized_gain_usd)
+ * are guaranteed numbers.
  */
 interface ITransaction {
   id: number;
@@ -49,22 +83,25 @@ interface ITransaction {
   to_account_id: number | null;
   type: "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
 
-  // single transaction amount (LEGACY)
+  // single transaction amount (LEGACY) as a number
   amount: number;
   // ISO date string from the backend
   timestamp: string;
   is_locked: boolean;
 
-  // Optional advanced fields from new double-entry
-  fee_amount?: number;
+  // Now guaranteed numeric after parseTransaction
+  fee_amount: number;
+  cost_basis_usd: number;
+  proceeds_usd: number;
+  realized_gain_usd: number;
+
+  holding_period?: string | null;
+  external_ref?: string | null;
+  source?: string | null;
+  purpose?: string | null;
   fee_currency?: string;
-  cost_basis_usd?: number;
-  proceeds_usd?: number;
-  realized_gain_usd?: number;
-  holding_period?: string;
-  external_ref?: string;
-  source?: string;
-  purpose?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**
@@ -182,7 +219,7 @@ const Transactions: React.FC = () => {
   // State to manage the TransactionPanel open/close
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
-  // All transactions
+  // All transactions (after parsing => numeric decimal fields)
   const [transactions, setTransactions] = useState<ITransaction[]>([]);
 
   // Sorting
@@ -195,22 +232,24 @@ const Transactions: React.FC = () => {
   /**
    * fetchTransactions => GET /transactions 
    * The new backend returns "Transaction" objects that might 
-   * have multiple ledger entries behind the scenes, but we 
-   * only see the single-row data here.
-   *
-   * Optionally, if the backend returns decimals as strings, you could:
-   *   const res = await api.get<ITransactionRaw[]>("/transactions");
-   *   const parsed = res.data.map(parseTransaction);  // parseTransaction from format.ts
-   *   setTransactions(parsed);
-   *
-   * We'll assume they're already numeric for this example.
+   * have decimal fields as strings, e.g. "50.00000000". We fetch them 
+   * as ITransactionRaw, then call parseTransaction(...) to convert 
+   * them into real numeric fields for ITransaction.
    */
   async function fetchTransactions() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<ITransaction[]>("/transactions/");
-      setTransactions(res.data);
+      // 1) Fetch raw data from /transactions
+      const res = await api.get<ITransactionRaw[]>("/transactions/");
+
+      // 2) Convert each ITransactionRaw => final ITransaction
+      //    by calling parseTransaction (from utils/format.ts)
+      const parsed = res.data.map((raw) => parseTransaction(raw));
+
+      // 3) Now 'parsed' is an array of ITransaction with 
+      //    numeric amount, fee_amount, proceeds_usd, realized_gain_usd, etc.
+      setTransactions(parsed);
     } catch (err) {
       console.error(err);
       setError("Failed to load transactions.");
@@ -250,22 +289,17 @@ const Transactions: React.FC = () => {
 
   /**
    * Group by date (e.g., "MMM DD, YYYY") for display
-   * We can use formatTimestamp if we want a specific 
-   * day label, but let's keep the existing approach 
-   * to show how you might do it manually.
+   * If we wanted to use formatTimestamp, we could do:
+   *   const dateLabel = formatTimestamp(tx.timestamp);
+   * But we'll keep the existing approach for consistency.
    */
   const groupedByDate: Record<string, ITransaction[]> = {};
   for (const tx of sortedTransactions) {
-    // We convert tx.timestamp into just a short date string.
-    // If we want a helper, we could do: 
-    //   const dateLabel = formatTimestamp(tx.timestamp, { dateOnly: true });
-    // For now, we do the existing toLocaleDateString approach:
     const dateLabel = new Date(tx.timestamp).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
-
     if (!groupedByDate[dateLabel]) {
       groupedByDate[dateLabel] = [];
     }
@@ -304,7 +338,7 @@ const Transactions: React.FC = () => {
               <h3>{dayLabel}</h3>
               {txArray.map((tx) => {
                 // If you want a more refined time, 
-                // you could do: const timeStr = formatTimestamp(tx.timestamp, { timeOnly: true });
+                // you could do: const timeStr = formatTimestamp(tx.timestamp);
                 // We'll keep the existing toLocaleTimeString approach:
                 const timeStr = new Date(tx.timestamp).toLocaleTimeString("en-US", {
                   hour: "numeric",
@@ -316,11 +350,6 @@ const Transactions: React.FC = () => {
 
                 // Fee (if any)
                 const feeNumber = tx.fee_amount ?? 0;
-                // If you want to be fancy, 
-                // you could do: 
-                //    const feeLabel = feeNumber ? `Fee: ${formatBtc(feeNumber)}` : "";
-                // or conditionally format in USD or BTC. 
-                // We'll keep the existing approach:
                 const feeLabel =
                   feeNumber !== 0
                     ? `Fee: ${feeNumber} ${tx.fee_currency || "USD"}`
