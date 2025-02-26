@@ -10,7 +10,7 @@
 import React, { useEffect, useState } from "react";
 import TransactionPanel from "../components/TransactionPanel";
 import "../styles/transactions.css";
-import api from "../api"; // Centralized API client
+import api from "../api"; // Centralized API client (keeps the base URL / config)
 
 // ------------------------------
 //  1) IMPORTING HELPER UTILS
@@ -51,11 +51,9 @@ interface ITransactionRaw {
   fee_amount?: string | number;
   cost_basis_usd?: string | number;
   proceeds_usd?: string | number;
+  realized_gain_usd?: string | number; // If the server sends realized gain
 
-  // NEW: realized_gain_usd might come back as string or number
-  realized_gain_usd?: string | number;
-
-  // Timestamps are strings, so that part is fine
+  // Timestamps are strings
   timestamp: string;
   is_locked: boolean;
 
@@ -65,15 +63,13 @@ interface ITransactionRaw {
   source?: string | null;
   purpose?: string | null;
   fee_currency?: string;
-
-  // For debug or advanced usage
   created_at?: string;
   updated_at?: string;
 }
 
 /**
  * ITransaction interface:
- * Reflects the final, parsed Transaction model after parseTransaction(),
+ * Reflects the final backend's Transaction model after parseTransaction(),
  * so all decimal fields (amount, fee_amount, proceeds_usd, realized_gain_usd)
  * are guaranteed numbers.
  */
@@ -83,23 +79,22 @@ interface ITransaction {
   to_account_id: number | null;
   type: "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
 
-  // single transaction amount (LEGACY) as a number
-  amount: number;
-  // ISO date string from the backend
-  timestamp: string;
+  amount: number;           // single transaction amount (LEGACY) as a real number
+  timestamp: string;        // ISO date
   is_locked: boolean;
 
-  // Now guaranteed numeric after parseTransaction
+  // Advanced fields from new double-entry, now numeric
   fee_amount: number;
+  fee_currency?: string;
   cost_basis_usd: number;
   proceeds_usd: number;
   realized_gain_usd: number;
+  holding_period?: string;
+  external_ref?: string;
+  source?: string;
+  purpose?: string;
 
-  holding_period?: string | null;
-  external_ref?: string | null;
-  source?: string | null;
-  purpose?: string | null;
-  fee_currency?: string;
+  // If needed
   created_at?: string;
   updated_at?: string;
 }
@@ -163,20 +158,13 @@ function resolveDisplayAccount(tx: ITransaction): string {
  * Format the single 'amount' we show. 
  * In the new system, multiple ledger lines might exist, 
  * but we keep a simplified approach for the UI.
- *
- * Now we can incorporate numeric formatting, e.g. formatBtc/formatUsd
- * if we know the currency. But since we only have 'type',
- * we do the same logic as before, but can optionally use helpers.
  */
 function formatAmount(tx: ITransaction): string {
   const { type, amount, cost_basis_usd, proceeds_usd } = tx;
-
   switch (type) {
     case "Deposit":
     case "Withdrawal":
     case "Transfer":
-      // We don't know if it's BTC or USD,
-      // but let's assume it's a plain numeric display:
       return `${amount}`;
 
     case "Buy":
@@ -241,6 +229,7 @@ const Transactions: React.FC = () => {
     setError(null);
     try {
       // 1) Fetch raw data from /transactions
+      //    using the same 'api' from '../api' (keeps baseURL / tokens, etc.)
       const res = await api.get<ITransactionRaw[]>("/transactions/");
 
       // 2) Convert each ITransactionRaw => final ITransaction
@@ -337,9 +326,7 @@ const Transactions: React.FC = () => {
             <div key={dayLabel} className="transactions-day-group">
               <h3>{dayLabel}</h3>
               {txArray.map((tx) => {
-                // If you want a more refined time, 
-                // you could do: const timeStr = formatTimestamp(tx.timestamp);
-                // We'll keep the existing toLocaleTimeString approach:
+                // For time, we do a simple toLocaleTimeString
                 const timeStr = new Date(tx.timestamp).toLocaleTimeString("en-US", {
                   hour: "numeric",
                   minute: "2-digit",
