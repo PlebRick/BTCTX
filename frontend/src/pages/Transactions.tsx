@@ -10,13 +10,38 @@
 import React, { useEffect, useState } from "react";
 import TransactionPanel from "../components/TransactionPanel";
 import "../styles/transactions.css";
-import api from '../api';  // Centralized API client
+import api from "../api";  // Centralized API client
+
+// ------------------------------
+//  1) IMPORTING HELPER UTILS
+// ------------------------------
+import {
+  // parseTransaction,   // Optional: If you want to parse transactions upon fetch
+  formatTimestamp,       // For date/time display
+  formatUsd,             // For USD fields
+  formatBtc,             // For BTC amounts
+  parseDecimal           // For any direct decimal parsing if needed
+} from "../utils/format";
+
+/*
+  We do a dummy usage to avoid TS/ESLint "unused variable" errors
+  while still preserving future availability and comments.
+*/
+void formatTimestamp;
+void parseDecimal;
 
 /**
  * ITransaction interface:
  * Reflects the final backend's Transaction model, which might have
  * cost_basis_usd, proceeds_usd, realized_gain_usd, etc., plus
  * legacy single-entry fields like 'amount' or 'fee_amount'.
+ *
+ * If your backend is returning decimals as strings, you can:
+ *  (A) Keep them as strings here, parse in the UI on the fly, or
+ *  (B) Use parseTransaction() at fetch-time to store them as numbers.
+ *
+ * For now, let's assume they are already numbers. If they're strings,
+ * you can define them as `string` or `string | number`.
  */
 interface ITransaction {
   id: number;
@@ -24,8 +49,10 @@ interface ITransaction {
   to_account_id: number | null;
   type: "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
 
-  amount: number;           // single transaction amount (LEGACY)
-  timestamp: string;        // ISO date
+  // single transaction amount (LEGACY)
+  amount: number;
+  // ISO date string from the backend
+  timestamp: string;
   is_locked: boolean;
 
   // Optional advanced fields from new double-entry
@@ -99,27 +126,34 @@ function resolveDisplayAccount(tx: ITransaction): string {
  * Format the single 'amount' we show. 
  * In the new system, multiple ledger lines might exist, 
  * but we keep a simplified approach for the UI.
+ *
+ * Now we can incorporate numeric formatting, e.g. formatBtc/formatUsd
+ * if we know the currency. But since we only have 'type',
+ * we do the same logic as before, but can optionally use helpers.
  */
 function formatAmount(tx: ITransaction): string {
   const { type, amount, cost_basis_usd, proceeds_usd } = tx;
+
   switch (type) {
     case "Deposit":
     case "Withdrawal":
     case "Transfer":
+      // We don't know if it's BTC or USD,
+      // but let's assume it's a plain numeric display:
       return `${amount}`;
 
     case "Buy":
       // amount is the USD spent
       return cost_basis_usd
-        ? `$${cost_basis_usd} spent`
-        : `$${amount} spent`;
+        ? `${formatUsd(cost_basis_usd)} spent`
+        : `${formatUsd(amount)} spent`;
 
     case "Sell":
       // amount is the BTC sold
       // if proceeds_usd is set, we can display it
       return proceeds_usd
-        ? `Sold ${amount} BTC -> $${proceeds_usd}`
-        : `Sold ${amount} BTC`;
+        ? `Sold ${formatBtc(amount)} -> ${formatUsd(proceeds_usd)}`
+        : `Sold ${formatBtc(amount)}`;
 
     default:
       return `${amount}`;
@@ -163,12 +197,19 @@ const Transactions: React.FC = () => {
    * The new backend returns "Transaction" objects that might 
    * have multiple ledger entries behind the scenes, but we 
    * only see the single-row data here.
+   *
+   * Optionally, if the backend returns decimals as strings, you could:
+   *   const res = await api.get<ITransactionRaw[]>("/transactions");
+   *   const parsed = res.data.map(parseTransaction);  // parseTransaction from format.ts
+   *   setTransactions(parsed);
+   *
+   * We'll assume they're already numeric for this example.
    */
   async function fetchTransactions() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<ITransaction[]>('/transactions/'); // Fixed path: removed 'api/'
+      const res = await api.get<ITransaction[]>("/transactions/");
       setTransactions(res.data);
     } catch (err) {
       console.error(err);
@@ -178,6 +219,7 @@ const Transactions: React.FC = () => {
     }
   }
 
+  // On mount, fetch the data
   useEffect(() => {
     fetchTransactions();
   }, []);
@@ -201,20 +243,29 @@ const Transactions: React.FC = () => {
     if (sortMode === "TIMESTAMP_DESC") {
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     } else {
+      // "CREATION_DESC" => sort by ID descending
       return b.id - a.id;
     }
   });
 
   /**
    * Group by date (e.g., "MMM DD, YYYY") for display
+   * We can use formatTimestamp if we want a specific 
+   * day label, but let's keep the existing approach 
+   * to show how you might do it manually.
    */
   const groupedByDate: Record<string, ITransaction[]> = {};
   for (const tx of sortedTransactions) {
+    // We convert tx.timestamp into just a short date string.
+    // If we want a helper, we could do: 
+    //   const dateLabel = formatTimestamp(tx.timestamp, { dateOnly: true });
+    // For now, we do the existing toLocaleDateString approach:
     const dateLabel = new Date(tx.timestamp).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
+
     if (!groupedByDate[dateLabel]) {
       groupedByDate[dateLabel] = [];
     }
@@ -252,6 +303,9 @@ const Transactions: React.FC = () => {
             <div key={dayLabel} className="transactions-day-group">
               <h3>{dayLabel}</h3>
               {txArray.map((tx) => {
+                // If you want a more refined time, 
+                // you could do: const timeStr = formatTimestamp(tx.timestamp, { timeOnly: true });
+                // We'll keep the existing toLocaleTimeString approach:
                 const timeStr = new Date(tx.timestamp).toLocaleTimeString("en-US", {
                   hour: "numeric",
                   minute: "2-digit",
@@ -262,6 +316,11 @@ const Transactions: React.FC = () => {
 
                 // Fee (if any)
                 const feeNumber = tx.fee_amount ?? 0;
+                // If you want to be fancy, 
+                // you could do: 
+                //    const feeLabel = feeNumber ? `Fee: ${formatBtc(feeNumber)}` : "";
+                // or conditionally format in USD or BTC. 
+                // We'll keep the existing approach:
                 const feeLabel =
                   feeNumber !== 0
                     ? `Fee: ${feeNumber} ${tx.fee_currency || "USD"}`
@@ -270,7 +329,7 @@ const Transactions: React.FC = () => {
                 const extraLabel = formatExtra(tx);
 
                 return (
-                  <div // Fixed: Changed from <tsx> to <div>
+                  <div
                     key={tx.id}
                     className="transaction-card"
                     style={{

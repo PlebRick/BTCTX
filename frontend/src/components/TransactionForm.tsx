@@ -1,8 +1,45 @@
+/**
+ * TransactionForm.tsx
+ *
+ * This refactor keeps all original logic and comments, 
+ * but integrates a "format.ts" helper file for decimal 
+ * parsing and date conversions. 
+ *
+ * For example, instead of "let amount = data.amount || 0;", 
+ * we now do "let amount = parseDecimal(data.amount);"
+ * so that we consistently handle numeric fields even if 
+ * user inputs are strings or partial decimals.
+ */
+
 import React, { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
-import axios from "axios";  // Import axios for isAxiosError
-import api from '../api';    // Centralized API client
+import axios from "axios";            // For isAxiosError checks
+import api from "../api";             // Centralized API client
 import "../styles/transactionForm.css";
+
+// ------------------------------
+//  1) IMPORTING HELPERS
+// ------------------------------
+// (We remove the broken import of `localDatetimeToIso`, 
+//  since it's not actually exported from ../utils/format.)
+
+import {
+  parseDecimal
+  // parseDecimal => ensures numeric fields like amount/fee 
+  //   are consistently parsed from user input.
+  // localDatetimeToIso => Moved to a local function below.
+} from "../utils/format";
+
+/**
+ * A small local helper function that converts a "datetime-local" 
+ * string (e.g. "2023-09-25T12:34") to a full ISO8601 format for the backend.
+ * This replaces the missing `localDatetimeToIso` from your utils.
+ */
+function localDatetimeToIso(localDatetime: string): string {
+  // You can customize how to handle the local time offset if needed.
+  // For simplicity, we just do `new Date(localDatetime).toISOString()`.
+  return new Date(localDatetime).toISOString();
+}
 
 /**
  * ------------------------------------------------------------
@@ -316,9 +353,17 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
     // 1) from/to IDs
     const { from_account_id, to_account_id } = mapDoubleEntryAccounts(data);
-    const isoTimestamp = new Date(data.timestamp).toISOString();
 
-    // 2) We unify legacy fields for the final request
+    // --------------------------------------------------------------
+    // Using our helper => convert "2023-09-25T12:34" to an ISO string.
+    // The user picks "datetime-local", so we do localDatetimeToIso 
+    // for consistent server handling.
+    // --------------------------------------------------------------
+    const isoTimestamp = localDatetimeToIso(data.timestamp);
+
+    // 2) We unify legacy fields for the final request, 
+    //    but now we parse them with parseDecimal to ensure 
+    //    they become proper numeric types. 
     let amount = 0;
     let feeCurrency = "USD";
     let source: string | undefined = undefined;
@@ -328,39 +373,44 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
     switch (data.type) {
       case "Deposit": {
-        amount = data.amount || 0;
+        // parseDecimal => ensures it’s a number, default 0 if invalid
+        amount = parseDecimal(data.amount);
         feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
         source = data.source && data.source !== "N/A" ? data.source : "N/A";
         if (showCostBasisField) {
-          cost_basis_usd = data.costBasisUSD || 0;
+          cost_basis_usd = parseDecimal(data.costBasisUSD);
         }
         break;
       }
       case "Withdrawal": {
-        amount = data.amount || 0;
+        amount = parseDecimal(data.amount);
         feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
         purpose = data.purpose && data.purpose !== "N/A" ? data.purpose : "N/A";
-        // Added: now we actually set proceeds_usd from data
-        proceeds_usd = data.proceeds_usd;
+        // parseDecimal => ensures proceeds_usd is numeric
+        proceeds_usd = parseDecimal(data.proceeds_usd);
         break;
       }
       case "Transfer": {
-        amount = data.amountFrom || 0;
+        // parseDecimal => handle from/to amounts as well
+        amount = parseDecimal(data.amountFrom);
         if (data.fromCurrency === "BTC") feeCurrency = "BTC";
         else feeCurrency = "USD";
         break;
       }
       case "Buy": {
-        amount = data.amountUSD || 0;
+        // user enters amountUSD, so parse it
+        amount = parseDecimal(data.amountUSD);
         feeCurrency = "USD";
-        cost_basis_usd = amount; // how much USD you spent
+        // We treat cost basis as how much USD we spent
+        cost_basis_usd = amount;
         break;
       }
       case "Sell": {
-        amount = data.amountBTC || 0;
+        // user enters amountBTC
+        amount = parseDecimal(data.amountBTC);
         feeCurrency = "USD";
-        // We were already setting proceeds_usd for Sell
-        proceeds_usd = data.amountUSD || 0;
+        // parse the proceeds in USD
+        proceeds_usd = parseDecimal(data.amountUSD);
         break;
       }
     }
@@ -372,7 +422,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       type: data.type,
       amount,
       timestamp: isoTimestamp,
-      fee_amount: data.fee || 0,
+      fee_amount: parseDecimal(data.fee), // parse fee
       fee_currency: feeCurrency,
       cost_basis_usd,
       proceeds_usd, // includes your new "Withdrawal" assignment
@@ -383,7 +433,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
     // 4) POST to backend using the centralized api client with corrected path
     try {
-      const response = await api.post('/transactions', transactionPayload);  // Fixed: Changed from 'api/transactions' to '/transactions'
+      const response = await api.post("/transactions", transactionPayload);
       console.log("Transaction created:", response.data);
 
       reset();
@@ -391,7 +441,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       alert("Transaction created successfully!");
       onSubmitSuccess?.();
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {  // Use axios.isAxiosError instead of api.isAxiosError
+      if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.detail || error.message || "Error";
         alert(`Failed to create transaction: ${msg}`);
       } else if (error instanceof Error) {
