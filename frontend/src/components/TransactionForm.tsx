@@ -11,32 +11,15 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import axios from "axios";   // For isAxiosError checks
 import api from "../api";    // Centralized API client
 import "../styles/transactionForm.css";
-
-// 1) IMPORTING HELPER
 import { parseDecimal } from "../utils/format";
-// parseDecimal => ensures numeric fields (amount/fee) are consistently
-// converted from user input strings to numbers.
 
-/**
- * localDatetimeToIso:
- * Converts a "datetime-local" string (e.g. "2023-09-25T12:34")
- * to a full ISO8601 format string for the backend.
- */
 function localDatetimeToIso(localDatetime: string): string {
   return new Date(localDatetime).toISOString();
 }
 
-/**
- * TransactionFormProps:
- * Minimal interface for this component's props. If you want to
- * also place this in global.d.ts, you can (optional).
- */
 interface TransactionFormProps {
-  /** ID for the <form>, if needed for referencing elsewhere */
   id?: string;
-  /** Callback to notify parent if form dirtiness changes */
   onDirtyChange?: (dirty: boolean) => void;
-  /** Callback to notify parent on successful submit */
   onSubmitSuccess?: () => void;
 }
 
@@ -108,8 +91,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   onDirtyChange,
   onSubmitSuccess,
 }) => {
-  // 1) useForm initialization:
-  //    references the global "TransactionFormData" interface
+  
   const {
     register,
     handleSubmit,
