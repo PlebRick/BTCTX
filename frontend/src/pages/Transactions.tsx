@@ -378,10 +378,17 @@ const Transactions: React.FC = () => {
                 // Format the main transaction amount, using new logic to differentiate BTC vs. USD
                 const amountLabel = formatAmount(tx);
 
-                // Format the fee, if present
-                const feeLabel = tx.fee_amount
-                  ? `Fee: ${formatUsd(tx.fee_amount)} ${tx.fee_currency || "USD"}`
-                  : "";
+                // Format the fee, branching on fee_currency
+                let feeLabel = "";
+                if (tx.fee_amount && tx.fee_amount !== 0) {
+                  if (tx.fee_currency === "BTC") {
+                    // If fee is in BTC, use your BTC formatter
+                    feeLabel = `Fee: ${formatBtc(tx.fee_amount)}`;
+                  } else {
+                  // Default to USD
+                  feeLabel = `Fee: ${formatUsd(tx.fee_amount)} ${tx.fee_currency || "USD"}`;
+                  }
+                }
 
                 // Format extra detail like source/purpose/holding_period
                 const extraLabel = formatExtra(tx);
