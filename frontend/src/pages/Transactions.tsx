@@ -1,9 +1,10 @@
 /**
  * Transactions.tsx
  *
- * A page that lists all transactions in the BitcoinTX application. Although the backend now stores
- * multiple ledger lines per transaction, we display each transaction as a single row for simplicity.
- * Future enhancements could expand this to show ledger lines or partial-lot usage details.
+ * A page that lists all transactions in the BitcoinTX application. Although the backend now
+ * stores multiple ledger lines per transaction, we display each transaction as a single row.
+ * This version combines the new refactor approach (centralized API, typed parsing utilities)
+ * with the older logic that distinguishes BTC vs. USD amounts for Deposit/Withdrawal/Transfer.
  */
 
 import React, { useEffect, useState } from "react";
@@ -11,85 +12,90 @@ import TransactionPanel from "../components/TransactionPanel";
 import "../styles/transactions.css";
 import api from "../api"; // Centralized API client (maintains base URL and config)
 
-// ------------------------------
-// 1) Importing Helper Utilities
-// ------------------------------
+// --------------------------------------------------------------------
+// 1) Importing Helper Utilities from format.ts
+// --------------------------------------------------------------------
+// parseTransaction: converts raw API data (with string decimals) into typed ITransaction
+// formatTimestamp, formatUsd, formatBtc, parseDecimal: used to present or parse numeric fields
 import {
-  parseTransaction, // Converts raw API data to the desired format
-  formatTimestamp,  // Formats timestamps for display (unused but preserved)
-  formatUsd,        // Formats USD amounts (e.g., "50.00 USD")
-  formatBtc,        // Formats BTC amounts (e.g., "0.50000000 BTC")
-  parseDecimal      // Parses string decimals to numbers (unused but preserved)
+  parseTransaction,
+  formatUsd,
+  formatBtc,
+  formatTimestamp, // not currently used, but imported if needed
+  parseDecimal,    // not currently used, but imported if needed
 } from "../utils/format";
 
-// Dummy usage to avoid TS/ESLint "unused variable" warnings while keeping utilities available
+// Use these 'dummy' references to keep them from being flagged as unused:
 void formatTimestamp;
 void parseDecimal;
+
+// --------------------------------------------------------------------
+// 2) Type Declarations (raw vs. parsed transaction)
+//    - Mirroring your updated approach with parseTransaction
+// --------------------------------------------------------------------
 
 /**
  * ITransactionRaw Interface
  * Represents the raw data structure returned by the `/api/transactions` endpoint.
- * Numeric fields like `amount` may arrive as strings (e.g., "50.00000000") from the backend,
- * requiring parsing via `parseTransaction` into `ITransaction`.
+ * Numeric fields may arrive as strings (e.g., "50.00000000") from the backend,
+ * requiring parseTransaction(...) to convert them to numbers.
  */
 interface ITransactionRaw {
   id: number;
   from_account_id: number | null;
   to_account_id: number | null;
   type: "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
-  amount?: string | number;           // Transaction amount (string or number)
-  fee_amount?: string | number;       // Fee amount (string or number)
-  cost_basis_usd?: string | number;   // Cost basis in USD (string or number)
-  proceeds_usd?: string | number;     // Proceeds in USD (string or number)
-  realized_gain_usd?: string | number;// Realized gain/loss in USD (string or number)
-  timestamp: string;                  // ISO timestamp (e.g., "2023-10-01T12:00:00Z")
-  is_locked: boolean;                 // Lock status
-  holding_period?: string | null;     // Optional holding period (e.g., "short")
-  external_ref?: string | null;       // External reference ID
-  source?: string | null;             // Source of deposit
-  purpose?: string | null;            // Purpose of withdrawal
-  fee_currency?: string;              // Currency of the fee (e.g., "USD", "BTC")
-  created_at?: string;                // Creation timestamp
-  updated_at?: string;                // Last update timestamp
+  amount?: string | number;
+  fee_amount?: string | number;
+  cost_basis_usd?: string | number;
+  proceeds_usd?: string | number;
+  realized_gain_usd?: string | number;
+  timestamp: string;
+  is_locked: boolean;
+  holding_period?: string | null;
+  external_ref?: string | null;
+  source?: string | null;
+  purpose?: string | null;
+  fee_currency?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**
  * ITransaction Interface
- * Represents the parsed transaction data after processing with `parseTransaction`.
- * Ensures all numeric fields are numbers for consistent use in the UI.
+ * Represents the transaction data after parsing. All numeric fields are guaranteed
+ * to be numbers, thanks to parseTransaction(...).
  */
 interface ITransaction {
   id: number;
   from_account_id: number | null;
   to_account_id: number | null;
   type: "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell";
-  amount: number;           // Parsed transaction amount
-  timestamp: string;        // ISO timestamp (unchanged)
-  is_locked: boolean;       // Lock status (unchanged)
-  fee_amount: number;       // Parsed fee amount
-  fee_currency?: string;    // Fee currency (unchanged)
-  cost_basis_usd: number;   // Parsed cost basis in USD
-  proceeds_usd: number;     // Parsed proceeds in USD
-  realized_gain_usd: number;// Parsed realized gain/loss in USD
-  holding_period?: string;  // Optional holding period
-  external_ref?: string;    // External reference ID
-  source?: string;          // Source of deposit
-  purpose?: string;         // Purpose of withdrawal
-  created_at?: string;      // Creation timestamp
-  updated_at?: string;      // Last update timestamp
+  amount: number;
+  timestamp: string;
+  is_locked: boolean;
+  fee_amount: number;
+  fee_currency?: string;
+  cost_basis_usd: number;
+  proceeds_usd: number;
+  realized_gain_usd: number;
+  holding_period?: string;
+  external_ref?: string;
+  source?: string;
+  purpose?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**
  * SortMode Type
- * Defines available sorting options for transactions.
+ * Defines the available sorting options in this page's dropdown.
  */
 type SortMode = "TIMESTAMP_DESC" | "CREATION_DESC";
 
-/**
- * accountIdToName Function
- * Converts numeric account IDs to human-readable labels. In a larger system, this could
- * fetch account details from the server, but here we use a static mapping for simplicity.
- */
+// --------------------------------------------------------------------
+// 3) Helper for Converting Account IDs to Names
+// --------------------------------------------------------------------
 function accountIdToName(id: number | null): string {
   if (id === null) return "N/A";
   switch (id) {
@@ -102,143 +108,196 @@ function accountIdToName(id: number | null): string {
   }
 }
 
-/**
- * resolveDisplayAccount Function
- * Determines the account label to display based on transaction type, showing a single
- * account or a "from -> to" format for transfers.
- */
+// --------------------------------------------------------------------
+// 4) Decide how to show the "account label" for each transaction
+// --------------------------------------------------------------------
 function resolveDisplayAccount(tx: ITransaction): string {
   const { type, from_account_id, to_account_id } = tx;
+
   switch (type) {
     case "Deposit":
+      // If it's a Deposit, typically from_account_id=99 (External) -> to_account_id=(1/2/3/4)
       return accountIdToName(to_account_id);
     case "Withdrawal":
+      // If it's a Withdrawal, typically from_account_id=(1/2/3/4) -> to_account_id=99 (External)
       return accountIdToName(from_account_id);
     case "Transfer":
+      // Transfer from one internal account to another (e.g., from Bank(1) to Wallet(2))
       return `${accountIdToName(from_account_id)} -> ${accountIdToName(to_account_id)}`;
     case "Buy":
     case "Sell":
-      return "Exchange"; // Simplified for trades; could expand to from->to
+      // For trades, we often see from=Exchange USD -> to=Exchange BTC or vice versa
+      return "Exchange";
     default:
       return "Unknown";
   }
 }
 
-/**
- * formatAmount Function
- * Formats the transaction amount for display, using `formatUsd` and `formatBtc` from `format.ts`
- * to ensure consistent formatting across the application.
- */
+// --------------------------------------------------------------------
+// 5) Format the 'amount' displayed, distinguishing BTC vs. USD
+//    for Deposit/Withdrawal/Transfer (restoring old logic).
+// --------------------------------------------------------------------
 function formatAmount(tx: ITransaction): string {
-  const { type, amount, cost_basis_usd, proceeds_usd } = tx;
+  const { type, amount, cost_basis_usd, proceeds_usd, from_account_id, to_account_id } = tx;
+
+  // This switch statement is the heart of the difference from your new code:
+  // We don't always assume BTC for deposits/withdrawals/transfers.
+  // Instead, we interpret whether it should be BTC or USD, based on the account(s).
   switch (type) {
     case "Deposit":
+      // If deposit, the to_account_id is receiving the funds
+      if (to_account_id === 1 || to_account_id === 3) {
+        // 1 = Bank (USD), 3 = Exchange USD -> interpret deposit as USD
+        return formatUsd(amount);
+      } else {
+        // Otherwise 2 = Wallet (BTC), 4 = Exchange BTC -> interpret deposit as BTC
+        return formatBtc(amount);
+      }
+
     case "Withdrawal":
+      // If withdrawal, the from_account_id is paying out
+      if (from_account_id === 1 || from_account_id === 3) {
+        // from Bank or Exchange USD -> show as USD
+        return formatUsd(amount);
+      } else {
+        // from a BTC-based account -> show as BTC
+        return formatBtc(amount);
+      }
+
     case "Transfer":
-      return `${formatBtc(amount)}`; // Assumes BTC for simplicity; adjust if USD
+      // Transfers can be from a USD account to a BTC account, or vice versa.
+      // The "amount" might represent BTC or USD. Decide which side we want to show.
+      // (There’s no perfect “both sides” without a bigger UI design.)
+      // For simplicity, let's assume the 'amount' is in the currency of the *from* account:
+      if (from_account_id === 1 || from_account_id === 3) {
+        return `${formatUsd(amount)} transferred`;
+      } else {
+        return `${formatBtc(amount)} transferred`;
+      }
+
+    // For Buy and Sell:
     case "Buy":
+      // A "Buy" typically means "buying BTC with USD". cost_basis_usd is how much USD was spent.
       return cost_basis_usd
         ? `${formatUsd(cost_basis_usd)} spent`
         : `${formatUsd(amount)} spent`;
+
     case "Sell":
+      // A "Sell" typically means "selling BTC for USD". proceeds_usd is the USD gained.
+      // 'amount' usually is the BTC quantity sold.
       return proceeds_usd
         ? `Sold ${formatBtc(amount)} -> ${formatUsd(proceeds_usd)}`
         : `Sold ${formatBtc(amount)}`;
+
     default:
+      // If some unknown type, fallback to just showing the numeric 'amount'
       return `${amount}`;
   }
 }
 
-/**
- * formatExtra Function
- * Provides additional context (e.g., source, purpose, holding period) for display.
- */
+// --------------------------------------------------------------------
+// 6) Show additional info like 'source', 'purpose', or 'holding_period'
+// --------------------------------------------------------------------
 function formatExtra(tx: ITransaction): string {
   const { type, source, purpose, holding_period } = tx;
-  if (type === "Deposit" && source && source !== "N/A") return source;
-  if (type === "Withdrawal" && purpose && purpose !== "N/A") return purpose;
-  if (holding_period) return `(${holding_period})`;
+
+  if (type === "Deposit" && source && source !== "N/A") {
+    return source; // e.g. "From paycheck" or "Coinbase" etc.
+  }
+  if (type === "Withdrawal" && purpose && purpose !== "N/A") {
+    return purpose; // e.g. "Rent payment"
+  }
+  if (holding_period) {
+    return `(${holding_period})`; // e.g., "(short)" or "(long)"
+  }
   return "";
 }
 
-/**
- * Transactions Component
- * Main component for the Transactions page, managing state and rendering the UI.
- */
+// --------------------------------------------------------------------
+// 7) Transactions Page Component
+// --------------------------------------------------------------------
 const Transactions: React.FC = () => {
-  // State for TransactionPanel visibility
+  // State for controlling the "Add Transaction" panel (TransactionPanel)
   const [isPanelOpen, setIsPanelOpen] = useState(false);
 
-  // State for transaction data (parsed into ITransaction)
+  // State for storing the parsed transactions
   const [transactions, setTransactions] = useState<ITransaction[] | null>(null);
 
-  // State for sorting mode
+  // Sorting mode (Timestamp descending or creation ID descending)
   const [sortMode, setSortMode] = useState<SortMode>("TIMESTAMP_DESC");
 
-  // State for loading and error handling (inspired by Dashboard.tsx)
+  // Loading and error states
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  /**
-   * fetchTransactions Function
-   * Fetches transaction data from the API, parses it, and updates state.
-   * Incorporates robust error handling and logging from Dashboard.tsx.
-   */
+  // ------------------------------------------------------------------
+  // fetchTransactions - load data from the backend
+  //   - Uses the new centralized API instance
+  //   - Parses the raw data into ITransaction
+  //   - Enhances error handling (inspired by the new approach)
+  // ------------------------------------------------------------------
   const fetchTransactions = async () => {
-    setIsLoading(true); // Show loading state before fetching
-    setFetchError(null); // Clear previous errors
-    try {
-      // Use the centralized API client to fetch raw transactions
-      const res = await api.get<ITransactionRaw[]>("/transactions");
-      console.log("Raw API response:", res.data); // Debug raw data
+    setIsLoading(true);
+    setFetchError(null);
 
-      // Parse raw data into ITransaction format using format.ts utility
-      const parsedTransactions = res.data.map((raw) => parseTransaction(raw));
-      console.log("Parsed transactions:", parsedTransactions); // Debug parsed data
+    try {
+      // GET /transactions (baseURL likely includes /api, so this resolves to /api/transactions)
+      const res = await api.get<ITransactionRaw[]>("/transactions");
+      console.log("Raw API response (transactions):", res.data);
+
+      // Convert raw data (with string decimal fields) to typed numeric fields
+      const parsedTransactions = res.data.map(raw => parseTransaction(raw));
+      console.log("Parsed transactions:", parsedTransactions);
 
       setTransactions(parsedTransactions);
-    } catch (err: unknown) {
-      // Enhanced error handling with detailed messaging
-      const errorMessage = err instanceof Error
-        ? `Failed to load transactions: ${err.message}`
-        : "Failed to load transactions: Unknown error";
-      console.error("Fetch error:", err); // Log for debugging
-      setFetchError(errorMessage);
-      setTransactions(null); // Clear transactions on error
+    } catch (err) {
+      // Provide a more descriptive error
+      const errorMsg =
+        err instanceof Error
+          ? `Failed to load transactions: ${err.message}`
+          : "Failed to load transactions: Unknown error";
+
+      console.error("Fetch error:", err);
+      setFetchError(errorMsg);
+      setTransactions(null);
     } finally {
-      setIsLoading(false); // Always reset loading state
+      setIsLoading(false);
     }
   };
 
-  // Fetch data on component mount
+  // Load transactions on mount
   useEffect(() => {
     fetchTransactions();
   }, []);
 
-  // TransactionPanel control functions
+  // Open/close the transaction panel
   const openPanel = () => setIsPanelOpen(true);
   const closePanel = () => setIsPanelOpen(false);
 
-  /**
-   * handleSubmitSuccess Function
-   * Refreshes the transaction list after a successful submission via TransactionPanel.
-   */
+  // When a new transaction is submitted successfully, refresh the list
   const handleSubmitSuccess = () => {
     setIsPanelOpen(false);
     fetchTransactions();
   };
 
-  // Sort transactions based on selected mode
+  // ------------------------------------------------------------------
+  // Sorting the transactions array by chosen mode
+  // ------------------------------------------------------------------
   const sortedTransactions = transactions
     ? [...transactions].sort((a, b) => {
         if (sortMode === "TIMESTAMP_DESC") {
+          // Sort by timestamp descending
           return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+        } else {
+          // Sort by ID descending
+          return b.id - a.id;
         }
-        return b.id - a.id; // CREATION_DESC sorts by ID descending
       })
     : [];
 
-  // Group transactions by date for display
+  // ------------------------------------------------------------------
+  // Group by date label for display
+  // ------------------------------------------------------------------
   const groupedByDate: Record<string, ITransaction[]> = {};
   for (const tx of sortedTransactions) {
     const dateLabel = new Date(tx.timestamp).toLocaleDateString("en-US", {
@@ -246,9 +305,12 @@ const Transactions: React.FC = () => {
       day: "numeric",
       year: "numeric",
     });
+
     if (!groupedByDate[dateLabel]) groupedByDate[dateLabel] = [];
     groupedByDate[dateLabel].push(tx);
   }
+
+  // Convert the grouped object to an array of [dayLabel, txArray] pairs
   const dateGroups = Object.entries(groupedByDate);
 
   return (
@@ -258,12 +320,12 @@ const Transactions: React.FC = () => {
         Add Transaction
       </button>
 
-      {/* Sort Dropdown */}
+      {/* Sorting Dropdown */}
       <div style={{ marginTop: "1rem" }}>
         <label>Sort by: </label>
         <select
           value={sortMode}
-          onChange={(e) => setSortMode(e.target.value as SortMode)}
+          onChange={e => setSortMode(e.target.value as SortMode)}
         >
           <option value="TIMESTAMP_DESC">Most Recent Date</option>
           <option value="CREATION_DESC">Last Added (ID)</option>
@@ -273,7 +335,7 @@ const Transactions: React.FC = () => {
       {/* Loading State */}
       {isLoading && <p>Loading transactions...</p>}
 
-      {/* Error State with Retry Option */}
+      {/* Error State */}
       {fetchError && (
         <div style={{ color: "red", marginTop: "1rem" }}>
           <p>{fetchError}</p>
@@ -294,26 +356,34 @@ const Transactions: React.FC = () => {
       )}
 
       {/* No Transactions Found */}
-      {!isLoading && !fetchError && (!transactions || transactions.length === 0) && (
+      {!isLoading && !fetchError && transactions && transactions.length === 0 && (
         <p>No transactions found.</p>
       )}
 
-      {/* Transaction List */}
+      {/* Transaction List - only show if we have transactions */}
       {!isLoading && !fetchError && transactions && transactions.length > 0 && (
         <div className="transactions-list" style={{ marginTop: "1rem" }}>
           {dateGroups.map(([dayLabel, txArray]) => (
             <div key={dayLabel} className="transactions-day-group">
               <h3>{dayLabel}</h3>
-              {txArray.map((tx) => {
+              {txArray.map(tx => {
                 const timeStr = new Date(tx.timestamp).toLocaleTimeString("en-US", {
                   hour: "numeric",
                   minute: "2-digit",
                 });
+
+                // Determine how to label the account(s)
                 const accountLabel = resolveDisplayAccount(tx);
+
+                // Format the main transaction amount, using new logic to differentiate BTC vs. USD
                 const amountLabel = formatAmount(tx);
+
+                // Format the fee, if present
                 const feeLabel = tx.fee_amount
                   ? `Fee: ${formatUsd(tx.fee_amount)} ${tx.fee_currency || "USD"}`
                   : "";
+
+                // Format extra detail like source/purpose/holding_period
                 const extraLabel = formatExtra(tx);
 
                 return (
@@ -338,6 +408,8 @@ const Transactions: React.FC = () => {
                     <span style={{ minWidth: "100px" }}>{amountLabel}</span>
                     <span style={{ minWidth: "120px" }}>{feeLabel}</span>
                     <span style={{ flex: 1 }}>{extraLabel}</span>
+
+                    {/* Example "Edit" button (not fully implemented) */}
                     <button
                       onClick={() => {
                         console.log("Edit transaction", tx.id);
@@ -362,7 +434,7 @@ const Transactions: React.FC = () => {
         </div>
       )}
 
-      {/* TransactionPanel for Adding Transactions */}
+      {/* TransactionPanel for adding new transactions */}
       <TransactionPanel
         isOpen={isPanelOpen}
         onClose={closePanel}
