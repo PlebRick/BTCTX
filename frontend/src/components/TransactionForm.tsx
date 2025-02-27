@@ -467,7 +467,22 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
    */
   const renderDynamicFields = () => {
     switch (currentType) {
-      case "Deposit":
+      case "Deposit": {
+        // 1) Watch the currently selected account & currency
+        const account = watch("account");     // Bank, Wallet, Exchange
+        const currency = watch("currency");   // USD, BTC
+      
+        // 2) Only show "Source" if: account=Wallet OR (account=Exchange AND currency=BTC)
+        const showSource =
+          account === "Wallet" ||
+          (account === "Exchange" && currency === "BTC");
+      
+        // 3) Show "Cost Basis (USD)" if deposit + BTC + (wallet or exchange)
+        const showCostBasisField =
+          currentType === "Deposit" &&
+          currency === "BTC" &&
+          (account === "Wallet" || account === "Exchange");
+      
         return (
           <>
             <div className="form-group">
@@ -485,7 +500,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">Please select an account</span>
               )}
             </div>
-
+      
             <div className="form-group">
               <label>Currency:</label>
               {account === "Exchange" ? (
@@ -509,7 +524,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">Currency is required</span>
               )}
             </div>
-
+      
             <div className="form-group">
               <label>Amount:</label>
               <input
@@ -522,22 +537,25 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">Amount is required</span>
               )}
             </div>
-
-            <div className="form-group">
-              <label>Source (BTC only):</label>
-              <select
-                className="form-control"
-                {...register("source", { required: true })}
-              >
-                <option value="N/A">N/A</option>
-                <option value="MyBTC">MyBTC</option>
-                <option value="Gift">Gift</option>
-                <option value="Income">Income</option>
-                <option value="Interest">Interest</option>
-                <option value="Reward">Reward</option>
-              </select>
-            </div>
-
+      
+            {/* Conditionally render "Source" only if showSource is true */}
+            {showSource && (
+              <div className="form-group">
+                <label>Source:</label>
+                <select
+                  className="form-control"
+                  {...register("source", { required: true })}
+                >
+                  <option value="N/A">N/A</option>
+                  <option value="MyBTC">MyBTC</option>
+                  <option value="Gift">Gift</option>
+                  <option value="Income">Income</option>
+                  <option value="Interest">Interest</option>
+                  <option value="Reward">Reward</option>
+                </select>
+              </div>
+            )}
+      
             <div className="form-group">
               <label>Fee:</label>
               <input
@@ -547,7 +565,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 {...register("fee", { valueAsNumber: true })}
               />
             </div>
-
+      
             {showCostBasisField && (
               <div className="form-group">
                 <label>Cost Basis (USD):</label>
@@ -561,11 +579,22 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             )}
           </>
         );
+      }      
 
       case "Withdrawal": {
+        // Watch the account/currency
+        const account = watch("account");
+        const currency = watch("currency");
+      
+        // Also keep the existing watchers for purpose/spent warning
         const purposeVal = watch("purpose");
         const proceedsUsdVal = watch("proceeds_usd") ?? 0;
-
+      
+        // Only show "Purpose" if: (account=Wallet) OR (account=Exchange & currency=BTC)
+        const showPurpose =
+          account === "Wallet" ||
+          (account === "Exchange" && currency === "BTC");
+      
         return (
           <>
             <div className="form-group">
@@ -583,7 +612,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">Please select an account</span>
               )}
             </div>
-
+      
             <div className="form-group">
               <label>Currency:</label>
               {account === "Exchange" ? (
@@ -607,7 +636,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">Currency is required</span>
               )}
             </div>
-
+      
             <div className="form-group">
               <label>Amount:</label>
               <input
@@ -623,21 +652,24 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">Amount is required</span>
               )}
             </div>
-
-            <div className="form-group">
-              <label>Purpose (BTC only):</label>
-              <select
-                className="form-control"
-                {...register("purpose", { required: true })}
-              >
-                <option value="">Select Purpose</option>
-                <option value="Spent">Spent</option>
-                <option value="Gift">Gift</option>
-                <option value="Donation">Donation</option>
-                <option value="Lost">Lost</option>
-              </select>
-            </div>
-
+      
+            {/* Conditionally show "Purpose" only if account=Wallet or (Exchange & BTC). */}
+            {showPurpose && (
+              <div className="form-group">
+                <label>Purpose (BTC only):</label>
+                <select
+                  className="form-control"
+                  {...register("purpose", { required: true })}
+                >
+                  <option value="">Select Purpose</option>
+                  <option value="Spent">Spent</option>
+                  <option value="Gift">Gift</option>
+                  <option value="Donation">Donation</option>
+                  <option value="Lost">Lost</option>
+                </select>
+              </div>
+            )}
+      
             <div className="form-group">
               <label>Fee:</label>
               <input
@@ -647,7 +679,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 {...register("fee", { valueAsNumber: true })}
               />
             </div>
-
+      
+            {/* Proceeds (USD) if currency=BTC */}
             {currency === "BTC" && (
               <div className="form-group">
                 <label>Proceeds (USD):</label>
@@ -660,7 +693,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 />
               </div>
             )}
-
+      
             {currency === "BTC" &&
               purposeVal === "Spent" &&
               proceedsUsdVal === 0 && (
@@ -670,7 +703,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             )}
           </>
         );
-      }
+      }      
 
       case "Transfer":
         return (
