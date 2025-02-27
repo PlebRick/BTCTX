@@ -2,6 +2,7 @@
     "cSpell.words": [
         "autoflush",
         "condecimal",
+        "dbaeumer",
         "dotenv",
         "ehthumbs",
         "fastapi",
@@ -14,6 +15,7 @@
         "sessionmaker",
         "sqlalchemy",
         "starlette",
+        "toolsai",
         "typer",
         "uvicorn",
         "venv"

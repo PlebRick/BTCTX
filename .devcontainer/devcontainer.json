@@ -5,15 +5,52 @@
   },
   "customizations": {
     "vscode": {
-      "settings": {
-        "terminal.integrated.shell.linux": "/bin/bash"
-      },
       "extensions": [
         "ms-python.python",
         "ms-toolsai.jupyter",
         "dbaeumer.vscode-eslint"
-      ]
+      ],
+      "settings": {
+        // cSpell words
+        "cSpell.words": [
+          "autoflush",
+          "condecimal",
+          "dbaeumer",
+          "dotenv",
+          "ehthumbs",
+          "fastapi",
+          "njsproj",
+          "ntvs",
+          "passlib",
+          "pycache",
+          "pydantic",
+          "PYTHONPATH",
+          "sessionmaker",
+          "sqlalchemy",
+          "starlette",
+          "toolsai",
+          "typer",
+          "uvicorn",
+          "venv"
+        ],
+
+        // This sets up Python environment file inside the container
+        "python.envFile": "${workspaceFolder}/backend/.env",
+
+        // Turn on Pytest, turn off unittest
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+
+        // If you want the container to always use your conda env as interpreter:
+        // Use the environment path from your devcontainer. Typically:
+        "python.defaultInterpreterPath": "/opt/conda/envs/bitcoin-tx/bin/python",
+
+        // If you want a Bash terminal by default in the container
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
     }
   },
-  "postCreateCommand": "source ~/.bashrc"
+
+  // Activate the environment after creation
+  "postCreateCommand": "conda activate bitcoin-tx"
 }
