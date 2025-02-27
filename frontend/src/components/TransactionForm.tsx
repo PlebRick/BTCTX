@@ -403,13 +403,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         break;
       }
       case "Buy": {
-        // user enters amountUSD, so parse it
-        amount = parseDecimal(data.amountUSD);
+        amount = parseDecimal(data.amountBTC);
         feeCurrency = "USD";
-        // We treat cost basis as how much USD we spent
-        cost_basis_usd = amount;
+        cost_basis_usd = parseDecimal(data.amountUSD);
         break;
       }
+      
       case "Sell": {
         // user enters amountBTC
         amount = parseDecimal(data.amountBTC);
