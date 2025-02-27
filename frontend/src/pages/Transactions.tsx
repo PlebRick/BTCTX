@@ -99,10 +99,10 @@ type SortMode = "TIMESTAMP_DESC" | "CREATION_DESC";
 function accountIdToName(id: number | null): string {
   if (id === null) return "N/A";
   switch (id) {
-    case 1: return "Bank (USD)";
-    case 2: return "Wallet (BTC)";
-    case 3: return "Exchange USD";
-    case 4: return "Exchange BTC";
+    case 1: return "Bank";
+    case 2: return "Wallet";
+    case 3: return "Exchange";
+    case 4: return "Exchange";
     case 99: return "External";
     default: return `Acct #${id}`;
   }
@@ -170,9 +170,9 @@ function formatAmount(tx: ITransaction): string {
       // (There’s no perfect “both sides” without a bigger UI design.)
       // For simplicity, let's assume the 'amount' is in the currency of the *from* account:
       if (from_account_id === 1 || from_account_id === 3) {
-        return `${formatUsd(amount)} transferred`;
+        return formatUsd(amount);
       } else {
-        return `${formatBtc(amount)} transferred`;
+        return formatBtc(amount);
       }
 
     // For Buy and Sell:
