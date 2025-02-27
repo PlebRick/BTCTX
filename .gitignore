@@ -4,6 +4,7 @@ __pycache__/                # Python cache files
 *.pyo                       # Python optimized files
 *.pyd                       # Compiled dynamic Python library files (Windows)
 *.pdb                       # Debug files
+*.pyc
 
 # --- Virtual Environment ---
 venv/                       # Local virtual environment (if present)
