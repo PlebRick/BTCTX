@@ -21,7 +21,7 @@ RUN echo "conda activate bitcoin-tx" >> ~/.bashrc
 
 # Copy package.json and package-lock.json to the container
 COPY frontend/package.json /workspaces/BitcoinTX_FastPython/frontend/package.json
-COPY frontend/package-lock.json /workspaces/BitcoinTX_FastPython/frontend/package-lock.json
+COPY package-lock.json /workspaces/BitcoinTX_FastPython/frontend/package-lock.json
 
 # Install frontend dependencies
 RUN cd /workspaces/BitcoinTX_FastPython/frontend && npm install
