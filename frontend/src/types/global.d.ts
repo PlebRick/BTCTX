@@ -146,6 +146,12 @@ declare global {
     is_locked: boolean;
   }
 
+  interface ApiErrorResponse {
+    detail?: string;
+    errors?: Record<string, string[]>; // if your server returns field‐specific errors
+  }
+  
+
   // --------------------------------------------------------------
   // 3) Types for the TransactionForm
   // --------------------------------------------------------------
