@@ -8,15 +8,15 @@
 
 import React, { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
-import axios from "axios";   // For isAxiosError checks
-import api from "../api";    // Centralized API client
+import axios from "axios";            // For isAxiosError checks
+import api from "../api";             // Centralized API client
 import "../styles/transactionForm.css";
 import { parseDecimal } from "../utils/format";
 
 /**
  * localDatetimeToIso:
  * Converts a "datetime-local" string (e.g. "2023-09-25T12:34")
- * to a full ISO8601 format that the backend expects.
+ * to a full ISO8601 format for the backend.
  */
 function localDatetimeToIso(localDatetime: string): string {
   return new Date(localDatetime).toISOString();
@@ -43,7 +43,7 @@ const EXCHANGE_BTC_ID = 4;
 /**
  * mapAccountToId:
  * Convert the user's chosen AccountType + Currency into
- * a numeric ID recognized by the backend. 
+ * a numeric ID recognized by the backend.
  *
  * E.g.:
  *   - Bank => 1
@@ -104,7 +104,7 @@ function mapDoubleEntryAccounts(data: TransactionFormData): IAccountMapping {
  * TransactionForm:
  * Handles creating/editing a transaction in "single-entry" style.
  * The new backend interprets it as multiple ledger lines behind
- * the scenes (double-entry). 
+ * the scenes (double-entry).
  */
 const TransactionForm: React.FC<TransactionFormProps> = ({
   id,
@@ -132,8 +132,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     },
   });
 
+  // Example if you want a local "loading" state:
+  // const [isLoading, setLoading] = useState(false);
+
   // Track the currently selected transaction type (Deposit, Withdrawal, etc.)
   const [currentType, setCurrentType] = useState<TransactionType | "">("");
+
   // For display: approximate fee in USD when transferring BTC
   const [feeInUsdDisplay, setFeeInUsdDisplay] = useState<number>(0);
 
@@ -248,6 +252,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       } else {
         const feeBtc = Number(calcFee.toFixed(8));
         setValue("fee", feeBtc);
+
+        // approximate USD for user display
         const mockBtcPrice = 30000; // Example only
         const approxUsd = feeBtc * mockBtcPrice;
         setFeeInUsdDisplay(Number(approxUsd.toFixed(2)));
@@ -258,78 +264,84 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   /**
    * onSubmit:
    * Build an ICreateTransactionPayload to send to /transactions.
-   * 
    * We parse decimal fields so they're guaranteed numbers in the payload.
    */
   const onSubmit: SubmitHandler<TransactionFormData> = async (data) => {
-    // For a BTC Withdrawal without proceeds => set proceeds_usd=0
-    if (data.type === "Withdrawal" && data.currency === "BTC" && !data.proceeds_usd) {
-      data.proceeds_usd = 0;
-    }
-
-    // 1) Get from/to IDs via mapDoubleEntryAccounts (returns IAccountMapping)
-    const { from_account_id, to_account_id } = mapDoubleEntryAccounts(data);
-
-    // 2) Convert user-chosen "datetime-local" -> ISO string
-    const isoTimestamp = localDatetimeToIso(data.timestamp);
-
-    // 3) Prepare fields for final payload
-    let amount = 0;
-    let feeCurrency: Currency | "USD" | "BTC" = "USD";
-    let source: string | undefined;
-    let purpose: string | undefined;
-    let cost_basis_usd = 0;
-    let proceeds_usd: number | undefined = undefined;
-
-    switch (data.type) {
-      case "Deposit":
-        amount = parseDecimal(data.amount);
-        feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
-        source = data.source && data.source !== "N/A" ? data.source : "N/A";
-        if (showCostBasisField) {
-          cost_basis_usd = parseDecimal(data.costBasisUSD);
-        }
-        break;
-      case "Withdrawal":
-        amount = parseDecimal(data.amount);
-        feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
-        purpose = data.purpose && data.purpose !== "N/A" ? data.purpose : "N/A";
-        proceeds_usd = parseDecimal(data.proceeds_usd);
-        break;
-      case "Transfer":
-        amount = parseDecimal(data.amountFrom);
-        feeCurrency = data.fromCurrency === "BTC" ? "BTC" : "USD";
-        break;
-      case "Buy":
-        amount = parseDecimal(data.amountBTC);
-        feeCurrency = "USD";
-        cost_basis_usd = parseDecimal(data.amountUSD);
-        break;
-      case "Sell":
-        amount = parseDecimal(data.amountBTC);
-        feeCurrency = "USD";
-        proceeds_usd = parseDecimal(data.amountUSD);
-        break;
-    }
-
-    // 4) Build the final payload object as ICreateTransactionPayload
-    const transactionPayload: ICreateTransactionPayload = {
-      from_account_id,
-      to_account_id,
-      type: data.type,
-      amount,
-      timestamp: isoTimestamp,
-      fee_amount: parseDecimal(data.fee),
-      fee_currency: feeCurrency as Currency, // ensures "BTC"|"USD"
-      cost_basis_usd,
-      proceeds_usd,
-      source,
-      purpose,
-      is_locked: false,
-    };
+    // If you track a local loading state:
+    // setLoading(true);
 
     try {
-      // 5) POST to backend
+      // 1) For a BTC Withdrawal without proceeds => set proceeds_usd=0
+      if (
+        data.type === "Withdrawal" &&
+        data.currency === "BTC" &&
+        !data.proceeds_usd
+      ) {
+        data.proceeds_usd = 0;
+      }
+
+      // 2) Get from/to IDs via mapDoubleEntryAccounts (returns IAccountMapping)
+      const { from_account_id, to_account_id } = mapDoubleEntryAccounts(data);
+
+      // 3) Convert user-chosen "datetime-local" -> ISO string
+      const isoTimestamp = localDatetimeToIso(data.timestamp);
+
+      // 4) Prepare fields for final payload
+      let amount = 0;
+      let feeCurrency: Currency | "USD" | "BTC" = "USD";
+      let source: string | undefined;
+      let purpose: string | undefined;
+      let cost_basis_usd = 0;
+      let proceeds_usd: number | undefined = undefined;
+
+      switch (data.type) {
+        case "Deposit":
+          amount = parseDecimal(data.amount);
+          feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
+          source = data.source && data.source !== "N/A" ? data.source : "N/A";
+          if (showCostBasisField) {
+            cost_basis_usd = parseDecimal(data.costBasisUSD);
+          }
+          break;
+        case "Withdrawal":
+          amount = parseDecimal(data.amount);
+          feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
+          purpose = data.purpose && data.purpose !== "N/A" ? data.purpose : "N/A";
+          proceeds_usd = parseDecimal(data.proceeds_usd);
+          break;
+        case "Transfer":
+          amount = parseDecimal(data.amountFrom);
+          feeCurrency = data.fromCurrency === "BTC" ? "BTC" : "USD";
+          break;
+        case "Buy":
+          amount = parseDecimal(data.amountBTC);
+          feeCurrency = "USD";
+          cost_basis_usd = parseDecimal(data.amountUSD);
+          break;
+        case "Sell":
+          amount = parseDecimal(data.amountBTC);
+          feeCurrency = "USD";
+          proceeds_usd = parseDecimal(data.amountUSD);
+          break;
+      }
+
+      // 5) Build the final payload object as ICreateTransactionPayload
+      const transactionPayload: ICreateTransactionPayload = {
+        from_account_id,
+        to_account_id,
+        type: data.type,
+        amount,
+        timestamp: isoTimestamp,
+        fee_amount: parseDecimal(data.fee),
+        fee_currency: feeCurrency as Currency,
+        cost_basis_usd,
+        proceeds_usd,
+        source,
+        purpose,
+        is_locked: false,
+      };
+
+      // 6) POST to backend
       const response = await api.post("/transactions", transactionPayload);
       console.log("Transaction created:", response.data);
 
@@ -339,14 +351,26 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       alert("Transaction created successfully!");
       onSubmitSuccess?.();
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        const msg = error.response?.data?.detail || error.message || "Error";
-        alert(`Failed to create transaction: ${msg}`);
+      // Typed Axios error check
+      if (axios.isAxiosError<ApiErrorResponse>(error)) {
+        const detailMsg = error.response?.data?.detail;
+        const fallbackMsg = error.message || "Error";
+        const finalMsg = detailMsg || fallbackMsg;
+
+        // If your backend returns field-level errors
+        if (error.response?.data?.errors) {
+          console.log("Field-specific errors:", error.response.data.errors);
+        }
+
+        alert(`Failed to create transaction: ${finalMsg}`);
       } else if (error instanceof Error) {
         alert(`Failed to create transaction: ${error.message}`);
       } else {
         alert("An unexpected error occurred while creating the transaction.");
       }
+    } finally {
+      // If you have a local loading state, end it here:
+      // setLoading(false);
     }
   };
 
@@ -357,8 +381,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const renderDynamicFields = () => {
     switch (currentType) {
       case "Deposit": {
-        const account = watch("account");    // Bank, Wallet, Exchange
-        const currency = watch("currency");  // USD, BTC
+        const account = watch("account");   // Bank, Wallet, Exchange
+        const currency = watch("currency"); // USD, BTC
         const feeLabel = currency === "BTC" ? "Fee (BTC)" : "Fee (USD)";
 
         // Should we show a "Source" field? Only if account=Wallet or (Exchange + BTC)

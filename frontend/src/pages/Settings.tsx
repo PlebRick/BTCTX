@@ -22,8 +22,11 @@ const Settings: React.FC = () => {
       setMessage("All transactions have been successfully deleted.");
     } catch (error: unknown) {
       console.error("Error deleting transactions:", error);
-      if (axios.isAxiosError(error)) {
-        setMessage(error.response?.data?.detail || error.message || "Failed to delete transactions.");
+      if (axios.isAxiosError<ApiErrorResponse>(error)) {
+        // error.response?.data is now seen as ApiErrorResponse (or undefined)
+        const detailMsg = error.response?.data?.detail;
+        const fallbackMsg = error.message || "Failed to delete transactions.";
+        setMessage(detailMsg ?? fallbackMsg);
       } else if (error instanceof Error) {
         setMessage(error.message);
       } else {
