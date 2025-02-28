@@ -1,12 +1,15 @@
 {
   "name": "BitcoinTX Codespace",
-  "dockerComposeFile": "../.devcontainer/docker-compose.yml",
-  "service": "backend",
-  "workspaceFolder": "/workspace",
+  "build": { 
+    "dockerfile": "Dockerfile", 
+    "context": ".." 
+  },
+  "workspaceFolder": "/workspace", 
+  "forwardPorts": [5173, 8000],
   "customizations": {
     "vscode": {
-      "settings": {
-        "terminal.integrated.defaultProfile.linux": "bash"
+      "settings": { 
+        "terminal.integrated.defaultProfile.linux": "bash" 
       },
       "extensions": [
         "ms-python.python",
@@ -16,5 +19,6 @@
       ]
     }
   },
-  "postCreateCommand": "bash .devcontainer/setup.sh"
+  // On first create, install Node deps on the mounted workspace
+  "postCreateCommand": "cd frontend && npm install"
 }
