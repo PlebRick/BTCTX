@@ -312,8 +312,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const renderDynamicFields = () => {
     switch (currentType) {
       case "Deposit": {
-        const account = watch("account");
-        const currency = watch("currency");
+        const account = watch("account"); //Ban, Wallet, Exchange
+        const currency = watch("currency"); //USD, BTC
+        const feeLabel = currency === "BTC" ? "Fee (BTC)" : "Fee (USD)";
         const showSource =
           account === "Wallet" ||
           (account === "Exchange" && currency === "BTC");
@@ -398,7 +399,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             )}
 
             <div className="form-group">
-              <label>Fee:</label>
+            <label>{feeLabel}:</label>
               <input
                 type="number"
                 step="0.00000001"
@@ -425,6 +426,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       case "Withdrawal": {
         const account = watch("account");
         const currency = watch("currency");
+        const feeLabel = currency === "BTC" ? "Fee (BTC)" : "Fee (USD)";
         const purposeVal = watch("purpose");
         const proceedsUsdVal = watch("proceeds_usd") ?? 0;
         const showPurpose =
@@ -506,7 +508,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             )}
 
             <div className="form-group">
-              <label>Fee:</label>
+            <label>{feeLabel}:</label>
               <input
                 type="number"
                 step="0.00000001"
