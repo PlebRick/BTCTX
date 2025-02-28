@@ -1,0 +1,14 @@
+name: btctx
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - fastapi
+  - uvicorn
+  - sqlalchemy
+  - bcrypt
+  - python-dotenv   # to load .env in FastAPI if needed (or for scripts)
+  - pytest          # include Pytest for backend testing
+  - pip
+  - pip:
+    - pipenv       # (optional, in case we still want pipenv available)
