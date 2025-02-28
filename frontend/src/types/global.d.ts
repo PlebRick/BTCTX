@@ -1,9 +1,9 @@
 /**
  * global.d.ts
  *
- * Ambient type declarations for the entire frontend. By placing interfaces
- * and types in the global scope, we can remove individual type definitions
- * from each component/page, thus simplifying imports.
+ * Ambient type declarations for the entire frontend.
+ * By placing interfaces and types in the global scope, we avoid
+ * duplicating domain models in each file.
  *
  * Make sure this file is included in tsconfig.json so TypeScript picks it up.
  */
@@ -14,8 +14,8 @@ declare global {
   // --------------------------------------------------------------
   /**
    * Represents an account balance row returned by the server.
-   * The `balance` might be a number or string; we parse it with
-   * parseDecimal to ensure it's numeric within the UI.
+   * The `balance` can be a number or string; we parse it to ensure
+   * numeric usage in the UI (via parseDecimal).
    */
   interface AccountBalance {
     account_id: number;
@@ -25,8 +25,8 @@ declare global {
   }
 
   /**
-   * Raw GainsAndLosses data from the backend. Numeric fields can
-   * be string or number; we parse them to real numbers in the UI.
+   * Raw GainsAndLosses data from the backend, where numeric fields
+   * may be string or number. We parse them into real numbers in the UI.
    */
   interface GainsAndLossesRaw {
     sells_proceeds: string | number;
@@ -42,7 +42,7 @@ declare global {
   }
 
   /**
-   * Parsed GainsAndLosses after we apply numeric conversions. All
+   * Parsed GainsAndLosses after numeric conversions. All
    * relevant fields are guaranteed to be `number`.
    */
   interface GainsAndLosses {
@@ -62,9 +62,9 @@ declare global {
   // 2) Domain Models for Transactions
   // --------------------------------------------------------------
   /**
-   * Raw transaction data as returned by the backend, where numeric
-   * fields may be strings (e.g. "0.00010000") and null may appear
-   * in optional fields.
+   * Raw transaction data as returned by the backend.
+   * Numeric fields may be strings (e.g. "0.00010000").
+   * Optional fields might be null.
    */
   interface ITransactionRaw {
     id: number;
@@ -88,9 +88,8 @@ declare global {
   }
 
   /**
-   * Final transaction data used in the UI, with all numeric fields
-   * parsed into `number` and optional text fields normalized to
-   * `string | undefined`.
+   * Final transaction data in the UI, where numeric fields
+   * are guaranteed `number` and null -> undefined for strings.
    */
   interface ITransaction {
     id: number;
@@ -121,7 +120,6 @@ declare global {
   /**
    * IAccountMapping:
    * The return shape from a function like mapDoubleEntryAccounts(...).
-   * It specifies the numeric from/to account IDs to use in the payload.
    */
   interface IAccountMapping {
     from_account_id: number;
@@ -130,23 +128,21 @@ declare global {
 
   /**
    * ICreateTransactionPayload:
-   * The shape of the final payload POSTed to /transactions when
-   * creating a new transaction. The backend interprets it as
-   * multiple ledger lines for double-entry, but the UI sees it
-   * as a single transaction concept.
+   * The shape of the final payload POSTed to /transactions.
+   * The backend interprets it as multiple ledger lines (double-entry).
    */
   interface ICreateTransactionPayload {
     from_account_id: number;
     to_account_id: number;
-    type: TransactionType;     // "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell"
+    type: TransactionType;
     amount: number;
-    timestamp: string;         // ISO8601 date string
+    timestamp: string;         // ISO8601
     fee_amount: number;
     fee_currency: Currency;    // "USD" or "BTC"
     cost_basis_usd: number;
-    proceeds_usd?: number;     // optional, only relevant for certain transaction types
-    source?: string;           // optional, e.g. deposit source
-    purpose?: string;          // optional, e.g. withdrawal purpose
+    proceeds_usd?: number;     // optional for certain transactions
+    source?: string;
+    purpose?: string;
     is_locked: boolean;
   }
 
