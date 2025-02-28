@@ -118,6 +118,38 @@ declare global {
    */
   type SortMode = "TIMESTAMP_DESC" | "CREATION_DESC";
 
+  /**
+   * IAccountMapping:
+   * The return shape from a function like mapDoubleEntryAccounts(...).
+   * It specifies the numeric from/to account IDs to use in the payload.
+   */
+  interface IAccountMapping {
+    from_account_id: number;
+    to_account_id: number;
+  }
+
+  /**
+   * ICreateTransactionPayload:
+   * The shape of the final payload POSTed to /transactions when
+   * creating a new transaction. The backend interprets it as
+   * multiple ledger lines for double-entry, but the UI sees it
+   * as a single transaction concept.
+   */
+  interface ICreateTransactionPayload {
+    from_account_id: number;
+    to_account_id: number;
+    type: TransactionType;     // "Deposit" | "Withdrawal" | "Transfer" | "Buy" | "Sell"
+    amount: number;
+    timestamp: string;         // ISO8601 date string
+    fee_amount: number;
+    fee_currency: Currency;    // "USD" or "BTC"
+    cost_basis_usd: number;
+    proceeds_usd?: number;     // optional, only relevant for certain transaction types
+    source?: string;           // optional, e.g. deposit source
+    purpose?: string;          // optional, e.g. withdrawal purpose
+    is_locked: boolean;
+  }
+
   // --------------------------------------------------------------
   // 3) Types for the TransactionForm
   // --------------------------------------------------------------
@@ -184,5 +216,4 @@ declare global {
   type Operation = "+" | "-" | "*" | "/" | null;
 }
 
-// Required to convert this file into a module.
-export {};
+export {}; // Required to convert this file into a module.
