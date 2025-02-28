@@ -1,32 +1,20 @@
 {
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
-
-    // Node scripts often can target a recent version of ECMAScript
     "target": "ES2022",
     "lib": ["ES2023"], // or "ES2022" if you prefer
-
-    // ESNext modules are fine for Vite config
     "module": "ESNext",
     "skipLibCheck": true,
-
-    // Node resolution, because this config is for scripts run in Node (like vite.config.ts)
     "moduleResolution": "node",
-
-    // Additional recommended flags
     "isolatedModules": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-
-    // For default imports in Node scripts
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-
     "noEmit": true
   },
-  // Typically, we only include the Vite config or any other Node scripts you might have
   "include": ["vite.config.ts"]
 }
