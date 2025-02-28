@@ -4,7 +4,7 @@
     "dockerfile": "Dockerfile", 
     "context": ".." 
   },
-  "workspaceFolder": "/workspace", 
+  "workspaceFolder": "/workspaces/BTCTX", 
   "forwardPorts": [5173, 8000],
   "customizations": {
     "vscode": {
