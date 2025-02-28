@@ -19,6 +19,6 @@
       ]
     }
   },
-  // On first create, install Node deps on the mounted workspace
-  "postCreateCommand": "cd frontend && npm install"
+  "_comment": "On first create, install Node and Python dependencies",
+  "postCreateCommand": "cd frontend && npm install && cd ../backend && pip install -r requirements.txt"
 }
