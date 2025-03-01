@@ -11,7 +11,7 @@ import {
 } from "../utils/format";
 
 // If your global.d.ts uses global declarations, you do NOT import them:
-// import { ITransactionRaw, ITransaction, SortMode } from "../global.d"; // <- Remove this line
+// import { ITransactionRaw, ITransaction, SortMode } from "../global.d"; // <- remove or comment out
 
 void formatTimestamp; // to avoid TS warnings
 void parseDecimal;    // to avoid TS warnings
@@ -62,30 +62,37 @@ function formatAmount(tx: ITransaction): string {
       } else {
         return formatBtc(amount);
       }
+
     case "Withdrawal":
       if (from_account_id === 1 || from_account_id === 3) {
         return formatUsd(amount);
       } else {
         return formatBtc(amount);
       }
+
     case "Transfer":
       if (from_account_id === 1 || from_account_id === 3) {
         return formatUsd(amount);
       } else {
         return formatBtc(amount);
       }
+
     case "Buy":
+      // Just show the USD amount, no "spent"
       return cost_basis_usd
-        ? `${formatUsd(cost_basis_usd)} spent`
-        : `${formatUsd(amount)} spent`;
+        ? `${formatUsd(cost_basis_usd)}`
+        : `${formatUsd(amount)}`;
+
     case "Sell":
+      // Show "BTC -> USD" but omit "Sold"
       return proceeds_usd
-        ? `Sold ${formatBtc(amount)} -> ${formatUsd(proceeds_usd)}`
-        : `Sold ${formatBtc(amount)}`;
+        ? `${formatBtc(amount)} -> ${formatUsd(proceeds_usd)}`
+        : `${formatBtc(amount)}`;
+
     default:
       return `${amount}`;
   }
-}
+} // <-- IMPORTANT: closing brace for formatAmount() function
 
 function formatExtra(tx: ITransaction): string {
   const { type, source, purpose } = tx;
@@ -205,7 +212,6 @@ const Transactions: React.FC = () => {
             value={sortMode}
             onChange={e => setSortMode(e.target.value as SortMode)}
           >
-            {/* Just says "Date" now instead of "Most Recent Date" */}
             <option value="TIMESTAMP_DESC">Sort by Date</option>
             <option value="CREATION_DESC">Last Added (ID)</option>
           </select>
@@ -253,19 +259,23 @@ const Transactions: React.FC = () => {
 
                 return (
                   <div key={tx.id} className="transaction-card">
-                    <span className="cell account-cell">{timeStr}</span>
-                    <span className="cell account-cell">{tx.type}</span>
-                    <span className="cell account-cell">{accountLabel}</span>
-                    <span className="cell account-cell">{amountLabel}</span>
-                    <span className="cell account-cell">{feeLabel}</span>
-                    <span className="cell extra-cell">
-                      {extraLabel}
-                      {disposalLabel && (
-                        <span style={{ marginLeft: "0.8rem", color: "#bbb" }}>
-                          {disposalLabel}
-                        </span>
-                      )}
+                    {/* Time */}
+                    <span className="cell time-col">{timeStr}</span>
+                    {/* Type */}
+                    <span className="cell type-col">{tx.type}</span>
+                    {/* Account */}
+                    <span className="cell account-col">{accountLabel}</span>
+                    {/* Amount */}
+                    <span className="cell amount-col">{amountLabel}</span>
+                    {/* Fee */}
+                    <span className="cell fee-col">{feeLabel}</span>
+                    {/* Extra (e.g. "Interest," "Spent," "Income") */}
+                    <span className="cell extra-col">{extraLabel}</span>
+                    {/* Disposal (e.g. "Gain: +$123.00 (40%)") */}
+                    <span className="cell disposal-col">
+                      {disposalLabel}
                     </span>
+                    {/* Edit button */}
                     <button
                       onClick={() => {
                         console.log("Edit transaction", tx.id);

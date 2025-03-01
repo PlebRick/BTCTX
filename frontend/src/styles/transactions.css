@@ -81,29 +81,29 @@
 
 /* Individual transaction row
    Switch to a grid to space columns more uniformly */
-.transaction-card {
-  display: grid;
-  grid-template-columns: 50px 70px 70px 110px 110px 1fr auto; 
-  /* 
-     columns:
-       - time (50px)
-       - type (70px)
-       - account (110px)
-       - amount (110px)
-       - fee (110px)
-       - extra (1fr)
-       - edit button (auto)
-  */
-  gap: 0.5rem; 
-  align-items: start;
-  background-color: #1e1e1e;
-  border: 1px solid #2a2a2a;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.4rem;
-  transition: background-color 0.2s;
-  font-size: 0.75rem; /* smaller row font */
-}
+   .transaction-card {
+    display: grid;
+    /* Example layout with 8 columns (adjust widths as needed) */
+    grid-template-columns:
+      55px   /* time-col    */
+      60px   /* type-col    */
+      70px   /* account-col */
+      110px  /* amount-col  */
+      110px  /* fee-col     */
+      100px  /* extra-col   */
+      1fr  /* disposal-col*/
+      45px;  /* edit button */
+  
+    gap: 0.5rem;
+    align-items: center;
+    background-color: #1e1e1e;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.4rem;
+    transition: background-color 0.2s;
+    font-size: 0.75rem; /* adjust as needed */
+  }  
 
 /* A special class for the Account cell so it can wrap */
 .account-cell {
