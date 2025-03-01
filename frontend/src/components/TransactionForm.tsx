@@ -11,7 +11,7 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import axios from "axios";            // For isAxiosError checks
 import api from "../api";             // Centralized API client
 import "../styles/transactionForm.css";
-import { parseDecimal } from "../utils/format";
+import { parseDecimal, formatUsd } from "../utils/format"; // <--- CHANGED: import formatUsd
 
 /**
  * localDatetimeToIso:
@@ -111,11 +111,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   onDirtyChange,
   onSubmitSuccess,
 }) => {
-  /**
-   * react-hook-form setup:
-   * - We default fee/costBasisUSD/proceeds_usd to 0 for convenience
-   * - We store the user inputs in a TransactionFormData shape (from global.d.ts).
-   */
+  // react-hook-form setup
   const {
     register,
     handleSubmit,
@@ -132,13 +128,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     },
   });
 
-  // Example if you want a local "loading" state:
-  // const [isLoading, setLoading] = useState(false);
-
-  // Track the currently selected transaction type (Deposit, Withdrawal, etc.)
+  // This component's local states
   const [currentType, setCurrentType] = useState<TransactionType | "">("");
-
-  // For display: approximate fee in USD when transferring BTC
   const [feeInUsdDisplay, setFeeInUsdDisplay] = useState<number>(0);
 
   // We watch certain fields for dynamic UI logic
@@ -152,18 +143,17 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const fromAccountVal = watch("fromAccount");
 
   /**
-   * For debugging: log user input changes
+   * For debugging: log user input changes (optional)
    */
   useEffect(() => {
-    console.log("User typed in amountUSD:", amountUsdVal);
+    // console.log("User typed in amountUSD:", amountUsdVal);
   }, [amountUsdVal]);
-
   useEffect(() => {
-    console.log("User typed in amountBTC:", amountBtcVal);
+    // console.log("User typed in amountBTC:", amountBtcVal);
   }, [amountBtcVal]);
 
   /**
-   * Notify the parent (if any) when the form's dirty state changes
+   * Notify parent about dirty state
    */
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -230,10 +220,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   };
 
   /**
-   * Show costBasisUSD field only if:
-   * - type = Deposit
-   * - currency = BTC
-   * - account = Wallet or Exchange
+   * showCostBasisField:
+   * Only if:
+   *  - type = Deposit
+   *  - currency = BTC
+   *  - account = Wallet or Exchange
    */
   const showCostBasisField =
     currentType === "Deposit" &&
@@ -242,7 +233,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   /**
    * If Transfer + fromCurrency=BTC => auto-calc fee = amountFrom - amountTo
-   * (clamp to 0 if negative) and show approximate USD display at a mock price.
    */
   useEffect(() => {
     if (currentType === "Transfer" && fromCurrencyVal === "BTC") {
@@ -267,11 +257,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
    * We parse decimal fields so they're guaranteed numbers in the payload.
    */
   const onSubmit: SubmitHandler<TransactionFormData> = async (data) => {
-    // If you track a local loading state:
-    // setLoading(true);
-
     try {
-      // 1) For a BTC Withdrawal without proceeds => set proceeds_usd=0
+      // 1) If BTC Withdrawal user doesn't specify proceeds, default to 0
       if (
         data.type === "Withdrawal" &&
         data.currency === "BTC" &&
@@ -280,13 +267,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         data.proceeds_usd = 0;
       }
 
-      // 2) Get from/to IDs via mapDoubleEntryAccounts (returns IAccountMapping)
+      // 2) from/to IDs
       const { from_account_id, to_account_id } = mapDoubleEntryAccounts(data);
 
-      // 3) Convert user-chosen "datetime-local" -> ISO string
+      // 3) Convert user-chosen "datetime-local" -> ISO
       const isoTimestamp = localDatetimeToIso(data.timestamp);
 
-      // 4) Prepare fields for final payload
+      // 4) Prepare fields
       let amount = 0;
       let feeCurrency: Currency | "USD" | "BTC" = "USD";
       let source: string | undefined;
@@ -303,21 +290,25 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             cost_basis_usd = parseDecimal(data.costBasisUSD);
           }
           break;
+
         case "Withdrawal":
           amount = parseDecimal(data.amount);
           feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
           purpose = data.purpose && data.purpose !== "N/A" ? data.purpose : "N/A";
           proceeds_usd = parseDecimal(data.proceeds_usd);
           break;
+
         case "Transfer":
           amount = parseDecimal(data.amountFrom);
           feeCurrency = data.fromCurrency === "BTC" ? "BTC" : "USD";
           break;
+
         case "Buy":
           amount = parseDecimal(data.amountBTC);
           feeCurrency = "USD";
           cost_basis_usd = parseDecimal(data.amountUSD);
           break;
+
         case "Sell":
           amount = parseDecimal(data.amountBTC);
           feeCurrency = "USD";
@@ -325,7 +316,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           break;
       }
 
-      // 5) Build the final payload object as ICreateTransactionPayload
+      // 5) Build payload
       const transactionPayload: ICreateTransactionPayload = {
         from_account_id,
         to_account_id,
@@ -345,13 +336,29 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       const response = await api.post("/transactions", transactionPayload);
       console.log("Transaction created:", response.data);
 
-      // Reset form & notify parent
+      // <--- ADDED: Show realized gain/loss from the new transaction (if present)
+      if (response.data) {
+        const createdTx = response.data as ITransactionRaw; // or ITransaction
+        const rg = createdTx.realized_gain_usd
+          ? parseDecimal(createdTx.realized_gain_usd)
+          : 0;
+        if (rg !== 0) {
+          const sign = rg >= 0 ? "+" : "";
+          alert(
+            `Transaction created successfully!\nRealized Gain: ${sign}${formatUsd(rg)}`
+          );
+        } else {
+          alert("Transaction created successfully!");
+        }
+      } else {
+        alert("Transaction created successfully!");
+      }
+
+      // reset form & notify parent
       reset();
       setCurrentType("");
-      alert("Transaction created successfully!");
       onSubmitSuccess?.();
     } catch (error: unknown) {
-      // Typed Axios error check
       if (axios.isAxiosError<ApiErrorResponse>(error)) {
         const detailMsg = error.response?.data?.detail;
         const fallbackMsg = error.message || "Error";
@@ -368,9 +375,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       } else {
         alert("An unexpected error occurred while creating the transaction.");
       }
-    } finally {
-      // If you have a local loading state, end it here:
-      // setLoading(false);
     }
   };
 
@@ -381,8 +385,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const renderDynamicFields = () => {
     switch (currentType) {
       case "Deposit": {
-        const account = watch("account");   // Bank, Wallet, Exchange
-        const currency = watch("currency"); // USD, BTC
+        const account = watch("account");
+        const currency = watch("currency");
         const feeLabel = currency === "BTC" ? "Fee (BTC)" : "Fee (USD)";
 
         // Should we show a "Source" field? Only if account=Wallet or (Exchange + BTC)
@@ -390,7 +394,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           account === "Wallet" ||
           (account === "Exchange" && currency === "BTC");
 
-        // Show cost basis if deposit + BTC + (wallet|exchange)
         const showCostBasisField =
           currentType === "Deposit" &&
           currency === "BTC" &&
@@ -619,7 +622,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       case "Transfer": {
         const fromAccount = watch("fromAccount");
         const fromCurrencyVal = watch("fromCurrency");
-      
+
         return (
           <>
             {/* From Account */}
@@ -638,7 +641,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">From Account is required</span>
               )}
             </div>
-      
+
             {/* From Currency */}
             <div className="form-group">
               <label>From Currency:</label>
@@ -663,7 +666,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">From Currency is required</span>
               )}
             </div>
-      
+
             {/* Amount (From) */}
             <div className="form-group">
               <label>Amount (From):</label>
@@ -680,7 +683,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">Amount (From) is required</span>
               )}
             </div>
-      
+
             {/* To Account */}
             <div className="form-group">
               <label>To Account:</label>
@@ -691,7 +694,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 readOnly
               />
             </div>
-      
+
             {/* To Currency */}
             <div className="form-group">
               <label>To Currency:</label>
@@ -702,7 +705,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 readOnly
               />
             </div>
-      
+
             {/* Amount (To) */}
             <div className="form-group">
               <label>Amount (To):</label>
@@ -719,7 +722,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">Amount (To) is required</span>
               )}
             </div>
-      
+
             {/* Fee: BTC (auto-calc) vs. USD (manual) */}
             {fromCurrencyVal === "BTC" ? (
               <div className="form-group">
@@ -751,7 +754,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             )}
           </>
         );
-      }      
+      }
 
       case "Buy":
         return (

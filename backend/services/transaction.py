@@ -1,3 +1,5 @@
+# backend/services/transaction.py
+
 """
 backend/services/transaction.py
 
@@ -59,7 +61,8 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
     6) Possibly skip net-zero if cross-currency (Buy/Sell)
     7) If Deposit/Buy => create BTC lot if to_acct=BTC
     8) If Withdrawal/Sell => do FIFO disposal if from_acct=BTC
-    9) If Sell => compute realized gains from partial-lot disposal
+    9) If it's a disposal (Withdrawal or Sell), compute realized gain summary
+       (cost_basis_usd, realized_gain_usd, holding_period).
     """
     ensure_fee_account_exists(db)
     _enforce_transaction_type_rules(tx_data, db)
@@ -83,15 +86,13 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
     )
     db.add(new_tx)
     db.flush()  # get new_tx.id
-    # group_id is used in your system for grouping related transactions; we set it to the same as id
-    new_tx.group_id = new_tx.id
 
-    # First, remove any existing ledger entries to avoid duplicates on re-build
+    # group_id (if you use it)
+    new_tx.group_id = new_tx.id  # This might not exist in your actual model, so ignore if not used
+
+    # Clear any old ledger lines, then rebuild
     remove_ledger_entries_for_tx(new_tx, db)
-    # Build ledger entries (double-entry lines) from the single-entry fields
     build_ledger_entries_for_transaction(new_tx, tx_data, db)
-
-    # Enforce net-zero if type != Buy/Sell (i.e. same-currency transfers must net to zero)
     _maybe_verify_balance_for_internal(new_tx, db)
 
     # If depositing or buying BTC, create a BitcoinLot
@@ -102,9 +103,12 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
     if new_tx.type in ("Withdrawal", "Sell"):
         maybe_dispose_lots_fifo(new_tx, tx_data, db)
 
-    # If it's a Sell, compute aggregated cost basis / realized gain / holding period
-    if new_tx.type == "Sell":
-        compute_sell_summary_from_disposals(new_tx, db)
+    # ---------------------------------------------------------------------------
+    # CHANGED: Call compute_sell_summary_from_disposals for ANY disposal 
+    # (Sell or Withdrawal).
+    # ---------------------------------------------------------------------------
+    if new_tx.type in ("Sell", "Withdrawal"):  # <--- CHANGED
+        compute_sell_summary_from_disposals(new_tx, db)  # <--- CHANGED
 
     db.commit()
     db.refresh(new_tx)
@@ -117,6 +121,7 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
      - Rebuild ledger lines
      - Possibly skip net-zero if cross-currency (Buy/Sell)
      - Re-create lots or disposal if changed from deposit->buy or amount changed
+     - If it's a disposal, recompute realized gain summary
     """
     tx = get_transaction_by_id(transaction_id, db)
     if not tx or tx.is_locked:
@@ -132,7 +137,7 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
     if "from_account_id" in tx_data:
         tx.from_account_id = tx_data["from_account_id"]
     if "to_account_id" in tx_data:
-        tx.to_account_id   = tx_data["to_account_id"]
+        tx.to_account_id = tx_data["to_account_id"]
     if "amount" in tx_data:
         tx.amount = tx_data["amount"]
     if "fee_amount" in tx_data:
@@ -154,19 +159,23 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
 
     tx.updated_at = datetime.utcnow()
 
-    # Rebuild ledger lines from scratch (remove old lines, add new)
+    # Rebuild ledger lines from scratch
     remove_ledger_entries_for_tx(tx, db)
-    remove_lot_usage_for_tx(tx, db)  # remove prior lot disposal or created lots if any
+    remove_lot_usage_for_tx(tx, db)
     build_ledger_entries_for_transaction(tx, tx_data, db)
     _maybe_verify_balance_for_internal(tx, db)
 
-    # Re-run lot creation or disposal logic based on the updated type
+    # Re-run lot creation or disposal logic
     if tx.type in ("Deposit", "Buy"):
         maybe_create_bitcoin_lot(tx, tx_data, db)
     if tx.type in ("Withdrawal", "Sell"):
         maybe_dispose_lots_fifo(tx, tx_data, db)
-        if tx.type == "Sell":
-            compute_sell_summary_from_disposals(tx, db)
+
+    # ---------------------------------------------------------------------------
+    # CHANGED: For Sell or Withdrawal, run compute_sell_summary_from_disposals
+    # ---------------------------------------------------------------------------
+    if tx.type in ("Sell", "Withdrawal"):  # <--- CHANGED
+        compute_sell_summary_from_disposals(tx, db)  # <--- CHANGED
 
     db.commit()
     db.refresh(tx)
@@ -304,13 +313,11 @@ def maybe_create_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
 
 def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     """
-    If withdrawal/sell => we do a FIFO partial-lot disposal if the 'from_acct' is BTC.
+    If withdrawal/sell => do a FIFO partial-lot disposal if from_acct=BTC.
     This calculates partial cost basis for each lot used.
 
-    REFRACTOR:
-      - If (tx.type == "Withdrawal") and tx.purpose in ("Gift","Donation","Lost"),
-        we skip recognized gain by setting disposal_gain=0. 
-        Optionally, partial_proceeds can also be set to 0 for a non-taxable event.
+    If (tx.type == "Withdrawal") and tx.purpose in ("Gift","Donation","Lost"), 
+    we skip recognized gain by setting disposal_gain=0, optionally partial_proceeds=0.
     """
     from_acct = db.query(Account).filter(Account.id == tx.from_account_id).first()
     if not from_acct or from_acct.currency != "BTC":
@@ -324,7 +331,7 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     # Check if the user supplied proceeds for the disposal
     total_proceeds = float(tx_data.get("proceeds_usd", 0))
 
-    # Retrieve all BTC lots that still have a remaining balance
+    # Retrieve all BTC lots with remaining balance, ordered by oldest first
     lots = db.query(BitcoinLot).filter(
         BitcoinLot.remaining_btc > 0
     ).order_by(BitcoinLot.acquired_date).all()
@@ -332,7 +339,6 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     remaining_outflow = btc_outflow
     total_outflow = btc_outflow
 
-    # Grab the "purpose" from the transaction to see if it's Gift/Donation/Lost
     withdrawal_purpose = (tx.purpose or "").strip()
 
     for lot in lots:
@@ -343,32 +349,26 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
         if lot_rem <= 0:
             continue
 
-        # 'can_use' is how many BTC we dispose from the current lot
         can_use = min(lot_rem, remaining_outflow)
 
-        # lot_fraction => the fraction of the total lot we're disposing
-        # disposal_basis => fraction of the lot's cost basis
+        # fraction of this lot we're disposing
         lot_fraction = can_use / lot_rem
         disposal_basis = float(lot.cost_basis_usd) * lot_fraction
 
-        # partial_proceeds => portion of total_proceeds allocated to this chunk
+        # allocate proceeds proportionally
         partial_proceeds = 0.0
         if total_outflow > 0:
             partial_proceeds = (can_use / total_outflow) * total_proceeds
 
-        # Normal recognized gain => (partial_proceeds - disposal_basis)
+        # normal recognized gain
         disposal_gain = partial_proceeds - disposal_basis
 
-        # -----------------------------------------------------------
-        # NEW LOGIC: If user selected Gift/Donation/Lost => zero out gain
-        # -----------------------------------------------------------
+        # If Gift/Donation/Lost, zero out recognized gain
         if tx.type == "Withdrawal" and withdrawal_purpose in ("Gift", "Donation", "Lost"):
             disposal_gain = 0.0
-            # Optionally: partial_proceeds = 0.0
-            # so the user sees 0 proceeds for a non-taxable event
-            # partial_proceeds = 0.0
+            # partial_proceeds = 0.0  # optional if we want no proceeds
 
-        # Create a new LotDisposal record with final disposal values
+        # Create the disposal record
         disp = LotDisposal(
             lot_id=lot.id,
             transaction_id=tx.id,
@@ -379,30 +379,39 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
         )
         db.add(disp)
 
-        # Reduce the remaining BTC in the lot
+        # reduce the lot's remaining BTC
         lot.remaining_btc = Decimal(lot_rem - can_use)
-
-        # Decrement how much BTC we still need to dispose
         remaining_outflow -= can_use
 
     db.flush()
 
 def compute_sell_summary_from_disposals(tx: Transaction, db: Session):
     """
-    For a Sell => sum up the partial-lot disposals, set cost_basis_usd & realized_gain_usd,
-    and determine holding_period = 'LONG' or 'SHORT'.
+    For a Sell (or any disposal transaction), sum up partial-lot disposals
+    and set cost_basis_usd, realized_gain_usd, proceeds_usd, holding_period.
+
+    We keep the name 'compute_sell_summary_from_disposals' but also use it for
+    Withdrawals that dispose BTC.
+
+    Steps:
+      - Sum disposal_basis_usd => tx.cost_basis_usd
+      - Sum realized_gain_usd  => tx.realized_gain_usd
+      - Sum proceeds_usd_for_that_portion => tx.proceeds_usd
+      - Determine holding period (SHORT/LONG) based on earliest lot acquisition
     """
     disposals = db.query(LotDisposal).filter(LotDisposal.transaction_id == tx.id).all()
     if not disposals:
         return
 
     total_basis = 0.0
-    total_gain  = 0.0
+    total_gain = 0.0
+    total_proceeds = 0.0
     earliest_date = None
 
     for disp in disposals:
-        total_basis += float(disp.disposal_basis_usd or 0)
-        total_gain  += float(disp.realized_gain_usd or 0)
+        total_basis    += float(disp.disposal_basis_usd or 0)
+        total_gain     += float(disp.realized_gain_usd or 0)
+        total_proceeds += float(disp.proceeds_usd_for_that_portion or 0)
 
         lot = db.query(BitcoinLot).get(disp.lot_id)
         if lot and (earliest_date is None or lot.acquired_date < earliest_date):
@@ -411,7 +420,11 @@ def compute_sell_summary_from_disposals(tx: Transaction, db: Session):
     tx.cost_basis_usd    = Decimal(total_basis)
     tx.realized_gain_usd = Decimal(total_gain)
 
-    # Check how many days between earliest_date of acquisition and the transaction date
+    # Overwrite tx.proceeds_usd with the sum of partial proceeds
+    if total_proceeds:
+        tx.proceeds_usd = Decimal(total_proceeds)
+
+    # Holding period: short/long if held > 365 days
     if earliest_date:
         days_held = (tx.timestamp.date() - earliest_date.date()).days
         tx.holding_period = "LONG" if days_held > 365 else "SHORT"
@@ -429,7 +442,7 @@ def _maybe_verify_balance_for_internal(tx: Transaction, db: Session):
     If type=Buy or Sell => skip net-zero check, because cross-currency doesn't net to zero
     in our simplified approach.
 
-    Otherwise we call _verify_double_entry_balance_for_internal for normal internal same-currency logic.
+    Otherwise we call _verify_double_entry_balance_for_internal for normal internal logic.
     """
     if tx.type in ("Buy", "Sell"):
         return
@@ -458,9 +471,9 @@ def _verify_double_entry_balance_for_internal(tx: Transaction, db: Session):
 
 def _enforce_fee_rules(tx_data: dict, db: Session):
     """
-    Transfer => fee matches from_acct currency
+    Transfer => fee must match from_acct currency
     Buy/Sell => fee must be USD
-    (Deposit/Withdrawal => no special rule, can do any fee currency if wanted.)
+    (Deposit/Withdrawal => no special rule)
     """
     tx_type = tx_data.get("type")
     from_id = tx_data.get("from_account_id")
@@ -574,7 +587,7 @@ def _enforce_transaction_type_rules(tx_data: dict, db: Session):
             status_code=400,
             detail=f"Unknown transaction type: {tx_type}"
         )
-    
+
 def delete_all_transactions(db: Session) -> int:
     """
     Delete all transactions from the database and return the count of deleted transactions.

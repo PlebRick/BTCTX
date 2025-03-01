@@ -5,16 +5,13 @@
  *   - ITransactionRaw
  *   - ITransaction
  *   - SortMode
- * locally. Now we remove those interfaces from here and rely
- * on the globally defined versions in global.d.ts.
+ * in global.d.ts. Now we remove local interfaces & rely on the global.
  */
 
 import React, { useEffect, useState } from "react";
 import TransactionPanel from "../components/TransactionPanel";
 import "../styles/transactions.css";
 import api from "../api";
-
-// Numeric formatting & parsing helpers
 import {
   parseTransaction,
   formatUsd,
@@ -23,14 +20,11 @@ import {
   parseDecimal,
 } from "../utils/format";
 
-// We keep references to formatTimestamp & parseDecimal, but they're
-// not currently used, so we can call them if needed:
-void formatTimestamp;
-void parseDecimal;
+void formatTimestamp; // Just to avoid TS unused warnings
+void parseDecimal;    // Same reason
 
 /**
- * Helper function to map a numeric account ID to a label. Not needed
- * in global types. It's UI logic only.
+ * Convert numeric account ID => label (UI only)
  */
 function accountIdToName(id: number | null): string {
   if (id === null) return "N/A";
@@ -44,6 +38,9 @@ function accountIdToName(id: number | null): string {
   }
 }
 
+/**
+ * Decide how to display the "main" account or direction of the transaction
+ */
 function resolveDisplayAccount(tx: ITransaction): string {
   const { type, from_account_id, to_account_id } = tx;
 
@@ -62,6 +59,9 @@ function resolveDisplayAccount(tx: ITransaction): string {
   }
 }
 
+/**
+ * Decide how to display the primary amount (or a short phrase).
+ */
 function formatAmount(tx: ITransaction): string {
   const { type, amount, cost_basis_usd, proceeds_usd, from_account_id, to_account_id } = tx;
 
@@ -102,8 +102,13 @@ function formatAmount(tx: ITransaction): string {
   }
 }
 
+/**
+ * For deposits, we show 'source'; for withdrawals, 'purpose'; for Sell or Disposal,
+ * we might show holding_period, but let's keep it separate. We'll add an additional
+ * label for gain/loss.
+ */
 function formatExtra(tx: ITransaction): string {
-  const { type, source, purpose, holding_period } = tx;
+  const { type, source, purpose } = tx;
 
   if (type === "Deposit" && source && source !== "N/A") {
     return source;
@@ -111,10 +116,40 @@ function formatExtra(tx: ITransaction): string {
   if (type === "Withdrawal" && purpose && purpose !== "N/A") {
     return purpose;
   }
-  if (holding_period) {
-    return `(${holding_period})`;
-  }
   return "";
+}
+
+// <--- ADDED: Build a disposal label: gain/loss + % + holding period
+function buildDisposalLabel(tx: ITransaction): string {
+  // Only show if Sell or Withdrawal
+  if (tx.type !== "Sell" && tx.type !== "Withdrawal") {
+    return "";
+  }
+  // Must have cost_basis_usd and realized_gain_usd to be meaningful
+  if (tx.cost_basis_usd == null || tx.realized_gain_usd == null) {
+    return "";
+  }
+
+  const costBasis = parseDecimal(tx.cost_basis_usd);
+  const gainVal   = parseDecimal(tx.realized_gain_usd);
+
+  if (costBasis === 0) {
+    // If there's no cost basis, or zero => no ratio
+    // Possibly user donated or lost?
+    return gainVal !== 0
+      ? `Gain: ${gainVal >= 0 ? "+" : ""}${formatUsd(gainVal)}`
+      : "";
+  }
+
+  const gainPerc = (gainVal / costBasis) * 100;
+  const sign = gainVal >= 0 ? "+" : "";
+  const percFmt = `${sign}${gainPerc.toFixed(2)}%`;
+  const gainFmt = `${sign}${formatUsd(gainVal)}`;
+
+  // If there's a holding_period, add it in parentheses
+  const hp = tx.holding_period ? ` ${tx.holding_period}` : "";
+
+  return `Gain: ${gainFmt} (${percFmt})${hp}`;
 }
 
 const Transactions: React.FC = () => {
@@ -124,6 +159,9 @@ const Transactions: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  /**
+   * Fetch transactions from backend
+   */
   const fetchTransactions = async () => {
     setIsLoading(true);
     setFetchError(null);
@@ -132,6 +170,7 @@ const Transactions: React.FC = () => {
       const res = await api.get<ITransactionRaw[]>("/transactions");
       console.log("Raw API response (transactions):", res.data);
 
+      // parse them to unify numeric fields
       const parsedTransactions = res.data.map(raw => parseTransaction(raw));
       console.log("Parsed transactions:", parsedTransactions);
 
@@ -161,16 +200,23 @@ const Transactions: React.FC = () => {
     fetchTransactions();
   };
 
+  /**
+   * Sort transactions
+   */
   const sortedTransactions = transactions
     ? [...transactions].sort((a, b) => {
         if (sortMode === "TIMESTAMP_DESC") {
           return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
         } else {
+          // CREATION_DESC => sort by ID descending
           return b.id - a.id;
         }
       })
     : [];
 
+  /**
+   * Group them by date string (e.g. "Mar 1, 2025")
+   */
   const groupedByDate: Record<string, ITransaction[]> = {};
   for (const tx of sortedTransactions) {
     const dateLabel = new Date(tx.timestamp).toLocaleDateString("en-US", {
@@ -178,11 +224,9 @@ const Transactions: React.FC = () => {
       day: "numeric",
       year: "numeric",
     });
-
     if (!groupedByDate[dateLabel]) groupedByDate[dateLabel] = [];
     groupedByDate[dateLabel].push(tx);
   }
-
   const dateGroups = Object.entries(groupedByDate);
 
   return (
@@ -239,16 +283,20 @@ const Transactions: React.FC = () => {
                 });
                 const accountLabel = resolveDisplayAccount(tx);
                 const amountLabel = formatAmount(tx);
-
                 let feeLabel = "";
                 if (tx.fee_amount && tx.fee_amount !== 0) {
                   if (tx.fee_currency === "BTC") {
                     feeLabel = `Fee: ${formatBtc(tx.fee_amount)}`;
                   } else {
-                    feeLabel = `Fee: ${formatUsd(tx.fee_amount)} ${tx.fee_currency || "USD"}`;
+                    feeLabel = `Fee: ${formatUsd(tx.fee_amount)} ${
+                      tx.fee_currency || "USD"
+                    }`;
                   }
                 }
                 const extraLabel = formatExtra(tx);
+
+                // <--- ADDED: Build disposal label (gain/loss) if applicable
+                const disposalLabel = buildDisposalLabel(tx);
 
                 return (
                   <div
@@ -271,7 +319,14 @@ const Transactions: React.FC = () => {
                     <span style={{ minWidth: "130px" }}>{accountLabel}</span>
                     <span style={{ minWidth: "100px" }}>{amountLabel}</span>
                     <span style={{ minWidth: "120px" }}>{feeLabel}</span>
-                    <span style={{ flex: 1 }}>{extraLabel}</span>
+                    <span style={{ flex: 1 }}>
+                      {extraLabel}
+                      {disposalLabel && (
+                        <span style={{ marginLeft: "0.8rem", color: "#bbb" }}>
+                          {disposalLabel}
+                        </span>
+                      )}
+                    </span>
                     <button
                       onClick={() => {
                         console.log("Edit transaction", tx.id);
