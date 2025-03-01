@@ -67,7 +67,7 @@ const BtcConverter: React.FC = () => {
 
   return (
     <div className="converter">
-      <div className="converter-title">BTC Converter</div>
+      <div className="converter-title">sats converter</div>
 
       {/* Toggle between manual vs auto mode */}
       <div className="price-toggle">

@@ -9,7 +9,7 @@
 .converter {
   width: 160px;          /* narrower to fit the sidebar cleanly */
   border: none;          /* no gold border */
-  background-color: #1e1e1e;
+  background-color: #1c1c1c;
   border-radius: 8px;
   padding: 10px;
   font-size: 0.8rem;     /* smaller base font */
@@ -18,8 +18,7 @@
 /* Title (if you still use .converter-title) */
 .converter-title {
   color: var(--color-text);
-  font-size: 0.9rem;
-  font-weight: bold;
+  font-size: 0.7rem;
   margin-bottom: 0.5rem;
   text-align: center;
 }

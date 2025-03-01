@@ -23,8 +23,7 @@ body {
    Layout Container
 ======================= */
 .app-container {
-  display: flex; 
-  /* Sidebar on left, content on right */
+  display: flex; /* Sidebar on left, content on right */
 }
 
 /* =======================
@@ -39,12 +38,14 @@ body {
   padding: 0; /* no pinned items */
 }
 
-/* Brand area */
+/* Brand area at the top of the sidebar */
 .sidebar-brand {
   display: flex;
   align-items: center;
-  height: 64px; /* matches header height */
-  padding-left: 1rem;
+  justify-content: center;
+  height: 60px; /* matches header height */
+  padding-left: .5rem;
+  padding-top: 1rem;
 }
 
 .sidebar-logo {
@@ -69,54 +70,25 @@ body {
   margin: 0;
 }
 
-/* Navigation links */
-.sidebar-nav {
-  flex-direction: column;
-  padding: 1rem;
-
-  /* Bring converter closer */
-  margin-bottom: 0.25rem; /* was 0.5rem */
-}
-
-.nav-item {
-  display: block;
-  padding: 0.5rem 0.75rem;
-  color: var(--color-text-dim);
-  transition: color 0.2s, background-color 0.2s;
-  margin-bottom: 0.25rem;
-  border-radius: 6px;
-  font-size: 0.9rem; /* previously reduced for smaller nav text */
-}
-
-.nav-item:hover {
-  color: var(--color-text);
-  background-color: #4a4a4a;
-}
-
 /* =======================
    Tools Section
+   (Converter + Calculator)
 ======================= */
 .sidebar-tools {
   display: flex;
   flex-direction: column;
   align-items: center;
-
-  /* Less space between converter and calculator */
-  gap: 0.3rem; /* was 0.5rem */
-
+  gap: 0.3rem;  /* small gap between converter & calculator */
   padding-bottom: 20px;
 }
 
-/* Converter container */
 .sidebar-converter {
   display: flex;
   justify-content: center;
   width: 100%;
-  /* Remove any top margin so it sits closer to nav */
-  margin-top: 0; 
+  margin-top: 0; /* no extra margin to keep it near the brand area */
 }
 
-/* Calculator container */
 .sidebar-calculator {
   display: flex;
   justify-content: center;
@@ -125,9 +97,72 @@ body {
 
 /* If your converter component uses a .converter-title class */
 .converter-title {
-  font-size: 0.8rem;  /* smaller than nav links */
-  font-weight: normal; /* less bold so it doesn't overshadow nav */
+  font-size: 0.8rem;   /* smaller than typical nav text */
+  font-weight: normal; /* not too bold */
   text-align: center;
+}
+
+/* =======================
+   Header (Top)
+======================= */
+.header {
+  background: linear-gradient(to bottom, #000000, #121212);
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 .25rem;
+}
+
+/* Page title in header (left side) */
+.header-title {
+  color: var(--color-text-dim);
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* 
+  NEW: Horizontal nav in the header
+  (replaces old sidebar nav).
+*/
+.header-nav {
+  display: flex;
+  gap: 1rem; /* space between links */
+  align-items: center;
+}
+
+/* Individual header nav link */
+.header-nav-item {
+  color: var(--color-text-dim);
+  font-size: 0.9rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: color 0.2s, background-color 0.2s;
+  text-decoration: none; /* remove underline */
+}
+
+.header-nav {
+  display: flex;
+  gap: 1.5rem; /* horizontal space between links */
+}
+
+.header-nav-item:hover {
+  color: var(--color-text);
+  background-color: #4a4a4a;
+}
+
+/* Active route in #e0b76b (gold-like) */
+.header-nav-item.active {
+  color: #c39b33;
+}
+
+.header-nav-item {
+  color: #cfcfcf;    /* dim white */
+  text-decoration: none;
+  font-size: 0.9rem; /* adjust as you like */
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 /* =======================
@@ -139,30 +174,15 @@ body {
   flex-direction: column;
 }
 
-/* Header – fix height to 64px so it lines up with the sidebar brand block. */
-.header {
-  background: linear-gradient(to bottom, #000000, #121212);
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1rem;
-}
-
-/* Match nav-item's font size & color exactly */
-.header-title {
-  color: var(--color-text-dim);
-  font-size: 1rem; 
-  margin: 0;
-}
-
 /* Main content below header */
 .main-content {
   flex: 1;
-  padding: 1rem;
+  padding: 0rem;
 }
 
-/* Optional accent button styling */
+/* =======================
+   Accent Buttons (Optional)
+======================= */
 .accent-btn {
   background-color: var(--color-accent);
   color: #000;

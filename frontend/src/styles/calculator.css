@@ -4,7 +4,7 @@
    with "justify-content: center", this is optional. 
 */
 .sidebar-calculator {
-  margin-top: 1rem;
+  margin-top: 0rem;
   width: 100%;
   display: flex;
   justify-content: center; 
