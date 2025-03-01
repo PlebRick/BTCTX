@@ -618,8 +618,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
       case "Transfer": {
         const fromAccount = watch("fromAccount");
+        const fromCurrencyVal = watch("fromCurrency");
+      
         return (
           <>
+            {/* From Account */}
             <div className="form-group">
               <label>From Account:</label>
               <select
@@ -635,7 +638,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">From Account is required</span>
               )}
             </div>
-
+      
+            {/* From Currency */}
             <div className="form-group">
               <label>From Currency:</label>
               {fromAccount === "Exchange" ? (
@@ -659,7 +663,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">From Currency is required</span>
               )}
             </div>
-
+      
+            {/* Amount (From) */}
             <div className="form-group">
               <label>Amount (From):</label>
               <input
@@ -675,7 +680,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">Amount (From) is required</span>
               )}
             </div>
-
+      
+            {/* To Account */}
             <div className="form-group">
               <label>To Account:</label>
               <input
@@ -685,7 +691,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 readOnly
               />
             </div>
-
+      
+            {/* To Currency */}
             <div className="form-group">
               <label>To Currency:</label>
               <input
@@ -695,7 +702,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 readOnly
               />
             </div>
-
+      
+            {/* Amount (To) */}
             <div className="form-group">
               <label>Amount (To):</label>
               <input
@@ -711,25 +719,39 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="error-text">Amount (To) is required</span>
               )}
             </div>
-
-            <div className="form-group">
-              <label>Fee (BTC):</label>
-              <input
-                type="number"
-                step="0.00000001"
-                className="form-control"
-                {...register("fee", { valueAsNumber: true })}
-                readOnly
-              />
-              {feeInUsdDisplay > 0 && (
-                <small style={{ color: "#bbb" }}>
-                  (~ ${feeInUsdDisplay} USD)
-                </small>
-              )}
-            </div>
+      
+            {/* Fee: BTC (auto-calc) vs. USD (manual) */}
+            {fromCurrencyVal === "BTC" ? (
+              <div className="form-group">
+                <label>Fee (BTC):</label>
+                <input
+                  type="number"
+                  step="0.00000001"
+                  className="form-control"
+                  {...register("fee", { valueAsNumber: true })}
+                  readOnly
+                />
+                {feeInUsdDisplay > 0 && (
+                  <small style={{ color: "#bbb" }}>
+                    (~ ${feeInUsdDisplay} USD)
+                  </small>
+                )}
+              </div>
+            ) : (
+              <div className="form-group">
+                <label>Fee (USD):</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-control"
+                  defaultValue={0}
+                  {...register("fee", { valueAsNumber: true })}
+                />
+              </div>
+            )}
           </>
         );
-      }
+      }      
 
       case "Buy":
         return (
