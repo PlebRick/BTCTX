@@ -75,13 +75,13 @@ const BtcConverter: React.FC = () => {
           className={!isAutoPrice ? 'toggle-btn active' : 'toggle-btn'}
           onClick={() => setIsAutoPrice(false)}
         >
-          Manual Price
+          Manual
         </button>
         <button
           className={isAutoPrice ? 'toggle-btn active' : 'toggle-btn'}
           onClick={() => setIsAutoPrice(true)}
         >
-          Auto Price
+          Auto
         </button>
       </div>
 

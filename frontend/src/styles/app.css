@@ -36,8 +36,7 @@ body {
   min-height: 100vh; /* full vertical height */
   display: flex;
   flex-direction: column;
-  /* no justify-content: space-between or anything that pins items */
-  padding: 0;
+  padding: 0; /* no pinned items */
 }
 
 /* Brand area */
@@ -74,6 +73,9 @@ body {
 .sidebar-nav {
   flex-direction: column;
   padding: 1rem;
+
+  /* Bring converter closer */
+  margin-bottom: 0.25rem; /* was 0.5rem */
 }
 
 .nav-item {
@@ -83,7 +85,9 @@ body {
   transition: color 0.2s, background-color 0.2s;
   margin-bottom: 0.25rem;
   border-radius: 6px;
+  font-size: 0.9rem; /* previously reduced for smaller nav text */
 }
+
 .nav-item:hover {
   color: var(--color-text);
   background-color: #4a4a4a;
@@ -92,34 +96,38 @@ body {
 /* =======================
    Tools Section
 ======================= */
-/*
-  This container holds both the Converter and Calculator.
-  By default, with flex-direction: column, the first child
-  is on top (Converter), then the Calculator below it.
-*/
 .sidebar-tools {
   display: flex;
-  flex-direction: column; 
-  align-items: center;    /* horizontally center them */
-  gap: 1rem;             /* space between converter & calculator */
-  padding-bottom: 20px;  /* extra bottom padding if you like */
+  flex-direction: column;
+  align-items: center;
+
+  /* Less space between converter and calculator */
+  gap: 0.3rem; /* was 0.5rem */
+
+  padding-bottom: 20px;
 }
 
-/* 
-  .sidebar-converter and .sidebar-calculator are 
-  optional wrappers that center or size each tool 
-  if needed. 
-*/
+/* Converter container */
 .sidebar-converter {
   display: flex;
   justify-content: center;
   width: 100%;
+  /* Remove any top margin so it sits closer to nav */
+  margin-top: 0; 
 }
 
+/* Calculator container */
 .sidebar-calculator {
   display: flex;
   justify-content: center;
   width: 100%;
+}
+
+/* If your converter component uses a .converter-title class */
+.converter-title {
+  font-size: 0.8rem;  /* smaller than nav links */
+  font-weight: normal; /* less bold so it doesn't overshadow nav */
+  text-align: center;
 }
 
 /* =======================

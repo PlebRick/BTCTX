@@ -61,7 +61,6 @@ const SidebarNav: React.FC = () => {
 const SidebarTools: React.FC = () => {
   return (
     <div className="sidebar-tools">
-      {/* BTC ↔ USD ↔ Satoshi converter on top */}
       <div className="sidebar-converter">
         <BtcConverter />
       </div>

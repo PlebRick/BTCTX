@@ -12,6 +12,8 @@
         "pycache",
         "pydantic",
         "PYTHONPATH",
+        "Satoshi",
+        "Satoshis",
         "sessionmaker",
         "sqlalchemy",
         "starlette",
