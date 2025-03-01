@@ -24,15 +24,14 @@
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  /* Optionally center the entire contents:
-     align-items: center; 
-     But typically we want the grid to fill width inside. */
+  padding: 8px; 
+  box-sizing: border-box; 
 }
 
 /* Display at the top, center-justified text */
 .display {
   text-align: center;         /* center the "0" or any typed numbers */
-  margin: 6px;
+  margin: 0 0 6px 0; 
   padding: 6px;
   border: 1px solid #4a4b4b;  /* same color as outer border */
   background: #2a2a2a;
@@ -53,7 +52,7 @@
   /* Force a 5th row so "C" doesn't overflow horizontally */
   grid-template-rows: repeat(5, 1fr);
   gap: 4px;
-  margin: 6px; /* consistent spacing around the grid */
+  margin: 0; /* consistent spacing around the grid */
 }
 
 /* Individual button styling, smaller font, border color #4a4b4b */
