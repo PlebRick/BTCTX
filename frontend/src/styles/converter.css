@@ -1,0 +1,75 @@
+.converter {
+    width: 200px;
+    border: 0.5px solid var(--color-accent);
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    padding: 15px;
+    font-size: 0.9rem;
+  }
+  
+  .converter-title {
+    color: var(--color-text);
+    font-size: 1rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    text-align: center;
+  }
+  
+  .price-toggle {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+  
+  .toggle-btn {
+    flex: 1;
+    margin: 0 0.25rem;
+    padding: 0.4rem;
+    font-size: 0.8rem;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #333;
+    color: #d4d4d4;
+    cursor: pointer;
+    transition: background 0.3s;
+    text-align: center;
+  }
+  .toggle-btn.active {
+    background-color: #4a4a4a;
+    border-color: var(--color-accent);
+    color: #fff;
+  }
+  .toggle-btn:hover {
+    background: #4a4a4a;
+  }
+  
+  .manual-price-row,
+  .converter-row {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.5rem;
+  }
+  
+  .manual-price-row label,
+  .converter-row label {
+    margin-bottom: 0.25rem;
+    color: var(--color-text-dim);
+    font-size: 0.8rem;
+  }
+  
+  .manual-price-row input,
+  .converter-row input {
+    width: 100%;
+    padding: 0.4rem;
+    font-size: 0.9rem;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background-color: #2a2a2a;
+    color: #d4d4d4;
+  }
+  .manual-price-row input:focus,
+  .converter-row input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+  

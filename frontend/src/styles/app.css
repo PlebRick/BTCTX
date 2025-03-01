@@ -36,18 +36,18 @@ body {
   min-height: 100vh; /* full vertical height */
   display: flex;
   flex-direction: column;
+  /* no justify-content: space-between or anything that pins items */
   padding: 0;
 }
 
-/* Top brand area: large logo + text */
+/* Brand area */
 .sidebar-brand {
   display: flex;
   align-items: center;
-  height: 64px;     /* matches header height */
-  padding-left: 1rem;  /* side padding if needed */
+  height: 64px; /* matches header height */
+  padding-left: 1rem;
 }
 
-/* The logo is round */
 .sidebar-logo {
   width: 30px;
   height: 30px;
@@ -56,7 +56,6 @@ body {
   transform: translateY(-1px);
 }
 
-/* "BitcoinTX" larger & bright white */
 .sidebar-title {
   font-size: 1.5rem;
   font-weight: bold;
@@ -64,34 +63,63 @@ body {
   margin-left: 0.5rem;
 }
 
+/* Optional divider */
 .sidebar-divider {
-  border: none;                /* remove the default hr border */
-  border-top: 1px solid #333;  /* replace it with a subtle top border */
-  margin: 0 rem 0;            /* top/bottom spacing */
-  /* You can tweak margin and color as you like */
+  border: none;
+  border-top: 1px solid #333;
+  margin: 0;
 }
 
-/* Nav links in the middle */
+/* Navigation links */
 .sidebar-nav {
-
   flex-direction: column;
-  /* add top padding so nav items aren’t glued to the border */
   padding: 1rem;
 }
 
-/* Nav items with darker hover & corner radius */
 .nav-item {
   display: block;
-  padding: 0.5rem 0.75rem; /* horizontal padding for consistent hover shape */
+  padding: 0.5rem 0.75rem;
   color: var(--color-text-dim);
   transition: color 0.2s, background-color 0.2s;
   margin-bottom: 0.25rem;
-  border-radius: 6px; /* corners for normal state */
+  border-radius: 6px;
 }
 .nav-item:hover {
   color: var(--color-text);
   background-color: #4a4a4a;
-  border-radius: 6px; /* ensure corners remain rounded on hover */
+}
+
+/* =======================
+   Tools Section
+======================= */
+/*
+  This container holds both the Converter and Calculator.
+  By default, with flex-direction: column, the first child
+  is on top (Converter), then the Calculator below it.
+*/
+.sidebar-tools {
+  display: flex;
+  flex-direction: column; 
+  align-items: center;    /* horizontally center them */
+  gap: 1rem;             /* space between converter & calculator */
+  padding-bottom: 20px;  /* extra bottom padding if you like */
+}
+
+/* 
+  .sidebar-converter and .sidebar-calculator are 
+  optional wrappers that center or size each tool 
+  if needed. 
+*/
+.sidebar-converter {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.sidebar-calculator {
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
 /* =======================
@@ -103,22 +131,20 @@ body {
   flex-direction: column;
 }
 
-/* Header – fix height to 64px so it lines up with the sidebar brand block.
-   Also add a bottom border that lines up with .sidebar-divider. */
-   .header {
-    background: linear-gradient(to bottom, #000000, #121212);
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 1rem;
-  }
+/* Header – fix height to 64px so it lines up with the sidebar brand block. */
+.header {
+  background: linear-gradient(to bottom, #000000, #121212);
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+}
 
 /* Match nav-item's font size & color exactly */
 .header-title {
   color: var(--color-text-dim);
   font-size: 1rem; 
-  /* No margin needed, but adjust as you see fit */
   margin: 0;
 }
 
@@ -128,12 +154,10 @@ body {
   padding: 1rem;
 }
 
-/* Place in app.css or a shared CSS file that loads globally */
-
-/* A reusable accent button class. Matches gold + black text. */
+/* Optional accent button styling */
 .accent-btn {
-  background-color: var(--color-accent);  /* your gold accent */
-  color: #000;                            /* black text on gold background */
+  background-color: var(--color-accent);
+  color: #000;
   border: none;
   border-radius: 4px;
   padding: 0.5rem 1rem;
@@ -141,7 +165,6 @@ body {
   cursor: pointer;
   transition: background-color 0.2s;
 }
-
 .accent-btn:hover {
   background-color: var(--color-accent-hover);
 }
