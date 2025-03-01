@@ -12,7 +12,7 @@ import React, { useEffect, useState } from "react";
 import api from "../api"; // Centralized API client
 import "../styles/dashboard.css";
 
-// Import numeric helpers
+// Numeric helpers
 import {
   parseDecimal,
   formatUsd,
@@ -20,34 +20,32 @@ import {
 } from "../utils/format";
 
 const Dashboard: React.FC = () => {
-  /**
-   * State for account balances (AccountBalance[]). The local
-   * definition of `AccountBalance` was removed. It is now
-   * declared globally in global.d.ts.
-   */
+  // -----------------------------
+  // State for Account Balances
+  // -----------------------------
   const [balances, setBalances] = useState<AccountBalance[] | null>(null);
 
-  // Individual balances for special accounts
+  // Individual “named” account balances
   const [bankBalance, setBankBalance] = useState<number>(0);
   const [exchangeUSDBalance, setExchangeUSDBalance] = useState<number>(0);
   const [exchangeBTCBalance, setExchangeBTCBalance] = useState<number>(0);
   const [walletBTCBalance, setWalletBTCBalance] = useState<number>(0);
 
-  // Totals for the portfolio summary
+  // Totals for the entire portfolio
   const [totalBTC, setTotalBTC] = useState<number>(0);
   const [totalUSD, setTotalUSD] = useState<number>(0);
 
-  /**
-   * GainsAndLosses after parsing. GainsAndLosses + GainsAndLossesRaw
-   * are now globally defined.
-   */
+  // -----------------------------
+  // Gains & Losses
+  // -----------------------------
   const [gainsAndLosses, setGainsAndLosses] = useState<GainsAndLosses | null>(null);
 
-  // State for any fetch errors
+  // Example placeholders
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const unrealizedGains = 0; // If not provided by backend, keep as 0 or placeholder
 
   // -----------------------------
-  // Fetch Account Balances
+  // 1) Fetch account balances
   // -----------------------------
   useEffect(() => {
     api
@@ -55,12 +53,12 @@ const Dashboard: React.FC = () => {
       .then((response) => {
         const data = response.data;
         console.log("Fetched balances data:", data);
+
         if (!Array.isArray(data)) {
           throw new Error(
             "Data is not an array. Received: " + JSON.stringify(data)
           );
         }
-        // Store raw AccountBalance data
         setBalances(data as AccountBalance[]);
       })
       .catch((err) => {
@@ -69,7 +67,7 @@ const Dashboard: React.FC = () => {
       });
   }, []);
 
-  // Process the fetched balances to set special account balances & totals
+  // Process fetched balances into local state
   useEffect(() => {
     if (!balances) return;
 
@@ -77,17 +75,18 @@ const Dashboard: React.FC = () => {
     let exchUSD = 0;
     let exchBTC = 0;
     let walletBTC = 0;
+
     let totalBtcTemp = 0;
     let totalUsdTemp = 0;
 
     balances.forEach((acc) => {
       const numericBalance = parseDecimal(acc.balance);
-
       if (Number.isNaN(numericBalance)) {
         console.warn("Encountered NaN balance for account:", acc);
         return;
       }
 
+      // Identify your known accounts by name/currency
       if (acc.name === "Bank" && acc.currency === "USD") {
         bank = numericBalance;
       } else if (acc.name === "Wallet" && acc.currency === "BTC") {
@@ -98,6 +97,7 @@ const Dashboard: React.FC = () => {
         exchBTC = numericBalance;
       }
 
+      // Tally total BTC / USD across all accounts
       if (acc.currency === "BTC") {
         totalBtcTemp += numericBalance;
       } else if (acc.currency === "USD") {
@@ -105,16 +105,18 @@ const Dashboard: React.FC = () => {
       }
     });
 
+    // Update state
     setBankBalance(bank);
     setExchangeUSDBalance(exchUSD);
     setExchangeBTCBalance(exchBTC);
     setWalletBTCBalance(walletBTC);
+
     setTotalBTC(totalBtcTemp);
     setTotalUSD(totalUsdTemp);
   }, [balances]);
 
   // -----------------------------
-  // Fetch Gains and Losses
+  // 2) Fetch Gains and Losses
   // -----------------------------
   useEffect(() => {
     api
@@ -123,7 +125,7 @@ const Dashboard: React.FC = () => {
         const raw = response.data;
         console.log("Fetched gains and losses data:", raw);
 
-        // Manual parsing of GainsAndLossesRaw into GainsAndLosses
+        // Convert GainsAndLossesRaw -> GainsAndLosses (numeric)
         const parsed: GainsAndLosses = {
           sells_proceeds: parseDecimal(raw.sells_proceeds),
           withdrawals_spent: parseDecimal(raw.withdrawals_spent),
@@ -136,6 +138,7 @@ const Dashboard: React.FC = () => {
           total_gains: parseDecimal(raw.total_gains),
           total_losses: parseDecimal(raw.total_losses),
         };
+
         setGainsAndLosses(parsed);
       })
       .catch((err) => {
@@ -144,9 +147,9 @@ const Dashboard: React.FC = () => {
       });
   }, []);
 
-  // Placeholder data
-  const unrealizedGains = 0;
-  const portfolioChartPlaceholder = "(Chart Placeholder)";
+  // For converting BTC-based fees (or other BTC amounts) to USD
+  // until you fetch a live price:
+  const BTC_PRICE = 25000; // example only
 
   if (fetchError) {
     return (
@@ -157,6 +160,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  // If either call is still loading, show a basic loading state
   if (balances === null || gainsAndLosses === null) {
     return (
       <div className="dashboard">
@@ -165,59 +169,89 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  // Compute total fees in USD by converting BTC fees at a placeholder price
+  const totalFeesUsd =
+    gainsAndLosses.fees.USD + gainsAndLosses.fees.BTC * BTC_PRICE;
+
   return (
     <div className="dashboard">
-      {/* Top row: Portfolio and BTC Price */}
+      {/* -------------------- TOP ROW -------------------- */}
       <div className="dashboard-row top-row">
+        {/* Portfolio Card */}
         <div className="card">
           <h5>Portfolio</h5>
           <p>BTC Balance: {formatBtc(totalBTC)}</p>
           <p>USD Value: {formatUsd(totalUSD)}</p>
           <p>Unrealized Gains/Losses: {unrealizedGains}</p>
-          <p>Portfolio Chart: {portfolioChartPlaceholder}</p>
+          <p>Portfolio Chart: (Placeholder)</p>
         </div>
+
+        {/* BTC Price Card */}
         <div className="card">
           <h5>Bitcoin Price</h5>
           <p>Placeholder for live BTC price & chart</p>
         </div>
       </div>
 
-      {/* Bottom row: Accounts */}
+      {/* -------------------- BOTTOM ROW: ACCOUNTS -------------------- */}
       <div className="dashboard-row bottom-row">
+        {/* Bank */}
         <div className="card">
           <h5>Bank</h5>
           <p>USD Balance: {formatUsd(bankBalance)}</p>
         </div>
+
+        {/* Exchange */}
         <div className="card">
           <h5>Exchange</h5>
           <p>USD Balance: {formatUsd(exchangeUSDBalance)}</p>
           <p>BTC Balance: {formatBtc(exchangeBTCBalance)}</p>
         </div>
+
+        {/* Wallet */}
         <div className="card">
           <h5>Wallet</h5>
           <p>BTC Balance: {formatBtc(walletBTCBalance)}</p>
         </div>
       </div>
 
-      {/* Gains and Losses row */}
+      {/* -------------------- GAINS & LOSSES ROW -------------------- */}
       <div className="dashboard-row bottom-row">
+        {/* Realized Gains */}
         <div className="card">
           <h5>Realized Gains</h5>
+          {/* If you do short-term vs. long-term, you’ll need them from the backend. */}
           <p>Short term: N/A</p>
           <p>Long term: N/A</p>
-          <p>Total: {formatUsd(gainsAndLosses.sells_proceeds)}</p>
+          {/* Actual net gains in total */}
+          <p>Total Gains: {formatUsd(gainsAndLosses.total_gains)}</p>
         </div>
+
+        {/* Other Gains */}
         <div className="card">
           <h5>Other Gains</h5>
+          {/* Sells Proceeds is how much total USD you got from selling BTC. */}
+          <p>Proceeds from Sells: {formatUsd(gainsAndLosses.sells_proceeds)}</p>
           <p>Income: {formatUsd(gainsAndLosses.income_earned)}</p>
           <p>Interest: {formatUsd(gainsAndLosses.interest_earned)}</p>
-          <p>Spent: {formatUsd(gainsAndLosses.withdrawals_spent)}</p>
+          {/* This is total USD spent via “Withdrawal” transactions. */}
+          <p>Spent (on Withdrawals): {formatUsd(gainsAndLosses.withdrawals_spent)}</p>
         </div>
+
+        {/* Losses */}
         <div className="card">
           <h5>Losses</h5>
           <p>Short term: N/A</p>
           <p>Long term: N/A</p>
           <p>Total: {formatUsd(gainsAndLosses.total_losses)}</p>
+        </div>
+
+        {/* Fees */}
+        <div className="card">
+          <h5>Fees</h5>
+          <p>Fees (USD): {formatUsd(gainsAndLosses.fees.USD)}</p>
+          <p>Fees (BTC): {formatBtc(gainsAndLosses.fees.BTC)}</p>
+          <p>Total Fees in USD (approx): {formatUsd(totalFeesUsd)}</p>
         </div>
       </div>
     </div>
