@@ -3,6 +3,7 @@
         "autoflush",
         "condecimal",
         "dbaeumer",
+        "disp",
         "dotenv",
         "ehthumbs",
         "fastapi",

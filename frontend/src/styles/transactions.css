@@ -28,10 +28,11 @@
   background-color: #c49b31;
   color: #000;
   border: none;
-  border-radius: 10px;
-  padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+  padding: 0.3rem 0.4rem;
   cursor: pointer;
-  font-size: 0.8rem; /* slightly smaller */
+  font-size: 0.6rem;
+  font-weight: 500;
 }
 
 /* Accent button (Add Transaction) */
@@ -39,9 +40,9 @@
   background-color: #c49b31; /* gold shade */
   color: #000;
   border: none;
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 0.3rem 0.8rem;
-  font-size: 0.8rem;
+  font-size: 0.6rem;
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -126,9 +127,9 @@
   color: #fff;
   border: 1px solid #666;
   border-radius: 4px;
-  padding: 0.3rem 0.6rem;
+  padding: 0.3rem 0.5rem;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.5rem;
 }
 .edit-button:hover {
   background-color: #c49b31;
