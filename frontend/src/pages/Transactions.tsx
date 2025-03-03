@@ -106,29 +106,32 @@ function formatExtra(tx: ITransaction): string {
 }
 
 function buildDisposalLabel(tx: ITransaction): string {
-  if (tx.type !== "Sell" && tx.type !== "Withdrawal") {
-    return "";
-  }
-  if (tx.cost_basis_usd == null || tx.realized_gain_usd == null) {
-    return "";
-  }
+  // Only applies to Sell or Withdrawal
+  if (tx.type !== "Sell" && tx.type !== "Withdrawal") return "";
+  if (tx.cost_basis_usd == null || tx.realized_gain_usd == null) return "";
 
   const costBasis = parseDecimal(tx.cost_basis_usd);
-  const gainVal   = parseDecimal(tx.realized_gain_usd);
-
-  if (costBasis === 0) {
-    return gainVal !== 0
-      ? `Gain: ${gainVal >= 0 ? "+" : ""}${formatUsd(gainVal)}`
-      : "";
-  }
-
-  const gainPerc = (gainVal / costBasis) * 100;
-  const sign = gainVal >= 0 ? "+" : "";
-  const percFmt = `${sign}${gainPerc.toFixed(2)}%`;
-  const gainFmt = `${sign}${formatUsd(gainVal)}`;
+  const gainVal = parseDecimal(tx.realized_gain_usd);
   const hp = tx.holding_period ? ` (${tx.holding_period})` : "";
 
-  return `Gain: ${gainFmt} (${percFmt})${hp}`;
+  // Decide prefix: "Gain" or "Loss"
+  const label = gainVal >= 0 ? "Gain" : "Loss";
+
+  // If cost basis = 0, show just the gain/loss $ if nonzero
+  if (costBasis === 0) {
+    if (gainVal === 0) return "";
+    const sign = gainVal >= 0 ? "+" : "-";
+    // use absolute value for currency, then prepend sign
+    return `${label}: ${sign}${formatUsd(Math.abs(gainVal))}${hp}`;
+  }
+
+  // Otherwise, show “Gain: ±$X (±YY%)” or “Loss: -$X (-YY%)”
+  const gainPerc = (gainVal / costBasis) * 100;
+  const sign = gainVal >= 0 ? "+" : "-";
+  const absGain = Math.abs(gainVal);
+  const absPerc = Math.abs(gainPerc).toFixed(2);
+
+  return `${label}: ${sign}${formatUsd(absGain)} (${sign}${absPerc}%)${hp}`;
 }
 
 const Transactions: React.FC = () => {
@@ -245,6 +248,7 @@ const Transactions: React.FC = () => {
 
                 const accountLabel = resolveDisplayAccount(tx);
                 const amountLabel = formatAmount(tx);
+                
 
                 let feeLabel = "";
                 if (tx.fee_amount && tx.fee_amount !== 0) {
@@ -256,6 +260,7 @@ const Transactions: React.FC = () => {
 
                 const extraLabel = formatExtra(tx);
                 const disposalLabel = buildDisposalLabel(tx);
+                const disposalColor = tx.realized_gain_usd >= 0 ? "gain-green" : "loss-red";
 
                 return (
                   <div key={tx.id} className="transaction-card">
@@ -272,7 +277,7 @@ const Transactions: React.FC = () => {
                     {/* Extra (e.g. "Interest," "Spent," "Income") */}
                     <span className="cell extra-col">{extraLabel}</span>
                     {/* Disposal (e.g. "Gain: +$123.00 (40%)") */}
-                    <span className="cell disposal-col">
+                    <span className={`cell disposal-col ${disposalColor}`}>
                       {disposalLabel}
                     </span>
                     {/* Edit button */}

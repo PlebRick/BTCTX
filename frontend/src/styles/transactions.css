@@ -135,3 +135,11 @@
   background-color: #c49b31;
   color: #000;
 }
+
+.gain-green {
+  color: #0b9981; /* or green, limegreen, etc. */
+}
+.loss-red {
+  color: #811922;
+}
+
