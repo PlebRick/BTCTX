@@ -80,7 +80,7 @@ function formatAmount(tx: ITransaction): string {
     case "Buy":
       // Just show the USD amount, no "spent"
       return cost_basis_usd
-        ? `${formatUsd(cost_basis_usd)}`
+        ? `${formatUsd(cost_basis_usd)} -> ${formatBtc(amount)}`
         : `${formatUsd(amount)}`;
 
     case "Sell":
