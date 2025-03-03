@@ -541,6 +541,10 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     If (tx.type == "Withdrawal") and tx.purpose in ("Gift","Donation","Lost"), 
     we skip recognized gain by setting disposal_gain=0 (and optionally partial_proceeds=0).
     
+    If (tx.type == "Withdrawal") and tx.purpose == "Spent" with a BTC fee,
+    we treat 'proceeds_usd' as the gross cost of the item, then reduce it by
+    the BTC fee converted to USD (net proceeds = proceeds_usd - fee_in_usd).
+    
     :param tx: The Transaction object
     :param tx_data: The dictionary with possible 'proceeds_usd'
     :param db: DB Session
@@ -556,8 +560,23 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     if btc_outflow <= 0:
         return
 
-    # 3) If the user supplied proceeds (for Sell), store that in total_proceeds
+    # 3) If the user supplied proceeds (for Sell/Spent), store that in total_proceeds
     total_proceeds = float(tx_data.get("proceeds_usd", 0))
+
+    # Check if this is a Withdrawal with purpose="Spent", and the fee is in BTC.
+    # If so, we treat proceeds as gross and subtract the fee (in USD) to get net.
+    withdrawal_purpose = (tx.purpose or "").strip()
+    if tx.type == "Withdrawal" and withdrawal_purpose == "Spent":
+        fee_btc = float(tx.fee_amount or 0)
+        fee_cur = (tx.fee_currency or "").upper()
+        if fee_btc > 0 and fee_cur == "BTC" and btc_outflow > 0 and total_proceeds > 0:
+            # Implied USD per BTC from (total_proceeds / btc_outflow)
+            implied_price = total_proceeds / btc_outflow
+            fee_in_usd = fee_btc * implied_price
+            net_proceeds = total_proceeds - fee_in_usd
+            if net_proceeds < 0:
+                net_proceeds = 0.0
+            total_proceeds = net_proceeds
 
     # 4) Retrieve all BTC lots with remaining balance, oldest first
     lots = db.query(BitcoinLot).filter(
@@ -566,9 +585,6 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
 
     remaining_outflow = btc_outflow
     total_outflow = btc_outflow
-
-    # For specialized purpose like "Gift" or "Donation" or "Lost"
-    withdrawal_purpose = (tx.purpose or "").strip()
 
     # 5) Iterate through lots in FIFO order
     for lot in lots:
@@ -599,7 +615,7 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
         # If Gift/Donation/Lost => recognized gain is zeroed out
         if tx.type == "Withdrawal" and withdrawal_purpose in ("Gift", "Donation", "Lost"):
             disposal_gain = 0.0
-            # partial_proceeds = 0.0  # optional if we want no proceeds for this portion
+            # partial_proceeds = 0.0  # optional if you want to show zero proceeds
 
         # Create a LotDisposal record for this partial disposal
         disp = LotDisposal(
