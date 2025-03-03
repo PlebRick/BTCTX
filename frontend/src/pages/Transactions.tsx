@@ -10,12 +10,17 @@ import {
   parseDecimal,
 } from "../utils/format";
 
-// If your global.d.ts uses global declarations, you do NOT import them:
-// import { ITransactionRaw, ITransaction, SortMode } from "../global.d"; // <- remove or comment out
+// IMPORTANT:
+// Because `global.d.ts` declares ITransaction, ITransactionRaw, SortMode, etc. 
+// in the global scope, we do NOT import them here.
+// We can just use `ITransaction`, `ITransactionRaw`, etc., directly.
 
-void formatTimestamp; // to avoid TS warnings
-void parseDecimal;    // to avoid TS warnings
+void formatTimestamp; // to avoid TS “unused import” warnings
+void parseDecimal;    // same reason
 
+// ----------------------------------------------------
+// Utility function to map account IDs to names
+// ----------------------------------------------------
 function accountIdToName(id: number | null): string {
   if (id === null) return "N/A";
   switch (id) {
@@ -34,6 +39,9 @@ function accountIdToName(id: number | null): string {
   }
 }
 
+// ----------------------------------------------------
+// Decide how to display the "account" label
+// ----------------------------------------------------
 function resolveDisplayAccount(tx: ITransaction): string {
   const { type, from_account_id, to_account_id } = tx;
 
@@ -52,11 +60,15 @@ function resolveDisplayAccount(tx: ITransaction): string {
   }
 }
 
+// ----------------------------------------------------
+// Format the "Amount" column based on transaction type
+// ----------------------------------------------------
 function formatAmount(tx: ITransaction): string {
   const { type, amount, cost_basis_usd, proceeds_usd, from_account_id, to_account_id } = tx;
 
   switch (type) {
     case "Deposit":
+      // If depositing into Bank(1) or Exchange(3), show USD
       if (to_account_id === 1 || to_account_id === 3) {
         return formatUsd(amount);
       } else {
@@ -64,6 +76,7 @@ function formatAmount(tx: ITransaction): string {
       }
 
     case "Withdrawal":
+      // If withdrawing from Bank(1) or Exchange(3), show USD
       if (from_account_id === 1 || from_account_id === 3) {
         return formatUsd(amount);
       } else {
@@ -71,6 +84,7 @@ function formatAmount(tx: ITransaction): string {
       }
 
     case "Transfer":
+      // If transferring from Bank(1) or Exchange(3), show USD
       if (from_account_id === 1 || from_account_id === 3) {
         return formatUsd(amount);
       } else {
@@ -78,22 +92,26 @@ function formatAmount(tx: ITransaction): string {
       }
 
     case "Buy":
-      // Just show the USD amount, no "spent"
+      // Show "spent USD -> gained BTC"
       return cost_basis_usd
         ? `${formatUsd(cost_basis_usd)} -> ${formatBtc(amount)}`
         : `${formatUsd(amount)}`;
 
     case "Sell":
-      // Show "BTC -> USD" but omit "Sold"
+      // Show "spent BTC -> gained USD"
       return proceeds_usd
         ? `${formatBtc(amount)} -> ${formatUsd(proceeds_usd)}`
         : `${formatBtc(amount)}`;
 
     default:
+      // Fallback: just show the raw amount
       return `${amount}`;
   }
-} // <-- IMPORTANT: closing brace for formatAmount() function
+}
 
+// ----------------------------------------------------
+// Format "Extra" label (e.g., deposit source or withdrawal purpose)
+// ----------------------------------------------------
 function formatExtra(tx: ITransaction): string {
   const { type, source, purpose } = tx;
   if (type === "Deposit" && source && source !== "N/A") {
@@ -105,6 +123,10 @@ function formatExtra(tx: ITransaction): string {
   return "";
 }
 
+// ----------------------------------------------------
+// Build disposal label for Sell/Withdrawal 
+// to show Gains/Losses (and holding period)
+// ----------------------------------------------------
 function buildDisposalLabel(tx: ITransaction): string {
   // Only applies to Sell or Withdrawal
   if (tx.type !== "Sell" && tx.type !== "Withdrawal") return "";
@@ -121,7 +143,6 @@ function buildDisposalLabel(tx: ITransaction): string {
   if (costBasis === 0) {
     if (gainVal === 0) return "";
     const sign = gainVal >= 0 ? "+" : "-";
-    // use absolute value for currency, then prepend sign
     return `${label}: ${sign}${formatUsd(Math.abs(gainVal))}${hp}`;
   }
 
@@ -134,21 +155,30 @@ function buildDisposalLabel(tx: ITransaction): string {
   return `${label}: ${sign}${formatUsd(absGain)} (${sign}${absPerc}%)${hp}`;
 }
 
+// ----------------------------------------------------
+// Main Transactions Component
+// ----------------------------------------------------
 const Transactions: React.FC = () => {
+  // Local state
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [transactions, setTransactions] = useState<ITransaction[] | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("TIMESTAMP_DESC");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // --------------------------------------------------
+  // Fetch Transactions from the API
+  // --------------------------------------------------
   const fetchTransactions = async () => {
     setIsLoading(true);
     setFetchError(null);
 
     try {
+      // We expect an array of ITransactionRaw from the server
       const res = await api.get<ITransactionRaw[]>("/transactions");
       console.log("Raw API response (transactions):", res.data);
 
+      // Convert raw string fields into numeric
       const parsedTransactions = res.data.map(raw => parseTransaction(raw));
       console.log("Parsed transactions:", parsedTransactions);
 
@@ -170,17 +200,25 @@ const Transactions: React.FC = () => {
     fetchTransactions();
   }, []);
 
+  // --------------------------------------------------
+  // Dialog toggles
+  // --------------------------------------------------
   const openPanel = () => setIsPanelOpen(true);
   const closePanel = () => setIsPanelOpen(false);
 
+  // Called after a successful form submit
   const handleSubmitSuccess = () => {
     setIsPanelOpen(false);
     fetchTransactions();
   };
 
+  // --------------------------------------------------
+  // Sorting
+  // --------------------------------------------------
   const sortedTransactions = transactions
     ? [...transactions].sort((a, b) => {
         if (sortMode === "TIMESTAMP_DESC") {
+          // Sort by date/time descending
           return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
         } else {
           // CREATION_DESC => sort by ID descending
@@ -189,6 +227,9 @@ const Transactions: React.FC = () => {
       })
     : [];
 
+  // --------------------------------------------------
+  // Group by date
+  // --------------------------------------------------
   const groupedByDate: Record<string, ITransaction[]> = {};
   for (const tx of sortedTransactions) {
     const dateLabel = new Date(tx.timestamp).toLocaleDateString("en-US", {
@@ -201,6 +242,9 @@ const Transactions: React.FC = () => {
   }
   const dateGroups = Object.entries(groupedByDate);
 
+  // --------------------------------------------------
+  // Render
+  // --------------------------------------------------
   return (
     <div className="transactions-page">
       {/* Header row with Add button (left) and sort control (right) */}
@@ -222,6 +266,7 @@ const Transactions: React.FC = () => {
       </div>
 
       {isLoading && <p>Loading transactions...</p>}
+
       {fetchError && (
         <div className="error-section">
           <p>{fetchError}</p>
@@ -231,25 +276,30 @@ const Transactions: React.FC = () => {
         </div>
       )}
 
+      {/* Show "No transactions" if we’re not loading/fetchError and have empty array */}
       {!isLoading && !fetchError && transactions && transactions.length === 0 && (
         <p>No transactions found.</p>
       )}
 
+      {/* Show transactions if we have them */}
       {!isLoading && !fetchError && transactions && transactions.length > 0 && (
         <div className="transactions-list">
           {dateGroups.map(([dayLabel, txArray]) => (
             <div key={dayLabel} className="transactions-day-group">
               <h3 className="date-heading">{dayLabel}</h3>
+
+              {/* Each transaction row */}
               {txArray.map(tx => {
                 const timeStr = new Date(tx.timestamp).toLocaleTimeString("en-US", {
                   hour: "numeric",
                   minute: "2-digit",
                 });
 
+                // Determine label text
                 const accountLabel = resolveDisplayAccount(tx);
                 const amountLabel = formatAmount(tx);
-                
 
+                // If there's a fee, display it. e.g. "Fee: $5.00 USD"
                 let feeLabel = "";
                 if (tx.fee_amount && tx.fee_amount !== 0) {
                   feeLabel =
@@ -260,27 +310,36 @@ const Transactions: React.FC = () => {
 
                 const extraLabel = formatExtra(tx);
                 const disposalLabel = buildDisposalLabel(tx);
+
+                // We'll color the disposal label green or red based on realized gain
                 const disposalColor = tx.realized_gain_usd >= 0 ? "gain-green" : "loss-red";
 
                 return (
                   <div key={tx.id} className="transaction-card">
                     {/* Time */}
                     <span className="cell time-col">{timeStr}</span>
+
                     {/* Type */}
                     <span className="cell type-col">{tx.type}</span>
+
                     {/* Account */}
                     <span className="cell account-col">{accountLabel}</span>
+
                     {/* Amount */}
                     <span className="cell amount-col">{amountLabel}</span>
+
                     {/* Fee */}
                     <span className="cell fee-col">{feeLabel}</span>
-                    {/* Extra (e.g. "Interest," "Spent," "Income") */}
+
+                    {/* Extra info (e.g. "Spent", "Income", etc.) */}
                     <span className="cell extra-col">{extraLabel}</span>
-                    {/* Disposal (e.g. "Gain: +$123.00 (40%)") */}
+
+                    {/* Disposal (gains/losses) */}
                     <span className={`cell disposal-col ${disposalColor}`}>
                       {disposalLabel}
                     </span>
-                    {/* Edit button */}
+
+                    {/* Edit button pinned on the right */}
                     <button
                       onClick={() => {
                         console.log("Edit transaction", tx.id);
@@ -298,6 +357,7 @@ const Transactions: React.FC = () => {
         </div>
       )}
 
+      {/* Slide‐in panel for adding a new transaction */}
       <TransactionPanel
         isOpen={isPanelOpen}
         onClose={closePanel}

@@ -1,8 +1,8 @@
-/* transactions.css */
-
+/* ---------------------------------------------
+   transactions-page base styling
+---------------------------------------------- */
 .transactions-page {
-  /* Slightly smaller base font */
-  font-size: 0.9rem;
+  font-size: 0.9rem; /* Slightly smaller base font */
   color: #fff;
   font-family: "Roboto", sans-serif;
   background-color: transparent;
@@ -17,13 +17,13 @@
   margin-bottom: 1rem;
 }
 
-/* We wrap the select in a separate div if needed */
+/* Container for the select dropdown */
 .sort-wrapper {
   display: flex;
   align-items: center;
 }
 
-/* The sort select in gold background with black text */
+/* Sort dropdown styling */
 .sort-select {
   background-color: #c49b31;
   color: #000;
@@ -51,7 +51,7 @@
   background-color: #e1b84b; /* lighter gold on hover */
 }
 
-/* Error section styling */
+/* Error or retry section */
 .error-section {
   color: red;
   margin-top: 1rem;
@@ -65,7 +65,7 @@
   cursor: pointer;
 }
 
-/* Date headings */
+/* Date headings in each group */
 .date-heading {
   font-size: 1rem;
   font-weight: 500;
@@ -73,55 +73,75 @@
   margin-bottom: 0.5rem;
 }
 
-/* Container for the daily groups */
+/* Container holding day groups */
 .transactions-list {
   display: flex;
   flex-direction: column;
   gap: 2rem;
 }
 
-/* Individual transaction row
-   Switch to a grid to space columns more uniformly */
-   .transaction-card {
-    display: grid;
-    /* Example layout with 8 columns (adjust widths as needed) */
-    grid-template-columns:
-      55px   /* time-col    */
-      60px   /* type-col    */
-      70px   /* account-col */
-      110px  /* amount-col  */
-      110px  /* fee-col     */
-      100px  /* extra-col   */
-      1fr  /* disposal-col*/
-      45px;  /* edit button */
-  
-    gap: 0.5rem;
-    align-items: center;
-    background-color: #1e1e1e;
-    border: 1px solid #2a2a2a;
-    border-radius: 6px;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.4rem;
-    transition: background-color 0.2s;
-    font-size: 0.75rem; /* adjust as needed */
-  }  
+/* ---------------------------------------------
+   LARGE-SCREEN LAYOUT (exact 8 columns in 1 row)
+---------------------------------------------- */
+.transaction-card {
+  display: grid;
 
-/* A special class for the Account cell so it can wrap */
-.account-cell {
-  white-space: normal;
-  overflow-wrap: anywhere;  /* or "break-word" */
+  /* 
+    The same 8 columns you listed:
+      - 60px time
+      - 70px type
+      - 110px account
+      - 160px amount
+      - 160px fee
+      - 1fr disposal
+      - 250px gain-loss
+      - 45px edit button
+  */
+  grid-template-columns:
+    60px   /* time-col    */
+    70px   /* type-col    */
+    110px  /* account-col */
+    160px  /* amount-col  */
+    160px  /* fee-col     */
+    1fr    /* disposal-col (flex leftover) */
+    250px  /* gain-loss */
+    45px;  /* edit button */
+
+  gap: 1rem;
+  align-items: center;
+  background-color: #1e1e1e;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.4rem;
+  transition: background-color 0.2s;
+  font-size: 0.75rem; /* adjust as needed */
 }
 
 .transaction-card:hover {
   background-color: #2a2a2a;
 }
 
-
-.extra-cell {
-  /* the “Extra” column stretches (1fr) */
+/* Example: let the account-col wrap text if it’s long */
+.account-col {
+  white-space: normal;
+  overflow-wrap: anywhere; /* or "break-word" */
 }
 
-/* Edit button in each row */
+/* Extra col just an example if you want a specific handle */
+.extra-col {
+  /* This is in the 1fr space by default. No special rules needed here. */
+}
+
+/* Gains in green, losses in red, etc. */
+.gain-green {
+  color: #0b9981;
+}
+.loss-red {
+  color: #811922;
+}
+
+/* Edit button styling */
 .edit-button {
   background-color: #333;
   color: #fff;
@@ -136,10 +156,61 @@
   color: #000;
 }
 
-.gain-green {
-  color: #0b9981; /* or green, limegreen, etc. */
-}
-.loss-red {
-  color: #811922;
-}
+/* ---------------------------------------------
+   SMALL-SCREEN LAYOUT (multi-row)
+   Adjust the breakpoint as needed
+---------------------------------------------- */
+@media (max-width: 800px) {
+  .transaction-card {
+    /* Instead of 8 columns, use 2 columns:
+       - 1fr for data
+       - 45px pinned for "Edit" button
+       Rows will auto-generate. */
+    grid-template-columns: 1fr 45px;
+    gap: 0.75rem;
+  }
 
+  /* Now place each .cell or "col" in its own row. 
+     Adjust row numbers if you want to merge some items on a single row. */
+
+  .time-col {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .type-col {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .account-col {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .amount-col {
+    grid-column: 1;
+    grid-row: 4;
+  }
+  .fee-col {
+    grid-column: 1;
+    grid-row: 5;
+  }
+  .extra-col {
+    grid-column: 1;
+    grid-row: 6;
+  }
+  .disposal-col {
+    grid-column: 1;
+    grid-row: 7;
+  }
+  .gain-loss-col {
+    grid-column: 1;
+    grid-row: 8;
+  }
+
+  /* Keep Edit button pinned in the second column (col 2) in row 8 (final row).
+     If you want it pinned to the top row, you could do e.g. grid-row: 1 / span 8. */
+  .edit-button {
+    grid-column: 2;
+    grid-row: 8;
+    align-self: center; /* center it vertically in that row */
+  }
+}
