@@ -407,45 +407,43 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
     # 3) Handle BUY => from=USD, to=BTC, fee=USD
     if (
         tx_type == "Buy"
-        and from_acct and from_acct.currency == "USD"
-        and to_acct and to_acct.currency == "BTC"
+        and from_acct
+        and from_acct.currency == "USD"
+        and to_acct
+        and to_acct.currency == "BTC"
     ):
-        # If user typed 'amount' as the BTC quantity, then the total USD cost
-        # might be cost_basis_usd or amountUSD in the front end.
-        # We can do: MAIN_OUT => -(cost_basis_usd) or -(amount + fee).
-        # But for simplicity, let's do net if they typed cost_basis_usd.
+        # Pull out user-supplied values from tx_data
+        amount_btc   = Decimal(tx_data.get("amount", "0"))
+        fee_amount   = Decimal(tx_data.get("fee_amount", "0"))
+        fee_currency = (tx_data.get("fee_currency") or "USD").upper()
 
-        # We check if the user typed (amount + fee) or separate:
-        # Usually, 'amount' is BTC, 'fee_amount' is in USD, and cost_basis_usd
-        # is the total outlay? We'll assume we remove cost_basis_usd if it
-        # is > 0, otherwise we do (amount + fee).
-        cost_basis_str = tx_data.get("cost_basis_usd", "0")
-        cost_basis_usd = Decimal(cost_basis_str) if cost_basis_str else Decimal("0")
+        # 'cost_basis_usd' is typically what the user typed as
+        # "Amount USD" in the Buy form
+        cost_basis_usd = Decimal(tx_data.get("cost_basis_usd", "0"))
 
-        # If cost_basis_usd > 0, let's remove that from the from_acct
-        usd_out = cost_basis_usd
-        if usd_out <= 0:
-            # fallback => amount + fee
-            usd_out = fee_amount + amount
+        # We want the total USD leaving the Exchange to be (cost_basis + fee)
+        total_usd_out = cost_basis_usd + fee_amount
 
-        if usd_out > 0:
-            db.add(LedgerEntry(
-                transaction_id=tx.id,
-                account_id=from_acct.id,
-                amount=-usd_out,
-                currency="USD",
-                entry_type="MAIN_OUT"
-            ))
-        # MAIN_IN => + amount BTC
-        if amount > 0:
+        # 1) Subtract total (cost + fee) from the Exchange USD account
+        db.add(LedgerEntry(
+            transaction_id=tx.id,
+            account_id=from_acct.id,
+            amount=-total_usd_out,
+            currency="USD",
+            entry_type="MAIN_OUT"
+        ))
+
+        # 2) Credit the purchased BTC to Exchange BTC
+        if amount_btc > 0:
             db.add(LedgerEntry(
                 transaction_id=tx.id,
                 account_id=to_acct.id,
-                amount=amount,
+                amount=amount_btc,
                 currency="BTC",
                 entry_type="MAIN_IN"
             ))
-        # FEE => 'USD Fees'
+
+        # 3) Record a separate FEE line to "USD Fees" if fee > 0
         if fee_amount > 0 and fee_currency == "USD":
             fee_acct = db.query(Account).filter_by(name="USD Fees").first()
             if fee_acct:
@@ -456,6 +454,7 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
                     currency="USD",
                     entry_type="FEE"
                 ))
+
         db.flush()
         return
 
