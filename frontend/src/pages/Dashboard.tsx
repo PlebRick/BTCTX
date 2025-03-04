@@ -6,6 +6,10 @@
  * - GainsAndLosses
  * - GainsAndLossesRaw
  * for typed state management and fetch handling.
+ *
+ * Updated to:
+ *  - Exclude fee accounts from main portfolio balances
+ *  - Use `parseGainsAndLosses` from `format.ts` for GainsAndLosses parsing
  */
 
 import React, { useEffect, useState } from "react";
@@ -17,6 +21,7 @@ import {
   parseDecimal,
   formatUsd,
   formatBtc,
+  parseGainsAndLosses, // <-- We'll use this helper function
 } from "../utils/format";
 
 const Dashboard: React.FC = () => {
@@ -40,9 +45,11 @@ const Dashboard: React.FC = () => {
   // -----------------------------
   const [gainsAndLosses, setGainsAndLosses] = useState<GainsAndLosses | null>(null);
 
-  // Example placeholders
+  // General error handling
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const unrealizedGains = 0; // If not provided by backend, keep as 0 or placeholder
+
+  // Placeholder for unrealized gains
+  const unrealizedGains = 0; // If not provided by backend, we leave it as 0
 
   // -----------------------------
   // 1) Fetch account balances
@@ -67,7 +74,10 @@ const Dashboard: React.FC = () => {
       });
   }, []);
 
-  // Process fetched balances into local state
+  /**
+   * Process fetched balances into local state, skipping fee accounts
+   * to avoid inflating the user's main BTC or USD totals.
+   */
   useEffect(() => {
     if (!balances) return;
 
@@ -79,14 +89,21 @@ const Dashboard: React.FC = () => {
     let totalBtcTemp = 0;
     let totalUsdTemp = 0;
 
+    // Loop over balances and filter out fee accounts by skipping them
     balances.forEach((acc) => {
+      // We parse the string|number balance to a number
       const numericBalance = parseDecimal(acc.balance);
       if (Number.isNaN(numericBalance)) {
         console.warn("Encountered NaN balance for account:", acc);
         return;
       }
 
-      // Identify your known accounts by name/currency
+      // Skip if this account is a fee account
+      if (acc.name === "BTC Fees" || acc.name === "USD Fees") {
+        return;
+      }
+
+      // Identify known non-fee accounts by name/currency
       if (acc.name === "Bank" && acc.currency === "USD") {
         bank = numericBalance;
       } else if (acc.name === "Wallet" && acc.currency === "BTC") {
@@ -97,7 +114,7 @@ const Dashboard: React.FC = () => {
         exchBTC = numericBalance;
       }
 
-      // Tally total BTC / USD across all accounts
+      // Tally total BTC / USD for main accounts only (no fees)
       if (acc.currency === "BTC") {
         totalBtcTemp += numericBalance;
       } else if (acc.currency === "USD") {
@@ -105,7 +122,7 @@ const Dashboard: React.FC = () => {
       }
     });
 
-    // Update state
+    // Update state with final sums
     setBankBalance(bank);
     setExchangeUSDBalance(exchUSD);
     setExchangeBTCBalance(exchBTC);
@@ -122,23 +139,10 @@ const Dashboard: React.FC = () => {
     api
       .get<GainsAndLossesRaw>("/calculations/gains-and-losses")
       .then((response) => {
-        const raw = response.data;
-        console.log("Fetched gains and losses data:", raw);
+        console.log("Fetched gains and losses data:", response.data);
 
-        // Convert GainsAndLossesRaw -> GainsAndLosses (numeric)
-        const parsed: GainsAndLosses = {
-          sells_proceeds: parseDecimal(raw.sells_proceeds),
-          withdrawals_spent: parseDecimal(raw.withdrawals_spent),
-          income_earned: parseDecimal(raw.income_earned),
-          interest_earned: parseDecimal(raw.interest_earned),
-          fees: {
-            USD: parseDecimal(raw.fees.USD),
-            BTC: parseDecimal(raw.fees.BTC),
-          },
-          total_gains: parseDecimal(raw.total_gains),
-          total_losses: parseDecimal(raw.total_losses),
-        };
-
+        // Use parseGainsAndLosses for numeric conversion
+        const parsed = parseGainsAndLosses(response.data);
         setGainsAndLosses(parsed);
       })
       .catch((err) => {
@@ -151,6 +155,9 @@ const Dashboard: React.FC = () => {
   // until you fetch a live price:
   const BTC_PRICE = 25000; // example only
 
+  // -----------------------------
+  // Render logic (handle errors/loading)
+  // -----------------------------
   if (fetchError) {
     return (
       <div style={{ color: "red", margin: "2rem" }}>
@@ -230,11 +237,9 @@ const Dashboard: React.FC = () => {
         {/* Other Gains */}
         <div className="card">
           <h5>Other Gains</h5>
-          {/* Sells Proceeds is how much total USD you got from selling BTC. */}
           <p>Proceeds from Sells: {formatUsd(gainsAndLosses.sells_proceeds)}</p>
           <p>Income: {formatUsd(gainsAndLosses.income_earned)}</p>
           <p>Interest: {formatUsd(gainsAndLosses.interest_earned)}</p>
-          {/* This is total USD spent via “Withdrawal” transactions. */}
           <p>Spent (on Withdrawals): {formatUsd(gainsAndLosses.withdrawals_spent)}</p>
         </div>
 

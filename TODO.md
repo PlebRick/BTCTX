@@ -74,4 +74,44 @@ This TODO outlines the near-term tasks and longer-term roadmap for BitcoinTX. It
 
 ---
 
-*This TODO and Roadmap will be updated as tasks are completed and new goals are set. Contributors are welcome to pick up any open tasks. Be sure to check the `README.md` for overall context and the latest project state before starting on a task.*
+*This TODO and Roadmap will be updated as tasks are completed and new goals are set. Contributors are welcome to pick up any open tasks. Be sure to check the `README.md` for overall context and the latest project state before starting on a task.
+
+
+*
+
+By scanning the two CSS blocks side by side, you can see **several small but potentially layout‐changing differences.** None of them are necessarily  *bad* , but taken together they can make the overall UI look a bit more condensed. Here are the main ones to check:
+
+1. **Header & Brand Height**
+
+   * **Old** : `.header` has `height: 64px;`. `.sidebar-brand` also uses `height: 64px;`.
+   * **New** : `.header` has `height: 60px;`. `.sidebar-brand` has `height: 60px;`.
+
+   A 4px difference may not sound like much, but it can visually shrink the top bar and brand area slightly.
+2. **Header Padding**
+
+   * **Old** : `.header { padding: 0 1rem; }`
+   * **New** : `.header { padding: 0 .25rem; }`
+
+   This reduces horizontal spacing around your header content (like your page title or nav items).
+3. **Main Content Padding**
+
+   * **Old** : `.main-content { padding: 1rem; }`
+   * **New** : `.main-content { padding: 0rem; }`
+
+   Removing that 1rem of padding around the main content will make items appear “closer to the edges,” effectively giving you less whitespace inside the content area. This can make the layout look smaller or more compressed vertically and horizontally.
+4. **Sidebar Brand Padding**
+
+   * **Old** : `.sidebar-brand { padding-left: 1rem; }`
+   * **New** : `.sidebar-brand { padding-left: .5rem; padding-top: 1rem; }`
+
+   Slightly less left padding means the logo/text might shift left by ~0.5rem, condensing that region.
+5. **Sidebar Nav** vs. **Header Nav**
+
+   * In the old code, you had `.sidebar-nav` for your main navigation. In the new code, you may be using a **top** nav (`.header-nav`) or a different layout altogether. If the top nav has less vertical space or smaller font, it can feel like it “shrinks” things overall.
+6. **Any Default Font‐Size**
+
+   * Double‐check that your global `font-size` or any root/parent container didn’t change. Even small changes in `font-size` (like `0.8rem` → `0.75rem`) can reduce the natural spacing around or inside elements.
+
+In short, **the big suspects** are the **reduced heights (64px → 60px)** for `.header` and `.sidebar-brand`, plus **reducing `padding`** in `.main-content`, `.header`, and `.sidebar-brand`. Those tweaks will definitely make the layout look more “compressed” or less tall overall, which explains why your calculator no longer stretches down to the same place it used to.
+
+If you prefer the old spacing, you can just revert the specific heights and padding back to their original values (e.g. `height: 64px`, `padding: 0 1rem;`, etc.) and keep all the other updates you made.
