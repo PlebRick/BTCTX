@@ -1,14 +1,17 @@
 {
     "cSpell.words": [
         "autoflush",
+        "coindesk",
         "condecimal",
         "dbaeumer",
         "disp",
         "dotenv",
         "ehthumbs",
         "fastapi",
+        "httpx",
         "njsproj",
         "ntvs",
+        "oaicite",
         "passlib",
         "Perc",
         "pycache",
@@ -22,7 +25,9 @@
         "toolsai",
         "typer",
         "uvicorn",
-        "venv"
+        "venv",
+        "vwap",
+        "XXBTZUSD"
     ],
     "python.pythonPath": "/opt/homebrew/Caskroom/miniforge/base/envs/bitcoin-tx/bin/python",
     "python.envFile": "${workspaceFolder}/backend/.env",
