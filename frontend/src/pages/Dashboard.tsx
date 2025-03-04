@@ -2,8 +2,8 @@
  * Dashboard.tsx
  *
  * New layout:
- *  - Top row: 
- *    (1) Portfolio Overview (left) 
+ *  - Top row:
+ *    (1) Portfolio Overview (left)
  *    (2) BTC Price Chart (right)
  *  - Bottom row side by side:
  *    (A) Account Balances
@@ -47,7 +47,9 @@ const Dashboard: React.FC = () => {
   // -----------------------------
   // Gains & Losses
   // -----------------------------
-  const [gainsAndLosses, setGainsAndLosses] = useState<GainsAndLosses | null>(null);
+  const [gainsAndLosses, setGainsAndLosses] = useState<GainsAndLosses | null>(
+    null
+  );
 
   // Basic error handling
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -227,14 +229,19 @@ const Dashboard: React.FC = () => {
         {/* (B) Realized Gains */}
         <div className="card realized-gains-container">
           <h3>Realized Gains/Losses</h3>
+
+          {/* If you want to show the new realized_gains field separately */}
+          <p>
+            Realized Gains (Sells only):{" "}
+            {formatUsd(gainsAndLosses.realized_gains)}
+          </p>
+
           <p>Short Term: N/A</p>
           <p>Long Term: N/A</p>
-          <p>
-            Total Gains: {formatUsd(gainsAndLosses.total_gains)}
-          </p>
-          <p>
-            Total Losses: {formatUsd(gainsAndLosses.total_losses)}
-          </p>
+
+          {/* total_gains may be the same as realized_gains in your new logic */}
+          <p>Total Gains: {formatUsd(gainsAndLosses.total_gains)}</p>
+          <p>Total Losses: {formatUsd(gainsAndLosses.total_losses)}</p>
         </div>
 
         {/* (C) Income / Interest / Rewards / Fees */}
@@ -242,9 +249,22 @@ const Dashboard: React.FC = () => {
           <h3>Income & Fees</h3>
           <p>Income (earned): {formatUsd(gainsAndLosses.income_earned)}</p>
           <p>Interest (earned): {formatUsd(gainsAndLosses.interest_earned)}</p>
-          {/* If you have a “rewards” field eventually: 
-              <p>Rewards: ...</p> 
-          */}
+          <p>Rewards (earned): {formatUsd(gainsAndLosses.rewards_earned)}</p>
+
+          {/* Gift is NOT counted as income, but we can show it here so the user sees the cost basis */}
+          <p>
+            Gifts (received):{" "}
+            {formatUsd(gainsAndLosses.gifts_received)}{" "}
+            <span style={{ fontStyle: "italic" }}>
+              (not added to income or gains)
+            </span>
+          </p>
+
+          {/* Show total_income if your backend returns it */}
+          <p>
+            Total Income (Income+Interest+Rewards):{" "}
+            {formatUsd(gainsAndLosses.total_income)}
+          </p>
 
           <br />
           <h4>Fees</h4>

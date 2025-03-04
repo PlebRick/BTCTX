@@ -9,10 +9,13 @@ It includes functions to:
 The gains and losses calculations include:
   - Proceeds from Sell transactions on the exchange.
   - Proceeds from Withdrawals with a purpose of "Spent".
-  - Income earned (from Deposit transactions with source "Income".
-  - Interest earned (from Deposit transactions with source "Interest".
+  - Income earned (from Deposit transactions with source "Income").
+  - Interest earned (from Deposit transactions with source "Interest").
+  - Rewards earned (from Deposit transactions with source "Reward").
+  - Gifts received (from Deposit transactions with source "Gift"),
+    tracked for cost basis but not treated as income or capital gains.
   - Aggregation of fees (grouped by currency).
-
+  
 These functions return Decimal values (or dictionaries containing Decimals)
 so that they can later be formatted or converted to floats for display.
 
@@ -51,6 +54,7 @@ def get_account_balance(db: Session, account_id: int) -> Decimal:
     )
     return total or Decimal("0.0")
 
+
 def get_all_account_balances(db: Session) -> List[Dict]:
     """
     Calculate the balances for all accounts in the system.
@@ -83,6 +87,7 @@ def get_all_account_balances(db: Session) -> List[Dict]:
         })
     return results
 
+
 def get_gains_and_losses(db: Session) -> Dict:
     """
     Calculate various gains and losses across all transactions.
@@ -90,10 +95,14 @@ def get_gains_and_losses(db: Session) -> Dict:
     This function processes each transaction to compute:
       - Sells Proceeds: total 'proceeds_usd' for 'Sell' transactions.
       - Withdrawals Spent: total 'proceeds_usd' for 'Withdrawal' transactions (purpose='Spent').
-      - Income Earned: 'cost_basis_usd' for 'Deposit' (source='Income').
-      - Interest Earned: 'cost_basis_usd' for 'Deposit' (source='Interest').
+      - Income Earned: 'cost_basis_usd' for 'Deposit' transactions with source='Income'.
+      - Interest Earned: 'cost_basis_usd' for 'Deposit' transactions with source='Interest'.
+      - Rewards Earned: 'cost_basis_usd' for 'Deposit' transactions with source='Reward'.
+      - Gifts Received: 'cost_basis_usd' for 'Deposit' transactions with source='Gift'
+                        (tracked but not counted as income/gains).
       - Fees: aggregated per currency (USD, BTC).
-      - Total Gains: sum of sells proceeds, income earned, and interest earned.
+      - Realized Gains: equals sells proceeds only (the capital-gain portion).
+      - Total Income: sum of Income, Interest, and Rewards (excluded from Realized Gains).
       - Total Losses: sum of withdrawals spent.
 
     Returns:
@@ -103,23 +112,31 @@ def get_gains_and_losses(db: Session) -> Dict:
                   "withdrawals_spent": Decimal(...),
                   "income_earned": Decimal(...),
                   "interest_earned": Decimal(...),
+                  "rewards_earned": Decimal(...),
+                  "gifts_received": Decimal(...),
                   "fees": {
                       "USD": Decimal(...),
                       "BTC": Decimal(...)
                   },
-                  "total_gains": Decimal(...),
+                  "realized_gains": Decimal(...),
+                  "total_income": Decimal(...),
+                  "total_gains": Decimal(...),  # same as realized_gains for backward compatibility
                   "total_losses": Decimal(...)
               }
     """
+    # Aggregators
     sells_proceeds = Decimal("0.0")
     withdrawals_spent = Decimal("0.0")
     income_earned = Decimal("0.0")
     interest_earned = Decimal("0.0")
     rewards_earned = Decimal("0.0")
+    gifts_received = Decimal("0.0")
     fees_usd = Decimal("0.0")
     fees_btc = Decimal("0.0")
 
+    # Pull all transactions
     transactions = db.query(Transaction).all()
+
     for tx in transactions:
         # SELL
         if tx.type.lower() == "sell" and tx.proceeds_usd is not None:
@@ -142,8 +159,9 @@ def get_gains_and_losses(db: Session) -> Dict:
             and (tx.source or "").lower() == "income"
             and tx.cost_basis_usd is not None):
             try:
-                if Decimal(str(tx.cost_basis_usd)) > 0:
-                    income_earned += Decimal(str(tx.cost_basis_usd))
+                cb = Decimal(str(tx.cost_basis_usd))
+                if cb > 0:
+                    income_earned += cb
             except Exception as e:
                 logging.warning(f"Error converting cost_basis_usd for Income Deposit txn {tx.id}: {e}")
 
@@ -152,10 +170,35 @@ def get_gains_and_losses(db: Session) -> Dict:
             and (tx.source or "").lower() == "interest"
             and tx.cost_basis_usd is not None):
             try:
-                if Decimal(str(tx.cost_basis_usd)) > 0:
-                    interest_earned += Decimal(str(tx.cost_basis_usd))
+                cb = Decimal(str(tx.cost_basis_usd))
+                if cb > 0:
+                    interest_earned += cb
             except Exception as e:
                 logging.warning(f"Error converting cost_basis_usd for Interest Deposit txn {tx.id}: {e}")
+
+        # DEPOSIT (Reward)
+        if (tx.type.lower() == "deposit"
+            and (tx.source or "").lower() == "reward"
+            and tx.cost_basis_usd is not None):
+            try:
+                cb = Decimal(str(tx.cost_basis_usd))
+                if cb > 0:
+                    rewards_earned += cb
+            except Exception as e:
+                logging.warning(f"Error converting cost_basis_usd for Reward Deposit txn {tx.id}: {e}")
+
+        # DEPOSIT (Gift)
+        if (tx.type.lower() == "deposit"
+            and (tx.source or "").lower() == "gift"
+            and tx.cost_basis_usd is not None):
+            # NOT treated as income; do not add to total_income
+            # But we still track cost basis for future FIFO calculations.
+            try:
+                cb = Decimal(str(tx.cost_basis_usd))
+                if cb > 0:
+                    gifts_received += cb
+            except Exception as e:
+                logging.warning(f"Error converting cost_basis_usd for Gift Deposit txn {tx.id}: {e}")
 
         # FEES
         if tx.fee_amount is not None and tx.fee_currency is not None:
@@ -171,7 +214,15 @@ def get_gains_and_losses(db: Session) -> Dict:
             except Exception as e:
                 logging.warning(f"Error converting fee_amount for txn {tx.id}: {e}")
 
-    total_gains = sells_proceeds + income_earned + interest_earned
+    # ---- REFACTORED LOGIC ----
+    # Capital gains (from Sells only)
+    realized_gains = sells_proceeds
+
+    # Deposits that are not capital gains (Income/Interest/Reward)
+    total_income = income_earned + interest_earned + rewards_earned
+
+    # For backward compatibility, total_gains = realized_gains (no deposit-based income included)
+    total_gains = realized_gains
     total_losses = withdrawals_spent
 
     return {
@@ -179,10 +230,14 @@ def get_gains_and_losses(db: Session) -> Dict:
         "withdrawals_spent": withdrawals_spent,
         "income_earned": income_earned,
         "interest_earned": interest_earned,
+        "rewards_earned": rewards_earned,
+        "gifts_received": gifts_received,   # <--- new aggregator
         "fees": {
             "USD": fees_usd,
             "BTC": fees_btc,
         },
+        "realized_gains": realized_gains,
+        "total_income": total_income,
         "total_gains": total_gains,
         "total_losses": total_losses,
     }

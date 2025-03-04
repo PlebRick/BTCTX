@@ -7,7 +7,7 @@
 }
 
 .converter {
-  width: 160px;          /* narrower to fit the sidebar cleanly */
+  width: 190px;          /* narrower to fit the sidebar cleanly */
   border: none;          /* no gold border */
   background-color: #1c1c1c;
   border-radius: 8px;

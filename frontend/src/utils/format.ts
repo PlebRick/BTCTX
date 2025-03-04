@@ -85,10 +85,6 @@ export function formatTimestamp(isoString: string): string {
  * No local interface definitions needed — we import them from global.d.ts.
  */
 
-// 1) Import the domain interfaces from global.d.ts
-//    - If you have "skipLibCheck": false or "allowJs": etc., this should work
-//      automatically. Otherwise, you may do a direct import from a types folder.
-
 
 /**
  * parseTransaction:
@@ -127,6 +123,11 @@ export function parseTransaction(rawTx: ITransactionRaw): ITransaction {
  * parseGainsAndLosses:
  *  - Parses raw GainsAndLosses data into numeric format.
  *  - Ensures all fields are real numbers, defaulting to 0 if missing.
+ *
+ * In your updated backend + global.d.ts:
+ *  - rewards_earned, gifts_received, realized_gains, total_income
+ *    are separate fields. We parse them here to keep them out of
+ *    capital gains if needed.
  */
 export function parseGainsAndLosses(raw: GainsAndLossesRaw): GainsAndLosses {
   return {
@@ -134,10 +135,18 @@ export function parseGainsAndLosses(raw: GainsAndLossesRaw): GainsAndLosses {
     withdrawals_spent: parseDecimal(raw.withdrawals_spent),
     income_earned: parseDecimal(raw.income_earned),
     interest_earned: parseDecimal(raw.interest_earned),
+    // Newly added fields
+    rewards_earned: parseDecimal(raw.rewards_earned),
+    gifts_received: parseDecimal(raw.gifts_received),
+    realized_gains: parseDecimal(raw.realized_gains),
+    total_income: parseDecimal(raw.total_income),
+
     fees: {
       USD: parseDecimal(raw.fees?.USD),
       BTC: parseDecimal(raw.fees?.BTC),
     },
+
+    // For backward compatibility, total_gains is still present
     total_gains: parseDecimal(raw.total_gains),
     total_losses: parseDecimal(raw.total_losses),
   };

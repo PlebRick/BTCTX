@@ -31,7 +31,7 @@ body {
 ======================= */
 .sidebar {
   background-color: var(--color-panel);
-  width: 210px;
+  width: 225px;
   min-height: 100vh; /* full vertical height */
   display: flex;
   flex-direction: column;
@@ -43,7 +43,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 60px; /* matches header height */
+  height: 64px; /* matches header height */
   padding-left: .5rem;
   padding-top: 1rem;
 }
@@ -107,11 +107,11 @@ body {
 ======================= */
 .header {
   background: linear-gradient(to bottom, #000000, #121212);
-  height: 60px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 .25rem;
+  padding: 0 .1rem;
 }
 
 /* Page title in header (left side) */

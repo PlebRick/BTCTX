@@ -12,6 +12,7 @@ declare global {
   // --------------------------------------------------------------
   // 1) Domain Models for Account Balances & Gains/Losses
   // --------------------------------------------------------------
+
   /**
    * Represents an account balance row returned by the server.
    * The `balance` can be a number or string; we parse it to ensure
@@ -27,40 +28,63 @@ declare global {
   /**
    * Raw GainsAndLosses data from the backend, where numeric fields
    * may be string or number. We parse them into real numbers in the UI.
+   * 
+   * Note:
+   *  - `rewards_earned` and `gifts_received` might be missing in some older
+   *    backend responses, so we mark them optional with `?:`.
+   *  - `realized_gains` and `total_income` are also optional in raw data
+   *    if the server doesn't return them.
    */
   interface GainsAndLossesRaw {
     sells_proceeds: string | number;
     withdrawals_spent: string | number;
     income_earned: string | number;
     interest_earned: string | number;
+    rewards_earned?: string | number;      // new: deposit-based reward (counted as income)
+    gifts_received?: string | number;      // new: deposit-based gift (NOT income/gains)
+    realized_gains?: string | number;      // new: purely from sells
+    total_income?: string | number;        // new: sum of income/interest/rewards
+
     fees: {
       USD: string | number;
       BTC: string | number;
     };
-    total_gains: string | number;
+    total_gains: string | number;          // legacy total_gains (for backward compatibility)
     total_losses: string | number;
   }
 
   /**
    * Parsed GainsAndLosses after numeric conversions. All
    * relevant fields are guaranteed to be `number`.
+   *
+   * This now includes:
+   *  - `rewards_earned`: BTC deposit-based "Reward" amounts, counted as income.
+   *  - `gifts_received`: BTC deposit-based "Gift" amounts, tracked for cost basis but NOT income.
+   *  - `realized_gains`: purely from sells.
+   *  - `total_income`: sum of income_earned + interest_earned + rewards_earned.
    */
   interface GainsAndLosses {
     sells_proceeds: number;
     withdrawals_spent: number;
     income_earned: number;
     interest_earned: number;
+    rewards_earned: number;    // deposit-based "Reward"
+    gifts_received: number;    // deposit-based "Gift" (not counted as income)
+    realized_gains: number;    // capital gains from sells only
+    total_income: number;      // sum of income/interest/rewards
+
     fees: {
       USD: number;
       BTC: number;
     };
-    total_gains: number;
+    total_gains: number;       // same as realized_gains in your refactored logic
     total_losses: number;
   }
 
   // --------------------------------------------------------------
   // 2) Domain Models for Transactions
   // --------------------------------------------------------------
+
   /**
    * Raw transaction data as returned by the backend.
    * Numeric fields may be strings (e.g. "0.00010000").
@@ -150,11 +174,11 @@ declare global {
     detail?: string;
     errors?: Record<string, string[]>; // if your server returns field‐specific errors
   }
-  
 
   // --------------------------------------------------------------
   // 3) Types for the TransactionForm
   // --------------------------------------------------------------
+
   /**
    * The possible transaction types the user can select in the UI.
    */
@@ -167,6 +191,8 @@ declare global {
 
   /**
    * For deposit sources, e.g. "Income", "Gift", "N/A".
+   *   - "Income" / "Interest" / "Reward" = counts as income in GainsAndLosses.
+   *   - "Gift" = track cost basis, but not counted as income.
    */
   type DepositSource = "N/A" | "MyBTC" | "Gift" | "Income" | "Interest" | "Reward";
 
@@ -188,6 +214,7 @@ declare global {
   interface TransactionFormData {
     type: TransactionType;
     timestamp: string;
+
     // Single-account transactions
     account?: AccountType;
     currency?: Currency;
@@ -197,6 +224,7 @@ declare global {
     fee?: number;
     costBasisUSD?: number;
     proceeds_usd?: number;
+
     // Transfer
     fromAccount?: AccountType;
     fromCurrency?: Currency;
@@ -204,6 +232,7 @@ declare global {
     toCurrency?: Currency;
     amountFrom?: number;
     amountTo?: number;
+
     // Buy/Sell
     amountUSD?: number;
     amountBTC?: number;
@@ -212,6 +241,7 @@ declare global {
   // --------------------------------------------------------------
   // 4) Types for the Calculator
   // --------------------------------------------------------------
+
   /**
    * Supported operations in the Calculator component.
    */
