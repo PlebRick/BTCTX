@@ -115,6 +115,7 @@ def get_gains_and_losses(db: Session) -> Dict:
     withdrawals_spent = Decimal("0.0")
     income_earned = Decimal("0.0")
     interest_earned = Decimal("0.0")
+    rewards_earned = Decimal("0.0")
     fees_usd = Decimal("0.0")
     fees_btc = Decimal("0.0")
 

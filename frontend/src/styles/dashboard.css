@@ -1,48 +1,139 @@
-/* Dashboard container for overall styling */
-.dashboard {
+
+
+/* Root variables for easy color management */
+:root {
+    --bg-color: #0d0d0d;       /* Primary background */
+    --card-bg: #1e1e1e;        /* Card background */
+    --text-color: #ffffff;     /* Main text color */
+    --highlight-color: #f2c45b; /* Gold-ish highlight */
+    --accent-red: #f14646;     /* For negative or down text */
+    --accent-green: #48f18a;   /* For positive or up text */
+    --fade-text: #999999;      /* For subtle text */
+  }
+  
+  /* Overall dashboard container */
+  .dashboard {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    padding: 1rem 2rem;
+    min-height: 100vh;
+    font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
+  }
+  
+  /* Utility row styling for top and bottom sections */
+  .top-row,
+  .bottom-row {
     display: flex;
-    flex-direction: column; 
-    gap: 1rem; /* space between rows */
-    padding: 1rem; /* optional, so it’s not flush against the edges */
-}
-
-/* Row containers */
-.dashboard-row {
-    display: grid;
-    gap: 1rem; /* spacing between cards in this row */
-}
-
-/* Top row: 2 columns (1fr each) */
-.top-row {
-    grid-template-columns: 1fr 1fr;
-}
-
-/* Bottom row: 3 columns */
-.bottom-row {
-    grid-template-columns: repeat(3, 1fr);
-}
-
-/* Card styling (re-use your existing .card style if you have one) */
-.card {
-    background-color: var(--color-panel);
-    border-radius: 6px;
-    border: .5px solid var(--color-accent);
-    box-shadow: 0 4px 8px 4px rgba(3, 3, 3, 0.5);
-    padding: 1rem;
-    /* If you want a subtle border or drop shadow, add here */
-    /* box-shadow: 0 2px 4px rgba(0,0,0,0.2); */
-}
-
-/* Headings and text in the card can be standard or customized */
-.card h5 {
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  /* Each "card" container */
+  .card {
+    background-color: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 8px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Headings within cards */
+  .card h3,
+  .card h4,
+  .card h5 {
     margin-top: 0;
-    margin-bottom: 1.5rem; /* Add space between the title and the text */
-    font-size: 1rem; /* Adjust the font size for the headings */
-    color: var(--color-text); /* Adjust the color for the headings */
-}
-
-.card p {
-    font-size: 0.75rem; /* Adjust the font size for the paragraph text */
-    color: var(--color-text-dim); /* Adjust the color for the paragraph text */
-    margin-bottom: 0.5rem; /* Add space between paragraphs */
-}
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 1rem;
+  }
+  
+  /* Slightly smaller text for sub-sections */
+  .card h4 {
+    font-size: 1.05rem;
+    color: var(--fade-text);
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Example large text highlight (like "Account Value: $35,193") */
+  .portfolio-overview h3 {
+    font-size: 1.2rem;
+    color: var(--highlight-color);
+    margin-bottom: 0.75rem;
+  }
+  
+  /* A subtle border or box-shadow for the card */
+  .card {
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+  }
+  
+  /* Spacing for placeholders or chart areas */
+  .portfolio-chart-placeholder,
+  .btc-price-chart-placeholder {
+    background-color: #2b2b2b;
+    margin-top: 1rem;
+    border-radius: 6px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ccc;
+    font-size: 0.95rem;
+    height: 200px; /* adjust as needed */
+  }
+  
+  /* Top Row Specific: 
+     You might make the left (portfolio-overview) bigger. */
+  .portfolio-overview {
+    flex: 1; /* Give it more space if you want a wide chart */
+  }
+  
+  /* Right container for BTC price chart */
+  .btc-price-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* For the bottom row, 3 cards side by side: 
+     .account-balances-container,
+     .realized-gains-container,
+     .income-fees-container {
+       flex: 1; // They share equal space
+     }
+  */
+  
+  /* Lists inside a card (like the account balances) */
+  .account-balances-container ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .account-balances-container li {
+    margin-bottom: 0.4rem;
+    font-size: 0.95rem;
+  }
+  
+  /* Example stylings for up/down text if you show % changes */
+  .text-up {
+    color: var(--accent-green);
+  }
+  .text-down {
+    color: var(--accent-red);
+  }
+  
+  /* If you want a bigger "price" text somewhere */
+  .price-display {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--highlight-color);
+  }
+  
+  /* Subtle note or subtext styling */
+  .note {
+    color: var(--fade-text);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+  }
+  
