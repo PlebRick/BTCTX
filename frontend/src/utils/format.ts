@@ -127,6 +127,7 @@ export function parseTransaction(rawTx: ITransactionRaw): ITransaction {
  *  - We keep older fields (short_term_realized_gains, etc.) for backward
  *    compatibility.
  *  - We also add new fields for detailed short-term vs. long-term gains/losses.
+ *  - And now we also parse the new BTC fields (income_btc, interest_btc, etc.).
  */
 export function parseGainsAndLosses(raw: GainsAndLossesRaw): GainsAndLosses {
   return {
@@ -156,7 +157,6 @@ export function parseGainsAndLosses(raw: GainsAndLossesRaw): GainsAndLosses {
     total_realized_gains_usd: parseDecimal(raw.total_realized_gains_usd),
 
     // ------------------ New short/long breakdown fields ------------------
-    // These fields allow more precise FIFO reporting for IRS compliance:
     short_term_gains: parseDecimal(raw.short_term_gains),
     short_term_losses: parseDecimal(raw.short_term_losses),
     short_term_net: parseDecimal(raw.short_term_net),
@@ -167,5 +167,12 @@ export function parseGainsAndLosses(raw: GainsAndLossesRaw): GainsAndLosses {
 
     // Overall net gains across short & long
     total_net_capital_gains: parseDecimal(raw.total_net_capital_gains),
+
+    // ------------------ New BTC fields for Income/Interest/Rewards/Gifts ------------------
+    // These were just introduced in the aggregator. We parse them similarly.
+    income_btc: parseDecimal(raw.income_btc),
+    interest_btc: parseDecimal(raw.interest_btc),
+    rewards_btc: parseDecimal(raw.rewards_btc),
+    gifts_btc: parseDecimal(raw.gifts_btc),
   };
 }

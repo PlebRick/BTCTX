@@ -103,6 +103,27 @@ declare global {
      * The overall net capital gains/losses across short & long.
      */
     total_net_capital_gains?: string | number;
+
+    // --------------------- NEW BTC fields for Income, Interest, Rewards, Gifts ---------------------
+    /**
+     * The total BTC amount for deposits with source = "Income".
+     */
+    income_btc?: string | number;
+
+    /**
+     * The total BTC amount for deposits with source = "Interest".
+     */
+    interest_btc?: string | number;
+
+    /**
+     * The total BTC amount for deposits with source = "Reward".
+     */
+    rewards_btc?: string | number;
+
+    /**
+     * The total BTC amount for deposits with source = "Gift".
+     */
+    gifts_btc?: string | number;
   }
 
   /**
@@ -139,6 +160,27 @@ declare global {
     long_term_losses: number;             // sum of long-term losses
     long_term_net: number;                // long_term_gains - long_term_losses
     total_net_capital_gains: number;      // overall net across short & long
+
+    // --------------------- NEW BTC fields for Income, Interest, Rewards, Gifts ---------------------
+    /**
+     * The total BTC amount for deposits with source = "Income".
+     */
+    income_btc: number;
+
+    /**
+     * The total BTC amount for deposits with source = "Interest".
+     */
+    interest_btc: number;
+
+    /**
+     * The total BTC amount for deposits with source = "Reward".
+     */
+    rewards_btc: number;
+
+    /**
+     * The total BTC amount for deposits with source = "Gift".
+     */
+    gifts_btc: number;
   }
 
   // --------------------------------------------------------------

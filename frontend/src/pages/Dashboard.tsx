@@ -174,7 +174,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Compute total fees in USD for clarity (using a fixed BTC price)
+  // Compute total fees in USD
   const totalFeesUsd =
     gainsAndLosses.fees.USD + gainsAndLosses.fees.BTC * BTC_PRICE;
 
@@ -225,7 +225,7 @@ const Dashboard: React.FC = () => {
           </ul>
         </div>
 
-        {/* (B) Realized Gains: only new short- vs. long-term breakdown remains */}
+        {/* (B) Realized Gains: short- vs. long-term breakdown */}
         <div className="card realized-gains-container">
           <h3>Realized Gains/Losses</h3>
 
@@ -268,15 +268,34 @@ const Dashboard: React.FC = () => {
         {/* (C) Income / Interest / Rewards / Fees */}
         <div className="card income-fees-container">
           <h3>Income & Fees</h3>
-          <p>Income (earned): {formatUsd(gainsAndLosses.income_earned)}</p>
-          <p>Interest (earned): {formatUsd(gainsAndLosses.interest_earned)}</p>
-          <p>Rewards (earned): {formatUsd(gainsAndLosses.rewards_earned)}</p>
+
+          {/* 
+            Show both USD and BTC for each category.
+            - income_earned + income_btc
+            - interest_earned + interest_btc
+            - rewards_earned + rewards_btc
+            - gifts_received + gifts_btc
+          */}
+          <p>
+            Income (earned): {formatUsd(gainsAndLosses.income_earned)}{" "}
+            (<em>{formatBtc(gainsAndLosses.income_btc)}</em>)
+          </p>
+          <p>
+            Interest (earned): {formatUsd(gainsAndLosses.interest_earned)}{" "}
+            (<em>{formatBtc(gainsAndLosses.interest_btc)}</em>)
+          </p>
+          <p>
+            Rewards (earned): {formatUsd(gainsAndLosses.rewards_earned)}{" "}
+            (<em>{formatBtc(gainsAndLosses.rewards_btc)}</em>)
+          </p>
           <p>
             Gifts (received): {formatUsd(gainsAndLosses.gifts_received)}{" "}
+            (<em>{formatBtc(gainsAndLosses.gifts_btc)}</em>){" "}
             <span style={{ fontStyle: "italic" }}>
               (not added to income or gains)
             </span>
           </p>
+
           <p>
             Total Income (Income+Interest+Rewards):{" "}
             {formatUsd(gainsAndLosses.total_income)}
