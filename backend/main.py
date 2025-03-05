@@ -7,8 +7,8 @@ Sets up the FastAPI application for BitcoinTX, a double-entry Bitcoin portfolio 
 Key Roles:
  - Load environment variables & configure JWT authentication
  - Add CORS middleware for frontend integration
- - Include the 'transaction', 'account', and 'user' routers
-   which now implement multi-line ledger entries, BTC lot tracking, etc.
+ - Include the 'transaction', 'account', 'user', and now 'bitcoin' routers,
+   which implement multi-line ledger entries, BTC lot tracking, and live BTC price data.
  - Serve the Vite frontend static files for SPA routing
 
 Because our double-entry logic is in the services and routers, no special
@@ -20,7 +20,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from starlette.staticfiles import StaticFiles
@@ -47,8 +47,9 @@ default_origins = (
 raw_origins = os.getenv("CORS_ALLOW_ORIGINS", default_origins)
 ALLOWED_ORIGINS = [origin.strip() for origin in raw_origins.split(",")]
 
-from fastapi.security import OAuth2PasswordBearer
+# OAuth2 scheme for protected endpoints (JWT bearer token)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
+
 
 # ---------------------------------------------------------
 # Initialize the FastAPI application
@@ -92,7 +93,7 @@ def create_access_token(data: dict) -> str:
 
 def verify_access_token(token: str) -> str:
     """
-    Verify a JWT, extracting the 'sub' (username). 
+    Verify a JWT, extracting the 'sub' (username).
     Raises HTTPException(401) if invalid.
     """
     try:
@@ -111,17 +112,24 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     """
     return verify_access_token(token)
 
+
 # ---------------------------------------------------------
 # Include Routers
 # ---------------------------------------------------------
-# We import the transaction, user, account, and calculation routers,
-# each referencing the multi-line ledger or user/account logic.
-from backend.routers import transaction, user, account, calculation
+# We import the transaction, user, account, calculation, and bitcoin routers,
+# each referencing the multi-line ledger or user/account logic, plus BTC price data.
+from backend.routers import transaction, user, account, calculation, bitcoin
 
+# Transaction, user, account, and calculation routers
 app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
 app.include_router(user.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
 app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"])
+
+# Bitcoin router for live BTC price & historical data
+# This makes endpoints like /api/bitcoin/price and /api/bitcoin/price/history available.
+app.include_router(bitcoin.router, prefix="/api", tags=["Bitcoin"])
+
 
 # ---------------------------------------------------------
 # Protected Route Example
@@ -130,10 +138,11 @@ app.include_router(calculation.router, prefix="/api/calculations", tags=["calcul
 def read_protected_route(current_user: str = Depends(get_current_user)):
     """
     Demonstration of a JWT-protected endpoint. The double-entry system
-    is unaffected by auth logic, but you could restrict transaction 
+    is unaffected by auth logic, but you could restrict transaction
     creation to authenticated users only, for example.
     """
     return {"message": f"Hello, {current_user}. You have access to this route!"}
+
 
 # ---------------------------------------------------------
 # Serve Vite Frontend Static Files with SPA Routing
@@ -153,6 +162,7 @@ class SPAStaticFiles(StaticFiles):
 # Mount the frontend static files at the root
 app.mount("/", SPAStaticFiles(directory="frontend/dist", html=True), name="static")
 
+
 # ---------------------------------------------------------
 # Root Route
 # ---------------------------------------------------------
@@ -163,6 +173,7 @@ def read_root():
     Does not intersect with the double-entry logic directly.
     """
     return {"message": "Welcome to BitcoinTX - Double-Entry Accounting Ready!"}
+
 
 # ---------------------------------------------------------
 # Local Testing
