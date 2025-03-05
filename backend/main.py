@@ -10,10 +10,6 @@ Key Roles:
  - Include the 'transaction', 'account', 'user', and now 'bitcoin' routers,
    which implement multi-line ledger entries, BTC lot tracking, and live BTC price data.
  - Serve the Vite frontend static files for SPA routing
-
-Because our double-entry logic is in the services and routers, no special
-changes are needed here beyond referencing them. This file is the entry
-point for running the API and hooking up the authentication + routing.
 """
 
 import os
@@ -50,7 +46,6 @@ ALLOWED_ORIGINS = [origin.strip() for origin in raw_origins.split(",")]
 # OAuth2 scheme for protected endpoints (JWT bearer token)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
 
-
 # ---------------------------------------------------------
 # Initialize the FastAPI application
 # ---------------------------------------------------------
@@ -70,7 +65,7 @@ app = FastAPI(
 # ---------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,  # For debugging, replace with ["*"] if needed
+    allow_origins=ALLOWED_ORIGINS,  # Or ["*"] in dev if needed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -120,14 +115,12 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
 # each referencing the multi-line ledger or user/account logic, plus BTC price data.
 from backend.routers import transaction, user, account, calculation, bitcoin
 
-# Transaction, user, account, and calculation routers
 app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
 app.include_router(user.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
 app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"])
 
 # Bitcoin router for live BTC price & historical data
-# This makes endpoints like /api/bitcoin/price and /api/bitcoin/price/history available.
 app.include_router(bitcoin.router, prefix="/api", tags=["Bitcoin"])
 
 
@@ -137,9 +130,10 @@ app.include_router(bitcoin.router, prefix="/api", tags=["Bitcoin"])
 @app.get("/api/protected")
 def read_protected_route(current_user: str = Depends(get_current_user)):
     """
-    Demonstration of a JWT-protected endpoint. The double-entry system
-    is unaffected by auth logic, but you could restrict transaction
-    creation to authenticated users only, for example.
+    Demonstration of a JWT-protected endpoint.
+    The double-entry system is unaffected by auth logic,
+    but you could restrict transaction creation to authenticated
+    users only, for example.
     """
     return {"message": f"Hello, {current_user}. You have access to this route!"}
 
@@ -147,7 +141,6 @@ def read_protected_route(current_user: str = Depends(get_current_user)):
 # ---------------------------------------------------------
 # Serve Vite Frontend Static Files with SPA Routing
 # ---------------------------------------------------------
-# Custom StaticFiles class to serve index.html for SPA routes
 class SPAStaticFiles(StaticFiles):
     async def get_response(self, path: str, scope):
         try:
@@ -159,9 +152,7 @@ class SPAStaticFiles(StaticFiles):
             else:
                 raise
 
-# Mount the frontend static files at the root
 app.mount("/", SPAStaticFiles(directory="frontend/dist", html=True), name="static")
-
 
 # ---------------------------------------------------------
 # Root Route
@@ -169,11 +160,9 @@ app.mount("/", SPAStaticFiles(directory="frontend/dist", html=True), name="stati
 @app.get("/")
 def read_root():
     """
-    The basic root path to confirm the API is running.
-    Does not intersect with the double-entry logic directly.
+    Basic root path to confirm the API is running.
     """
     return {"message": "Welcome to BitcoinTX - Double-Entry Accounting Ready!"}
-
 
 # ---------------------------------------------------------
 # Local Testing
@@ -181,5 +170,5 @@ def read_root():
 if __name__ == "__main__":
     import sys
     sys.path.append(os.getenv("PYTHONPATH", "."))
-    # You could run: python main.py (with a dev server, e.g. 'uvicorn main:app --reload')
+    # e.g. run: uvicorn main:app --reload
     # The double-entry system is loaded in the transaction, account, user routers.
