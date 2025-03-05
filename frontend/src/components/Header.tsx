@@ -1,10 +1,16 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  pageTitle?: string; // optional if you like
+}
+
+const Header: React.FC<HeaderProps> = ({ pageTitle }) => {
   return (
     <header className="header">
-      {/* Left-justified nav links */}
+      {/* If pageTitle is provided, render it */}
+      {pageTitle && <h1>{pageTitle}</h1>}
+
       <nav className="header-nav">
         <NavLink
           to="/dashboard"

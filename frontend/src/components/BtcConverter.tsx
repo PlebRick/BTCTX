@@ -1,36 +1,43 @@
 import React, { useState, useEffect } from "react";
-import api from "../api"; // centralized Axios or fetch wrapper
+import api from "../api"; // Your centralized Axios/fetch wrapper
 import "../styles/converter.css";
 
 const BtcConverter: React.FC = () => {
-  // Toggle for manual vs. auto
+  // --------------------------------------------
+  // 1) State: Toggle for manual vs. auto price
+  // --------------------------------------------
   const [isAutoPrice, setIsAutoPrice] = useState<boolean>(false);
 
-  // Store the user-entered manual price
-  const [manualBtcPrice, setManualBtcPrice] = useState<number>(23000); // Example default
+  // Manually entered price (only used if isAutoPrice == false)
+  const [manualBtcPrice, setManualBtcPrice] = useState<number>(23000);
 
-  // This will hold the live price fetched from /bitcoin/price
+  // Auto‐fetched live price (only used if isAutoPrice == true)
   const [autoBtcPrice, setAutoBtcPrice] = useState<number | null>(null);
 
-  // For user input values
+  // --------------------------------------------
+  // 2) Fields for USD, BTC, and sats
+  // --------------------------------------------
   const [usdValue, setUsdValue] = useState<string>("");
   const [btcValue, setBtcValue] = useState<string>("");
   const [satsValue, setSatsValue] = useState<string>("");
 
-  // Periodically fetch the live BTC price if in auto mode
+  // --------------------------------------------
+  // 3) Auto mode: fetch the live BTC price
+  //    periodically if isAutoPrice == true
+  // --------------------------------------------
   useEffect(() => {
     if (!isAutoPrice) {
-      // Clear autoBtcPrice when leaving auto mode
+      // When switching back to manual mode, clear auto price
       setAutoBtcPrice(null);
       return;
     }
 
-    // Helper to fetch the live price
+    // Helper to fetch the live price once
     const fetchLivePrice = () => {
       api
-        .get("/bitcoin/price")
+        .get("/bitcoin/price") // => GET /api/bitcoin/price
         .then((res) => {
-          // Expect { "USD": 12345.67 }
+          // Expect { USD: <number> }
           if (res.data && res.data.USD) {
             setAutoBtcPrice(res.data.USD);
           }
@@ -40,36 +47,38 @@ const BtcConverter: React.FC = () => {
         });
     };
 
-    // 1) Fetch immediately on mode switch
+    // Initial fetch on mount or when user toggles to auto
     fetchLivePrice();
 
-    // 2) Optionally poll every 30 seconds
-    const intervalId = setInterval(fetchLivePrice, 30000);
+    // Optionally poll every 30 seconds
+    const intervalId = setInterval(fetchLivePrice, 30_000);
 
-    // Cleanup the interval on unmount or when switching away from auto
-    return () => {
-      clearInterval(intervalId);
-    };
+    // Cleanup interval on unmount or when toggling away from auto
+    return () => clearInterval(intervalId);
   }, [isAutoPrice]);
 
-  // Decide which BTC price to use
-  // If isAutoPrice == true, we use autoBtcPrice; if that’s null (still loading),
-  // we fallback to manualBtcPrice to avoid NaN or 0 conversions.
+  // --------------------------------------------
+  // 4) Decide which BTC price to use
+  //    - If auto mode is on, use autoBtcPrice (if available)
+  //    - Otherwise use the manualBtcPrice
+  // --------------------------------------------
   const effectiveBtcPrice =
-    isAutoPrice && autoBtcPrice != null ? autoBtcPrice : manualBtcPrice;
+    isAutoPrice && autoBtcPrice !== null ? autoBtcPrice : manualBtcPrice;
 
-  // Helper for rounding
+  // A small helper for rounding to 5 decimal places
   const round = (num: number) => Math.round(num * 100000) / 100000;
 
-  // Whenever one field changes, recalc the others:
+  // --------------------------------------------
+  // 5) Conversion Logic
+  //    Whenever user changes one field, recalc others
+  // --------------------------------------------
   const handleUsdChange = (value: string) => {
     setUsdValue(value);
     const usdNum = parseFloat(value) || 0;
 
     // 1 BTC = effectiveBtcPrice USD
     const btcNum = usdNum / effectiveBtcPrice;
-    // 1 BTC = 100,000,000 sats
-    const satsNum = btcNum * 100000000;
+    const satsNum = btcNum * 100_000_000; // 1 BTC = 100,000,000 sats
 
     setBtcValue(btcNum ? round(btcNum).toString() : "");
     setSatsValue(satsNum ? Math.floor(satsNum).toString() : "");
@@ -80,7 +89,7 @@ const BtcConverter: React.FC = () => {
     const btcNum = parseFloat(value) || 0;
 
     const usdNum = btcNum * effectiveBtcPrice;
-    const satsNum = btcNum * 100000000;
+    const satsNum = btcNum * 100_000_000;
 
     setUsdValue(usdNum ? round(usdNum).toString() : "");
     setSatsValue(satsNum ? Math.floor(satsNum).toString() : "");
@@ -90,13 +99,16 @@ const BtcConverter: React.FC = () => {
     setSatsValue(value);
     const satsNum = parseFloat(value) || 0;
 
-    const btcNum = satsNum / 100000000;
+    const btcNum = satsNum / 100_000_000;
     const usdNum = btcNum * effectiveBtcPrice;
 
     setBtcValue(btcNum ? round(btcNum).toString() : "");
     setUsdValue(usdNum ? round(usdNum).toString() : "");
   };
 
+  // --------------------------------------------
+  // 6) Render
+  // --------------------------------------------
   return (
     <div className="converter">
       <div className="converter-title">sats converter</div>
@@ -117,7 +129,7 @@ const BtcConverter: React.FC = () => {
         </button>
       </div>
 
-      {/* Manual Price Input (only show if not in auto mode) */}
+      {/* Manual Price Input (only show if NOT in auto mode) */}
       {!isAutoPrice && (
         <div className="manual-price-row">
           <label htmlFor="manualPrice">BTC Price (USD)</label>
@@ -125,19 +137,20 @@ const BtcConverter: React.FC = () => {
             id="manualPrice"
             type="number"
             value={manualBtcPrice}
-            onChange={(e) =>
-              setManualBtcPrice(parseFloat(e.target.value) || 0)
-            }
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              setManualBtcPrice(isNaN(val) ? 0 : val);
+            }}
           />
         </div>
       )}
 
-      {/* If auto mode is active and we have an autoBtcPrice, show it */}
+      {/* If auto mode is active, show the auto price (or "Loading...") */}
       {isAutoPrice && (
         <div className="auto-price-row">
           <p>
-            Live BTC Price:{" "}
-            {autoBtcPrice
+            Live BTC Price:&nbsp;
+            {autoBtcPrice !== null
               ? `$${autoBtcPrice.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
@@ -147,7 +160,7 @@ const BtcConverter: React.FC = () => {
         </div>
       )}
 
-      {/* Conversion fields */}
+      {/* Conversion fields: USD, BTC, Sats */}
       <div className="converter-row">
         <label htmlFor="usdInput">USD</label>
         <input
