@@ -34,7 +34,7 @@ const Dashboard: React.FC = () => {
   // -----------------------------
   const [balances, setBalances] = useState<AccountBalance[] | null>(null);
 
-  // For known accounts (no fee accounts)
+  // For known accounts (excluding fee accounts)
   const [bankBalance, setBankBalance] = useState<number>(0);
   const [exchangeUSDBalance, setExchangeUSDBalance] = useState<number>(0);
   const [exchangeBTCBalance, setExchangeBTCBalance] = useState<number>(0);
@@ -47,17 +47,15 @@ const Dashboard: React.FC = () => {
   // -----------------------------
   // Gains & Losses
   // -----------------------------
-  const [gainsAndLosses, setGainsAndLosses] = useState<GainsAndLosses | null>(
-    null
-  );
+  const [gainsAndLosses, setGainsAndLosses] = useState<GainsAndLosses | null>(null);
 
   // Basic error handling
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Placeholder for now
-  const unrealizedGains = 0; // We'll do a real calculation later
+  // Placeholder for now (will incorporate BTC price for actual unrealized gains)
+  const unrealizedGains = 0;
 
-  // Example BTC price for fee conversions or placeholders
+  // Example BTC price used for fee calculations or placeholders
   const BTC_PRICE = 25000;
 
   // -------------------------------------------------------
@@ -84,7 +82,8 @@ const Dashboard: React.FC = () => {
   }, []);
 
   /**
-   * Process fetched balances, skipping fee accounts
+   * Process fetched balances, skipping fee accounts ("BTC Fees", "USD Fees").
+   * Calculate total BTC and total USD across all relevant accounts.
    */
   useEffect(() => {
     if (!balances) return;
@@ -120,7 +119,7 @@ const Dashboard: React.FC = () => {
         exchBTC = numericBalance;
       }
 
-      // Tally total BTC / USD
+      // Tally totals
       if (acc.currency === "BTC") {
         totalBtcTemp += numericBalance;
       } else if (acc.currency === "USD") {
@@ -175,7 +174,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Compute total fees in USD
+  // Compute total fees in USD for clarity (using a fixed BTC price)
   const totalFeesUsd =
     gainsAndLosses.fees.USD + gainsAndLosses.fees.BTC * BTC_PRICE;
 
@@ -193,7 +192,7 @@ const Dashboard: React.FC = () => {
           <p>USD Balance: {formatUsd(totalUSD)}</p>
           <p>Unrealized Gains/Losses: {unrealizedGains}</p>
 
-          {/* Example placeholder for line chart of user’s BTC holdings */}
+          {/* Placeholder for portfolio chart */}
           <div className="portfolio-chart-placeholder">
             <p>Portfolio Holdings Chart (Placeholder)</p>
           </div>
@@ -206,7 +205,7 @@ const Dashboard: React.FC = () => {
             Current Price (Example): <strong>${BTC_PRICE.toFixed(2)}</strong>
           </p>
 
-          {/* Another placeholder for a chart of the live BTC price */}
+          {/* Placeholder for a live BTC price chart */}
           <div className="btc-price-chart-placeholder">
             <p>Live BTC Price Chart (Placeholder)</p>
           </div>
@@ -226,22 +225,44 @@ const Dashboard: React.FC = () => {
           </ul>
         </div>
 
-        {/* (B) Realized Gains */}
+        {/* (B) Realized Gains: only new short- vs. long-term breakdown remains */}
         <div className="card realized-gains-container">
           <h3>Realized Gains/Losses</h3>
 
-          {/* If you want to show the new realized_gains field separately */}
           <p>
-            Realized Gains (Sells only):{" "}
-            {formatUsd(gainsAndLosses.realized_gains)}
+            <strong>Short‐Term Gains:</strong>{" "}
+            {formatUsd(gainsAndLosses.short_term_gains)}
+          </p>
+          <p>
+            <strong>Short‐Term Losses:</strong>{" "}
+            {formatUsd(gainsAndLosses.short_term_losses)}
+          </p>
+          <p>
+            <strong>Net Short‐Term:</strong>{" "}
+            {formatUsd(gainsAndLosses.short_term_net)}
           </p>
 
-          <p>Short Term: N/A</p>
-          <p>Long Term: N/A</p>
+          <hr />
 
-          {/* total_gains may be the same as realized_gains in your new logic */}
-          <p>Total Gains: {formatUsd(gainsAndLosses.total_gains)}</p>
-          <p>Total Losses: {formatUsd(gainsAndLosses.total_losses)}</p>
+          <p>
+            <strong>Long‐Term Gains:</strong>{" "}
+            {formatUsd(gainsAndLosses.long_term_gains)}
+          </p>
+          <p>
+            <strong>Long‐Term Losses:</strong>{" "}
+            {formatUsd(gainsAndLosses.long_term_losses)}
+          </p>
+          <p>
+            <strong>Net Long‐Term:</strong>{" "}
+            {formatUsd(gainsAndLosses.long_term_net)}
+          </p>
+
+          <hr />
+
+          <p>
+            <strong>Total Net Capital Gains:</strong>{" "}
+            {formatUsd(gainsAndLosses.total_net_capital_gains)}
+          </p>
         </div>
 
         {/* (C) Income / Interest / Rewards / Fees */}
@@ -250,17 +271,12 @@ const Dashboard: React.FC = () => {
           <p>Income (earned): {formatUsd(gainsAndLosses.income_earned)}</p>
           <p>Interest (earned): {formatUsd(gainsAndLosses.interest_earned)}</p>
           <p>Rewards (earned): {formatUsd(gainsAndLosses.rewards_earned)}</p>
-
-          {/* Gift is NOT counted as income, but we can show it here so the user sees the cost basis */}
           <p>
-            Gifts (received):{" "}
-            {formatUsd(gainsAndLosses.gifts_received)}{" "}
+            Gifts (received): {formatUsd(gainsAndLosses.gifts_received)}{" "}
             <span style={{ fontStyle: "italic" }}>
               (not added to income or gains)
             </span>
           </p>
-
-          {/* Show total_income if your backend returns it */}
           <p>
             Total Income (Income+Interest+Rewards):{" "}
             {formatUsd(gainsAndLosses.total_income)}

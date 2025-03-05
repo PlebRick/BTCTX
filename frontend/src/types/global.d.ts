@@ -28,57 +28,139 @@ declare global {
   /**
    * Raw GainsAndLosses data from the backend, where numeric fields
    * may be string or number. We parse them into real numbers in the UI.
-   * 
+   *
    * Note:
-   *  - `rewards_earned` and `gifts_received` might be missing in some older
-   *    backend responses, so we mark them optional with `?:`.
-   *  - `realized_gains` and `total_income` are also optional in raw data
-   *    if the server doesn't return them.
+   *  - Some fields may be missing if the server is older, so we mark them optional with `?:`.
+   *  - The short/long term fields are also optional.
    */
   interface GainsAndLossesRaw {
-    sells_proceeds: string | number;
-    withdrawals_spent: string | number;
-    income_earned: string | number;
-    interest_earned: string | number;
-    rewards_earned?: string | number;      // new: deposit-based reward (counted as income)
-    gifts_received?: string | number;      // new: deposit-based gift (NOT income/gains)
-    realized_gains?: string | number;      // new: purely from sells
-    total_income?: string | number;        // new: sum of income/interest/rewards
-
-    fees: {
-      USD: string | number;
-      BTC: string | number;
+    // --------------------- Legacy + existing fields ---------------------
+    sells_proceeds?: string | number;
+    withdrawals_spent?: string | number;
+    income_earned?: string | number;
+    interest_earned?: string | number;
+    rewards_earned?: string | number;
+    gifts_received?: string | number;
+    realized_gains?: string | number;
+    total_income?: string | number;
+    fees?: {
+      USD?: string | number;
+      BTC?: string | number;
     };
-    total_gains: string | number;          // legacy total_gains (for backward compatibility)
-    total_losses: string | number;
+    total_gains?: string | number;
+    total_losses?: string | number;
+
+    // --------------------- Old short/long fields (backward compat) ---------------------
+    /**
+     * Used by older code to track short-term realized gains.
+     * Replaced by the more detailed short_term_gains / short_term_losses, but still present for compatibility.
+     */
+    short_term_realized_gains?: string | number;
+
+    /**
+     * Used by older code to track long-term realized gains.
+     * Replaced by the more detailed long_term_gains / long_term_losses, but still present for compatibility.
+     */
+    long_term_realized_gains?: string | number;
+
+    /**
+     * Possibly the sum of short+long realized gains. Retained for older code usage.
+     */
+    total_realized_gains_usd?: string | number;
+
+    // --------------------- NEW detailed short/long fields ---------------------
+    /**
+     * The total short-term *gains* portion (positive numbers only).
+     */
+    short_term_gains?: string | number;
+
+    /**
+     * The total short-term *losses* portion (positive numbers only).
+     */
+    short_term_losses?: string | number;
+
+    /**
+     * The net short-term result (gains - losses). Can be negative or positive.
+     */
+    short_term_net?: string | number;
+
+    /**
+     * The total long-term *gains* portion (positive numbers only).
+     */
+    long_term_gains?: string | number;
+
+    /**
+     * The total long-term *losses* portion (positive numbers only).
+     */
+    long_term_losses?: string | number;
+
+    /**
+     * The net long-term result (gains - losses). Can be negative or positive.
+     */
+    long_term_net?: string | number;
+
+    /**
+     * The overall net capital gains/losses across short & long.
+     */
+    total_net_capital_gains?: string | number;
   }
 
   /**
    * Parsed GainsAndLosses after numeric conversions. All
-   * relevant fields are guaranteed to be `number`.
-   *
-   * This now includes:
-   *  - `rewards_earned`: BTC deposit-based "Reward" amounts, counted as income.
-   *  - `gifts_received`: BTC deposit-based "Gift" amounts, tracked for cost basis but NOT income.
-   *  - `realized_gains`: purely from sells.
-   *  - `total_income`: sum of income_earned + interest_earned + rewards_earned.
+   * relevant fields are guaranteed to be `number` (defaulting to 0 if missing).
    */
   interface GainsAndLosses {
+    // --------------------- Legacy + existing fields ---------------------
     sells_proceeds: number;
     withdrawals_spent: number;
     income_earned: number;
     interest_earned: number;
-    rewards_earned: number;    // deposit-based "Reward"
-    gifts_received: number;    // deposit-based "Gift" (not counted as income)
-    realized_gains: number;    // capital gains from sells only
-    total_income: number;      // sum of income/interest/rewards
-
+    rewards_earned: number;
+    gifts_received: number;
+    realized_gains: number;
+    total_income: number;
     fees: {
       USD: number;
       BTC: number;
     };
-    total_gains: number;       // same as realized_gains in your refactored logic
+    total_gains: number;
     total_losses: number;
+
+    // --------------------- Old short/long fields (backward compat) ---------------------
+    short_term_realized_gains?: number;    // might be 0 or undefined if older backend
+    long_term_realized_gains?: number;     // might be 0 or undefined
+    total_realized_gains_usd?: number;     // short+long combined
+
+    // --------------------- NEW detailed short/long fields ---------------------
+    short_term_gains: number;             // sum of short-term gains
+    short_term_losses: number;            // sum of short-term losses
+    short_term_net: number;               // short_term_gains - short_term_losses
+    long_term_gains: number;              // sum of long-term gains
+    long_term_losses: number;             // sum of long-term losses
+    long_term_net: number;                // long_term_gains - long_term_losses
+    total_net_capital_gains: number;      // overall net across short & long
+  }
+
+  // --------------------------------------------------------------
+  // 1a) Optional: Bitcoin Price API Types
+  // --------------------------------------------------------------
+
+  /**
+   * For /bitcoin/price => returns { USD: number }
+   * We can store it in a generic object if you track multiple currencies,
+   * but typically you just have { USD: 12345.67 }.
+   */
+  interface LiveBtcPriceResponse {
+    USD: number;
+  }
+
+  /**
+   * For /bitcoin/price/history?days=7 => returns an array
+   * of { time: number, price: number } in your code.
+   */
+  interface BtcPriceHistoryPoint {
+    time: number;   // e.g. Unix timestamp in seconds
+    price: number;  // in USD
   }
 
   // --------------------------------------------------------------

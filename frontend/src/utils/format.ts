@@ -85,7 +85,6 @@ export function formatTimestamp(isoString: string): string {
  * No local interface definitions needed — we import them from global.d.ts.
  */
 
-
 /**
  * parseTransaction:
  *  - Converts string-based numeric fields (e.g. "50.00000000") to numbers
@@ -124,30 +123,49 @@ export function parseTransaction(rawTx: ITransactionRaw): ITransaction {
  *  - Parses raw GainsAndLosses data into numeric format.
  *  - Ensures all fields are real numbers, defaulting to 0 if missing.
  *
- * In your updated backend + global.d.ts:
- *  - rewards_earned, gifts_received, realized_gains, total_income
- *    are separate fields. We parse them here to keep them out of
- *    capital gains if needed.
+ * Note:
+ *  - We keep older fields (short_term_realized_gains, etc.) for backward
+ *    compatibility.
+ *  - We also add new fields for detailed short-term vs. long-term gains/losses.
  */
 export function parseGainsAndLosses(raw: GainsAndLossesRaw): GainsAndLosses {
   return {
+    // ------------------ Existing or legacy fields ------------------
     sells_proceeds: parseDecimal(raw.sells_proceeds),
     withdrawals_spent: parseDecimal(raw.withdrawals_spent),
     income_earned: parseDecimal(raw.income_earned),
     interest_earned: parseDecimal(raw.interest_earned),
-    // Newly added fields
     rewards_earned: parseDecimal(raw.rewards_earned),
     gifts_received: parseDecimal(raw.gifts_received),
     realized_gains: parseDecimal(raw.realized_gains),
     total_income: parseDecimal(raw.total_income),
 
+    // Fees are nested; parse both USD & BTC
     fees: {
       USD: parseDecimal(raw.fees?.USD),
       BTC: parseDecimal(raw.fees?.BTC),
     },
 
-    // For backward compatibility, total_gains is still present
+    // total_gains & total_losses still exist for older code references
     total_gains: parseDecimal(raw.total_gains),
     total_losses: parseDecimal(raw.total_losses),
+
+    // Backward compatibility: older short/long fields
+    short_term_realized_gains: parseDecimal(raw.short_term_realized_gains),
+    long_term_realized_gains: parseDecimal(raw.long_term_realized_gains),
+    total_realized_gains_usd: parseDecimal(raw.total_realized_gains_usd),
+
+    // ------------------ New short/long breakdown fields ------------------
+    // These fields allow more precise FIFO reporting for IRS compliance:
+    short_term_gains: parseDecimal(raw.short_term_gains),
+    short_term_losses: parseDecimal(raw.short_term_losses),
+    short_term_net: parseDecimal(raw.short_term_net),
+
+    long_term_gains: parseDecimal(raw.long_term_gains),
+    long_term_losses: parseDecimal(raw.long_term_losses),
+    long_term_net: parseDecimal(raw.long_term_net),
+
+    // Overall net gains across short & long
+    total_net_capital_gains: parseDecimal(raw.total_net_capital_gains),
   };
 }
