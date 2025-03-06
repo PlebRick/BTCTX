@@ -134,11 +134,12 @@ body {
 /* Individual header nav link */
 .header-nav-item {
   color: var(--color-text-dim);
-  font-size: 0.9rem;
+  font-size: 0.1rem;
   padding: 0.5rem;
   border-radius: 4px;
   transition: color 0.2s, background-color 0.2s;
   text-decoration: none; /* remove underline */
+  margin-left: 35px;
 }
 
 .header-nav {

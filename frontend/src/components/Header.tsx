@@ -1,16 +1,9 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 
-interface HeaderProps {
-  pageTitle?: string; // optional if you like
-}
-
-const Header: React.FC<HeaderProps> = ({ pageTitle }) => {
+const Header: React.FC = () => {
   return (
     <header className="header">
-      {/* If pageTitle is provided, render it */}
-      {pageTitle && <h1>{pageTitle}</h1>}
-
       <nav className="header-nav">
         <NavLink
           to="/dashboard"
