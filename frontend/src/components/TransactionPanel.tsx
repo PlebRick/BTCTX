@@ -6,12 +6,14 @@ interface TransactionPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmitSuccess?: () => void;
+  transactionId?: number | null; // New prop for editing
 }
 
 const TransactionPanel: React.FC<TransactionPanelProps> = ({
   isOpen,
   onClose,
   onSubmitSuccess,
+  transactionId,
 }) => {
   const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [isFormDirty, setIsFormDirty] = useState(false);
@@ -52,7 +54,7 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
       <div className="transaction-panel-overlay" onClick={handleOverlayClick} />
       <div className="transaction-panel">
         <div className="panel-header">
-          <h2>Add Transaction</h2>
+          <h2>{transactionId ? "Edit Transaction" : "Add Transaction"}</h2>
         </div>
 
         <div className="panel-body">
@@ -60,6 +62,7 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
             id="transaction-form"
             onDirtyChange={setIsFormDirty}
             onSubmitSuccess={handleFormSubmitSuccess}
+            transactionId={transactionId} // Pass to form
           />
         </div>
 
@@ -69,7 +72,7 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
             type="submit"
             form="transaction-form"
           >
-            Save Transaction
+            {transactionId ? "Update Transaction" : "Save Transaction"}
           </button>
         </div>
       </div>
