@@ -1,6 +1,5 @@
+// frontend/src/components/TransactionForm.tsx
 /**
- * TransactionForm.tsx
- *
  * Pulls all domain-specific types (TransactionType, TransactionFormData, etc.)
  * from your global.d.ts. The only local interface below is TransactionFormProps,
  * which is purely a React prop type you can optionally move to global if desired.
@@ -31,6 +30,7 @@ interface TransactionFormProps {
   id?: string;
   onDirtyChange?: (dirty: boolean) => void;
   onSubmitSuccess?: () => void;
+  transactionId?: number | null; // New prop for editing
 }
 
 // ------------------------------------------------------------
@@ -104,6 +104,85 @@ function mapDoubleEntryAccounts(data: TransactionFormData): IAccountMapping {
   }
 }
 
+// New function to map ITransaction to TransactionFormData
+function mapTransactionToFormData(tx: ITransaction): TransactionFormData {
+  const baseData = {
+    type: tx.type,
+    timestamp: new Date(tx.timestamp).toISOString().slice(0, 16),
+    fee: tx.fee_amount ?? 0,
+  };
+
+  const accountIdToType = (id: number): AccountType => {
+    switch (id) {
+      case 1: return "Bank";
+      case 2: return "Wallet";
+      case 3: return "Exchange";
+      case 4: return "Exchange";
+      default: return "External";
+    }
+  };
+
+  const getCurrencyFromAccountId = (id: number): Currency => {
+    return id === 1 || id === 3 ? "USD" : "BTC";
+  };
+
+  switch (tx.type) {
+    case "Deposit":
+      const toAccount = accountIdToType(tx.to_account_id);
+      const currency = getCurrencyFromAccountId(tx.to_account_id);
+      return {
+        ...baseData,
+        account: toAccount,
+        currency,
+        amount: tx.amount,
+        source: tx.source ?? "N/A",
+        costBasisUSD: tx.cost_basis_usd ?? 0,
+      };
+    case "Withdrawal":
+      const fromAccount = accountIdToType(tx.from_account_id);
+      const currency = getCurrencyFromAccountId(tx.from_account_id);
+      return {
+        ...baseData,
+        account: fromAccount,
+        currency,
+        amount: tx.amount,
+        purpose: tx.purpose ?? "N/A",
+        proceeds_usd: tx.proceeds_usd ?? 0,
+      };
+    case "Transfer":
+      const fromAccount = accountIdToType(tx.from_account_id);
+      const toAccount = accountIdToType(tx.to_account_id);
+      const fromCurrency = getCurrencyFromAccountId(tx.from_account_id);
+      const toCurrency = getCurrencyFromAccountId(tx.to_account_id);
+      return {
+        ...baseData,
+        fromAccount,
+        toAccount,
+        fromCurrency,
+        toCurrency,
+        amountFrom: tx.amount,
+        amountTo: tx.amount - (tx.fee_amount ?? 0), // Fee deducted for BTC transfers
+        fee: tx.fee_amount ?? 0,
+      };
+    case "Buy":
+      return {
+        ...baseData,
+        account: "Exchange",
+        amountUSD: tx.cost_basis_usd ?? 0,
+        amountBTC: tx.amount,
+      };
+    case "Sell":
+      return {
+        ...baseData,
+        account: "Exchange",
+        amountBTC: tx.amount,
+        amountUSD: tx.proceeds_usd ?? 0,
+      };
+    default:
+      return baseData;
+  }
+}
+
 /**
  * TransactionForm:
  * Handles creating/editing a transaction in "single-entry" style.
@@ -114,6 +193,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   id,
   onDirtyChange,
   onSubmitSuccess,
+  transactionId,
 }) => {
   // react-hook-form setup
   const {
@@ -147,16 +227,30 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const amountBtcVal = watch("amountBTC") || 0; // For Buy/Sell
   const fromAccountVal = watch("fromAccount");
 
-  /**
-   * For debugging or logging user inputs (optional)
-   */
+  // Fetch transaction data when editing
   useEffect(() => {
-    // console.log("User typed in amountUSD:", amountUsdVal);
-  }, [amountUsdVal]);
-
-  useEffect(() => {
-    // console.log("User typed in amountBTC:", amountBtcVal);
-  }, [amountBtcVal]);
+    if (transactionId) {
+      api.get<ITransactionRaw>(`/transactions/${transactionId}`)
+        .then(response => {
+          const tx = parseTransaction(response.data); // Parse raw data
+          const formData = mapTransactionToFormData(tx);
+          reset(formData); // Pre-fill form
+          setCurrentType(tx.type); // Set transaction type
+        })
+        .catch(error => {
+          console.error("Failed to fetch transaction:", error);
+          alert("Failed to load transaction data.");
+        });
+    } else {
+      reset({
+        timestamp: new Date().toISOString().slice(0, 16),
+        fee: 0,
+        costBasisUSD: 0,
+        proceeds_usd: 0,
+      });
+      setCurrentType("");
+    }
+  }, [transactionId, reset]);
 
   /**
    * Notify parent (if any) about "dirty" (unsaved) form state
@@ -257,7 +351,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         setValue("fee", feeBtc);
 
         // Example approximate price to show the user
-        const mockBtcPrice = 30000; 
+        const mockBtcPrice = 90000; 
         const approxUsd = feeBtc * mockBtcPrice;
         setFeeInUsdDisplay(Number(approxUsd.toFixed(2)));
       }
@@ -282,7 +376,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
       // (2) Resolve from/to account IDs
       const { from_account_id, to_account_id } = mapDoubleEntryAccounts(data);
-
       // (3) Convert "datetime-local" to full ISO8601 for the backend
       const isoTimestamp = localDatetimeToIso(data.timestamp);
 
@@ -351,7 +444,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         is_locked: false,
       };
 
-      // (6) POST to the backend
+      if (transactionId) {
+        // Update existing transaction
+        const response = await api.put(`/transactions/${transactionId}`, transactionPayload);
+        console.log("Transaction updated:", response.data);
+        alert("Transaction updated successfully!");
+      } else {
+      // (6) Create new transaction and POST to the backend
       const response = await api.post("/transactions", transactionPayload);
       console.log("Transaction created:", response.data);
 
