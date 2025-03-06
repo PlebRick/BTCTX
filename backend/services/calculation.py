@@ -49,9 +49,13 @@ def get_gains_and_losses(db: Session) -> Dict:
     sells_proceeds = Decimal("0.0")
     withdrawals_spent = Decimal("0.0")
     income_earned = Decimal("0.0")
+    income_btc = Decimal("0.0")
     interest_earned = Decimal("0.0")
+    interest_btc = Decimal("0.0")
     rewards_earned = Decimal("0.0")
+    rewards_btc = Decimal("0.0")
     gifts_received = Decimal("0.0")
+    gifts_btc = Decimal("0.0")
     fees_usd = Decimal("0.0")
     fees_btc = Decimal("0.0")
 
@@ -88,11 +92,15 @@ def get_gains_and_losses(db: Session) -> Dict:
             tx.type.lower() == "deposit"
             and (tx.source or "").lower() == "income"
             and tx.cost_basis_usd is not None
+            and tx.amount is not None
         ):
             try:
                 cb = Decimal(str(tx.cost_basis_usd))
+                amt = Decimal(str(tx.amount))  # Get BTC amount
                 if cb > 0:
                     income_earned += cb
+                if amt > 0:
+                    income_btc += amt  # Store BTC amount
             except Exception as e:
                 logging.warning(f"Error converting cost_basis_usd for Income Deposit txn {tx.id}: {e}")
 
@@ -101,11 +109,15 @@ def get_gains_and_losses(db: Session) -> Dict:
             tx.type.lower() == "deposit"
             and (tx.source or "").lower() == "interest"
             and tx.cost_basis_usd is not None
+            and tx.amount is not None
         ):
             try:
                 cb = Decimal(str(tx.cost_basis_usd))
+                amt = Decimal(str(tx.amount))
                 if cb > 0:
                     interest_earned += cb
+                if amt > 0:
+                    interest_btc += amt  # Store BTC amount
             except Exception as e:
                 logging.warning(f"Error converting cost_basis_usd for Interest Deposit txn {tx.id}: {e}")
 
@@ -114,11 +126,15 @@ def get_gains_and_losses(db: Session) -> Dict:
             tx.type.lower() == "deposit"
             and (tx.source or "").lower() == "reward"
             and tx.cost_basis_usd is not None
+            and tx.amount is not None
         ):
             try:
                 cb = Decimal(str(tx.cost_basis_usd))
+                amt = Decimal(str(tx.amount))
                 if cb > 0:
                     rewards_earned += cb
+                if amt > 0:
+                    rewards_btc += amt  # Store BTC amount
             except Exception as e:
                 logging.warning(f"Error converting cost_basis_usd for Reward Deposit txn {tx.id}: {e}")
 
@@ -127,11 +143,15 @@ def get_gains_and_losses(db: Session) -> Dict:
             tx.type.lower() == "deposit"
             and (tx.source or "").lower() == "gift"
             and tx.cost_basis_usd is not None
+            and tx.amount is not None
         ):
             try:
                 cb = Decimal(str(tx.cost_basis_usd))
+                amt = Decimal(str(tx.amount))
                 if cb > 0:
                     gifts_received += cb
+                if amt > 0:
+                    gifts_btc += amt  # Store BTC amount
             except Exception as e:
                 logging.warning(f"Error converting cost_basis_usd for Gift Deposit txn {tx.id}: {e}")
 
@@ -192,9 +212,13 @@ def get_gains_and_losses(db: Session) -> Dict:
         "sells_proceeds": sells_proceeds,
         "withdrawals_spent": withdrawals_spent,
         "income_earned": income_earned,
+        "income_btc": income_btc,  # ✅ NEW
         "interest_earned": interest_earned,
+        "interest_btc": interest_btc,  # ✅ NEW
         "rewards_earned": rewards_earned,
+        "rewards_btc": rewards_btc,  # ✅ NEW
         "gifts_received": gifts_received,
+        "gifts_btc": gifts_btc,  # ✅ NEW
         "fees": {
             "USD": fees_usd,
             "BTC": fees_btc,
@@ -209,3 +233,4 @@ def get_gains_and_losses(db: Session) -> Dict:
         "long_term_net": long_term_net,
         "total_net_capital_gains": total_net_capital_gains,
     }
+

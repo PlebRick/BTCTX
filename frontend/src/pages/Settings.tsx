@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import api from '../api'; // Centralized API client
+import React, { useState } from "react";
+import axios from "axios";
+import api from "../api"; // Centralized API client
+import "../styles/Settings.css"; 
+
+// ✅ Define the API error response type
+interface ApiErrorResponse {
+  detail?: string;
+}
 
 const Settings: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
 
-  const handleDeleteTransactions = async () => {
-    const confirmed = window.confirm(
+  // ✅ Function to delete all transactions
+  const handleDeleteTransactions = async (): Promise<void> => {
+    const confirmed: boolean = window.confirm(
       "Are you sure you want to delete all transactions? This action cannot be undone."
     );
     if (!confirmed) {
@@ -18,14 +25,13 @@ const Settings: React.FC = () => {
     setMessage("");
 
     try {
-      await api.delete('/transactions/delete_all');
+      await api.delete<ApiErrorResponse>("/transactions/delete_all");
       setMessage("All transactions have been successfully deleted.");
     } catch (error: unknown) {
       console.error("Error deleting transactions:", error);
       if (axios.isAxiosError<ApiErrorResponse>(error)) {
-        // error.response?.data is now seen as ApiErrorResponse (or undefined)
-        const detailMsg = error.response?.data?.detail;
-        const fallbackMsg = error.message || "Failed to delete transactions.";
+        const detailMsg: string | undefined = error.response?.data?.detail;
+        const fallbackMsg: string = error.message || "Failed to delete transactions.";
         setMessage(detailMsg ?? fallbackMsg);
       } else if (error instanceof Error) {
         setMessage(error.message);
@@ -38,19 +44,56 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <p>Manage your user settings here.</p>
-      <hr />
-      <div>
-        <h3>Data Management</h3>
-        <button
-          onClick={handleDeleteTransactions}
-          disabled={loading}
-          style={{ padding: "0.5rem 1rem" }}
-        >
-          {loading ? "Deleting Transactions..." : "Delete All Transactions"}
-        </button>
-        {message && <p>{message}</p>}
+    <div className="settings-container">
+      <h2 className="settings-title">Settings</h2>
+
+      {/* ✅ Data Management */}
+      <div className="settings-section">
+        <div className="settings-option">
+          <div>
+            <span className="settings-option-title">Delete All Transactions</span>
+            <p className="settings-option-subtitle">This action cannot be undone.</p>
+          </div>
+          <button
+            onClick={handleDeleteTransactions}
+            disabled={loading}
+            className="settings-button danger"
+          >
+            {loading ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+        {message && <p className="settings-message">{message}</p>}
+      </div>
+
+      {/* ✅ Account Section */}
+      <div className="settings-section">
+        <h3>Account</h3>
+        <div className="settings-option">
+          <div>
+            <span className="settings-option-title">Logout</span>
+            <p className="settings-option-subtitle">Sign out of your account.</p>
+          </div>
+          <button className="settings-button">Logout</button>
+        </div>
+        <div className="settings-option">
+          <div>
+            <span className="settings-option-title">Reset Account</span>
+            <p className="settings-option-subtitle">Reset your account data.</p>
+          </div>
+          <button className="settings-button">Reset</button>
+        </div>
+      </div>
+
+      {/* ✅ Application Section */}
+      <div className="settings-section">
+        <h3>Application</h3>
+        <div className="settings-option">
+          <div>
+            <span className="settings-option-title">Uninstall</span>
+            <p className="settings-option-subtitle">Remove the application.</p>
+          </div>
+          <button className="settings-button danger">Uninstall</button>
+        </div>
       </div>
     </div>
   );

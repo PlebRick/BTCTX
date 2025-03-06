@@ -1,0 +1,86 @@
+/* Settings container - Align left with padding */
+.settings-container {
+    max-width: 600px;
+    margin: 20px;
+    padding: 20px;
+    background-color: #1c1c1e;
+    border-radius: 10px;
+    color: white;
+    font-family: Arial, sans-serif;
+    position: relative;
+    left: 20px; /* Moves the container slightly away from the left */
+  }
+  
+  /* Title */
+  .settings-title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+  }
+  
+  /* Each section */
+  .settings-section {
+    background: #2c2c2e;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+  }
+  
+  /* Section headings */
+  .settings-section h3 {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  
+  /* Individual option rows */
+  .settings-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 0;
+    border-top: 1px solid #3a3a3c;
+  }
+  
+  /* Option title and subtitle */
+  .settings-option-title {
+    font-size: 16px;
+    font-weight: bold;
+  }
+  
+  .settings-option-subtitle {
+    font-size: 14px;
+    color: #a1a1a1;
+  }
+  
+  /* Buttons */
+  .settings-button {
+    background: #3a3a3c;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.3s ease;
+  }
+  
+  .settings-button:hover {
+    background: #505052;
+  }
+  
+  /* Danger (Delete/Uninstall) Buttons */
+  .settings-button.danger {
+    background: #ff453a;
+  }
+  
+  .settings-button.danger:hover {
+    background: #d72c1c;
+  }
+  
+  /* Message */
+  .settings-message {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #ff9f0a;
+  }
+  
