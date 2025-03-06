@@ -165,6 +165,8 @@ const Transactions: React.FC = () => {
   const [sortMode, setSortMode] = useState<SortMode>("TIMESTAMP_DESC");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  // New state for tracking the transaction being edited
+  const [editingTransactionId, setEditingTransactionId] = useState<number | null>(null);
 
   // --------------------------------------------------
   // Fetch Transactions from the API
@@ -204,11 +206,15 @@ const Transactions: React.FC = () => {
   // Dialog toggles
   // --------------------------------------------------
   const openPanel = () => setIsPanelOpen(true);
-  const closePanel = () => setIsPanelOpen(false);
+  const closePanel = () => {
+    setIsPanelOpen(false);
+    setEditingTransactionId(null); // Reset editing ID when closing
+  };
 
   // Called after a successful form submit
   const handleSubmitSuccess = () => {
     setIsPanelOpen(false);
+    setEditingTransactionId(null); // Reset after successful submit
     fetchTransactions();
   };
 
@@ -342,8 +348,8 @@ const Transactions: React.FC = () => {
                     {/* Edit button pinned on the right */}
                     <button
                       onClick={() => {
-                        console.log("Edit transaction", tx.id);
-                        alert("Edit functionality TBD");
+                        setEditingTransactionId(tx.id);
+                        setIsPanelOpen(true);
                       }}
                       className="edit-button"
                     >
@@ -362,6 +368,7 @@ const Transactions: React.FC = () => {
         isOpen={isPanelOpen}
         onClose={closePanel}
         onSubmitSuccess={handleSubmitSuccess}
+        transactionId={editingTransactionId} // Pass the ID to the panel
       />
     </div>
   );
