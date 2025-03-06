@@ -44,20 +44,20 @@ body {
   align-items: center;
   justify-content: center;
   height: 64px; /* matches header height */
-  padding-left: .5rem;
+  padding-left: 0rem;
   padding-top: 1rem;
 }
 
 .sidebar-logo {
-  width: 30px;
-  height: 30px;
+  width: 35px;
+  height: 35px;
   border-radius: 50%;
   object-fit: cover;
   transform: translateY(-1px);
 }
 
 .sidebar-title {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   font-weight: bold;
   color: #fff; 
   margin-left: 0.5rem;
@@ -78,7 +78,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;  /* small gap between converter & calculator */
+  gap: 1rem;  /* small gap between converter & calculator */
   padding-bottom: 20px;
 }
 
@@ -86,7 +86,7 @@ body {
   display: flex;
   justify-content: center;
   width: 100%;
-  margin-top: 0; /* no extra margin to keep it near the brand area */
+  margin-top: 1rem; /* margin to keep it near the brand area */
 }
 
 .sidebar-calculator {
@@ -118,6 +118,7 @@ body {
 .header-title {
   color: var(--color-text-dim);
   font-size: 1rem;
+  font-weight: bold;
   margin: 0;
 }
 
@@ -134,7 +135,7 @@ body {
 /* Individual header nav link */
 .header-nav-item {
   color: var(--color-text-dim);
-  font-size: 0.1rem;
+  font-size: 1rem;
   padding: 0.5rem;
   border-radius: 4px;
   transition: color 0.2s, background-color 0.2s;

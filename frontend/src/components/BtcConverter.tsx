@@ -111,7 +111,7 @@ const BtcConverter: React.FC = () => {
   // --------------------------------------------
   return (
     <div className="converter">
-      <div className="converter-title">sats converter</div>
+      <div className="converter-title">Sats Converter</div>
 
       {/* Toggle between manual vs auto mode */}
       <div className="price-toggle">
@@ -149,13 +149,13 @@ const BtcConverter: React.FC = () => {
       {isAutoPrice && (
         <div className="auto-price-row">
           <p>
-            Live BTC Price:&nbsp;
+            BTC:&nbsp;
             {autoBtcPrice !== null
               ? `$${autoBtcPrice.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}`
-              : "Loading..."}
+              : "Loading..."} USD
           </p>
         </div>
       )}
