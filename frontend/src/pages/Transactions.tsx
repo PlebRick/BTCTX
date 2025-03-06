@@ -11,9 +11,9 @@ import {
 } from "../utils/format";
 
 // IMPORTANT:
-// Because `global.d.ts` declares ITransaction, ITransactionRaw, SortMode, etc. 
+// Because `global.d.ts` declares ITransaction, ITransactionRaw, SortMode, etc.
 // in the global scope, we do NOT import them here.
-// We can just use `ITransaction`, `ITransactionRaw`, etc., directly.
+// We can just use `ITransaction`, `ITransactionRaw`, etc. directly.
 
 void formatTimestamp; // to avoid TS “unused import” warnings
 void parseDecimal;    // same reason
@@ -124,7 +124,7 @@ function formatExtra(tx: ITransaction): string {
 }
 
 // ----------------------------------------------------
-// Build disposal label for Sell/Withdrawal 
+// Build disposal label for Sell/Withdrawal
 // to show Gains/Losses (and holding period)
 // ----------------------------------------------------
 function buildDisposalLabel(tx: ITransaction): string {
@@ -159,12 +159,16 @@ function buildDisposalLabel(tx: ITransaction): string {
 // Main Transactions Component
 // ----------------------------------------------------
 const Transactions: React.FC = () => {
-  // Local state
+  // Local states
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [transactions, setTransactions] = useState<ITransaction[] | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("TIMESTAMP_DESC");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // NEW: single state for storing the transaction to edit
+  // If null => create mode; if not null => edit mode
+  const [selectedTransaction, setSelectedTransaction] = useState<ITransaction | null>(null);
 
   // --------------------------------------------------
   // Fetch Transactions from the API
@@ -201,9 +205,20 @@ const Transactions: React.FC = () => {
   }, []);
 
   // --------------------------------------------------
-  // Dialog toggles
+  // Panel Toggles
   // --------------------------------------------------
-  const openPanel = () => setIsPanelOpen(true);
+  const openCreatePanel = () => {
+    // means "create" mode
+    setSelectedTransaction(null);
+    setIsPanelOpen(true);
+  };
+
+  const openEditPanel = (tx: ITransaction) => {
+    // means "edit" mode
+    setSelectedTransaction(tx);
+    setIsPanelOpen(true);
+  };
+
   const closePanel = () => setIsPanelOpen(false);
 
   // Called after a successful form submit
@@ -249,7 +264,7 @@ const Transactions: React.FC = () => {
     <div className="transactions-page">
       {/* Header row with Add button (left) and sort control (right) */}
       <div className="transactions-header">
-        <button className="accent-btn" onClick={openPanel}>
+        <button className="accent-btn" onClick={openCreatePanel}>
           Add Transaction
         </button>
 
@@ -343,7 +358,7 @@ const Transactions: React.FC = () => {
                     <button
                       onClick={() => {
                         console.log("Edit transaction", tx.id);
-                        alert("Edit functionality TBD");
+                        openEditPanel(tx);
                       }}
                       className="edit-button"
                     >
@@ -357,11 +372,14 @@ const Transactions: React.FC = () => {
         </div>
       )}
 
-      {/* Slide‐in panel for adding a new transaction */}
+      {/* Slide‐in panel for adding/editing a transaction */}
       <TransactionPanel
         isOpen={isPanelOpen}
         onClose={closePanel}
         onSubmitSuccess={handleSubmitSuccess}
+        // The important logic: if selectedTransaction != null => "edit", else "create"
+        mode={selectedTransaction ? "edit" : "create"}
+        existingTransaction={selectedTransaction || undefined}
       />
     </div>
   );

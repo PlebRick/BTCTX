@@ -31,6 +31,14 @@ interface TransactionFormProps {
   id?: string;
   onDirtyChange?: (dirty: boolean) => void;
   onSubmitSuccess?: () => void;
+
+  // NEW: Allows using the same form for create or edit
+  mode?: "create" | "edit";
+  existingTransaction?: ITransaction;
+  /**
+   * If parent wants to show a spinner, we can notify it that we're "Saving".
+   */
+  onSavingStateChange?: (saving: boolean) => void;
 }
 
 // ------------------------------------------------------------
@@ -114,8 +122,44 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   id,
   onDirtyChange,
   onSubmitSuccess,
+
+  // NEW: default to "create" if not specified
+  mode = "create",
+  existingTransaction,
+  onSavingStateChange,
 }) => {
-  // react-hook-form setup
+  // ----------------------------------------------------------------------------
+  // 1) REACT-HOOK-FORM SETUP
+  // ----------------------------------------------------------------------------
+  // If we are editing an existing transaction, we can fill in initial values:
+  const editModeDefaults: TransactionFormData | undefined = (() => {
+    if (mode === "edit" && existingTransaction) {
+      // Minimal approach: set up the form data from the existing transaction
+      // This is optional, or you can do a detailed mapping
+      // For now, we keep the same approach as create, but you can parse "existingTransaction" if you want
+      // e.g. if it's a BTC deposit, "amount"= existingTransaction.amount, etc.
+      // To keep the form logic identical, we’ll do a quick partial:
+      const preset: TransactionFormData = {
+        timestamp: existingTransaction.timestamp.slice(0, 16), // Convert "2025-03-01T12:00:00Z" => "2025-03-01T12:00"
+        type: existingTransaction.type,
+        fee: existingTransaction.fee_amount,
+        costBasisUSD: existingTransaction.cost_basis_usd,
+        proceeds_usd: existingTransaction.proceeds_usd,
+      };
+      // For deposit/withdrawal, put existingTransaction.amount in the "amount" field
+      // For buy/sell, put it in "amountBTC," etc.  We'll keep it simpler for now
+      if (existingTransaction.type === "Deposit" || existingTransaction.type === "Withdrawal") {
+        preset.amount = existingTransaction.amount;
+      } else if (existingTransaction.type === "Buy" || existingTransaction.type === "Sell") {
+        preset.amountBTC = existingTransaction.amount;
+        // etc. You can do more detailed mapping if you want
+      }
+      return preset;
+    }
+    // else return undefined, meaning we default to the normal creation defaults
+    return undefined;
+  })();
+
   const {
     register,
     handleSubmit,
@@ -124,7 +168,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     reset,
     formState: { errors, isDirty },
   } = useForm<TransactionFormData>({
-    defaultValues: {
+    defaultValues: editModeDefaults || {
       timestamp: new Date().toISOString().slice(0, 16), // e.g. "2025-03-01T12:00"
       fee: 0,
       costBasisUSD: 0,
@@ -132,9 +176,16 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     },
   });
 
+  // ----------------------------------------------------------------------------
+  // 2) LOCAL STATES & WATCH FIELDS
+  // ----------------------------------------------------------------------------
+
   // Local state to track the user-selected transaction type,
   // as well as a display-only USD estimate of any BTC fee (for Transfer).
-  const [currentType, setCurrentType] = useState<TransactionType | "">("");
+  // If we're in edit mode, we can default currentType to the existingTransaction's type.
+  const [currentType, setCurrentType] = useState<TransactionType | "">(
+    mode === "edit" && existingTransaction ? existingTransaction.type : ""
+  );
   const [feeInUsdDisplay, setFeeInUsdDisplay] = useState<number>(0);
 
   // Watch certain fields for dynamic UI logic
@@ -217,10 +268,16 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
    * we reset the form but keep the newly selected transaction type.
    */
   const onTransactionTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    // If we're editing, you might want to disable changing the type:
+    if (mode === "edit") {
+      // If you absolutely don't want to allow type changes in edit mode:
+      // return;
+    }
+
     const selectedType = e.target.value as TransactionType;
     setCurrentType(selectedType);
 
-    // Reset the form to default values
+    // Reset the form to default values + new type
     reset({
       type: selectedType,
       timestamp: new Date().toISOString().slice(0, 16),
@@ -257,21 +314,22 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         setValue("fee", feeBtc);
 
         // Example approximate price to show the user
-        const mockBtcPrice = 30000; 
+        const mockBtcPrice = 30000;
         const approxUsd = feeBtc * mockBtcPrice;
         setFeeInUsdDisplay(Number(approxUsd.toFixed(2)));
       }
     }
   }, [currentType, fromCurrencyVal, amountFromVal, amountToVal, setValue]);
 
-  /**
-   * onSubmit:
-   * Handle final form submission by constructing an ICreateTransactionPayload
-   * and POSTing to /transactions. We parse decimals to ensure numeric fields.
-   */
+  // ----------------------------------------------------------------------------
+  // 3) onSubmit: Differentiates between create vs. edit
+  // ----------------------------------------------------------------------------
   const onSubmit: SubmitHandler<TransactionFormData> = async (data) => {
+    // If parent wants to show a spinner, say "true" now, "false" after
+    onSavingStateChange?.(true);
+
     try {
-      // (1) If it's a BTC Withdrawal and proceeds_usd was not specified, default to 0
+      // If it's a BTC Withdrawal and proceeds_usd was not specified, default to 0
       if (
         data.type === "Withdrawal" &&
         data.currency === "BTC" &&
@@ -295,41 +353,39 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       let proceeds_usd: number | undefined = undefined;
 
       switch (data.type) {
-        case "Deposit":
+        case "Deposit": {
           amount = parseDecimal(data.amount);
-          // For Deposits, we no longer show any dynamic fee field, even for BTC.
-          // The user can incorporate BTC miner fees into costBasisUSD if desired.
           feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
           source = data.source && data.source !== "N/A" ? data.source : "N/A";
           if (showCostBasisField) {
             cost_basis_usd = parseDecimal(data.costBasisUSD);
           }
           break;
-
-        case "Withdrawal":
+        }
+        case "Withdrawal": {
           amount = parseDecimal(data.amount);
           feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
           purpose = data.purpose && data.purpose !== "N/A" ? data.purpose : "N/A";
           proceeds_usd = parseDecimal(data.proceeds_usd);
           break;
-
-        case "Transfer":
+        }
+        case "Transfer": {
           amount = parseDecimal(data.amountFrom);
           feeCurrency = data.fromCurrency === "BTC" ? "BTC" : "USD";
           break;
-
-        case "Buy":
+        }
+        case "Buy": {
           amount = parseDecimal(data.amountBTC);
           feeCurrency = "USD";
           cost_basis_usd = parseDecimal(data.amountUSD);
           break;
-
-        case "Sell":
+        }
+        case "Sell": {
           amount = parseDecimal(data.amountBTC);
           feeCurrency = "USD";
           proceeds_usd = parseDecimal(data.amountUSD);
           break;
-
+        }
         default:
           // Should never happen if type is enforced via TS
           break;
@@ -348,38 +404,52 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         proceeds_usd,
         source,
         purpose,
-        is_locked: false,
+        // If editing an existing locked TX, the server will reject anyway
+        // but let's pass false or the existing is_locked if you want
+        is_locked: mode === "edit" && existingTransaction
+          ? existingTransaction.is_locked
+          : false,
       };
 
-      // (6) POST to the backend
-      const response = await api.post("/transactions", transactionPayload);
-      console.log("Transaction created:", response.data);
+      // (6) POST or PUT depending on mode
+      let response;
+      if (mode === "edit" && existingTransaction) {
+        // If edit, do PUT /transactions/:id
+        response = await api.put(`/transactions/${existingTransaction.id}`, transactionPayload);
+        console.log("Transaction updated:", response.data);
+      } else {
+        // Otherwise, create new via POST
+        response = await api.post("/transactions", transactionPayload);
+        console.log("Transaction created:", response.data);
+      }
 
-      // If the server returns a realized_gain_usd, show an alert with that info
+      // If the server returns realized_gain_usd, show an alert with that info
       if (response.data) {
-        const createdTx = response.data as ITransactionRaw;
-        const rg = createdTx.realized_gain_usd
-          ? parseDecimal(createdTx.realized_gain_usd)
+        const returnedTx = response.data as ITransactionRaw;
+        const rg = returnedTx.realized_gain_usd
+          ? parseDecimal(returnedTx.realized_gain_usd)
           : 0;
+        const modeStr = mode === "edit" ? "updated" : "created";
+
         if (rg !== 0) {
           const sign = rg >= 0 ? "+" : "";
           alert(
-            `Transaction created successfully!\n` +
-            `Realized Gain: ${sign}${formatUsd(rg)}`
+            `Transaction ${modeStr} successfully!\n` +
+            `Realized Gain: ${sign}${formatUsd(Math.abs(rg))}`
           );
         } else {
-          alert("Transaction created successfully!");
+          alert(`Transaction ${modeStr} successfully!`);
         }
       } else {
-        alert("Transaction created successfully!");
+        alert(`Transaction ${mode === "edit" ? "updated" : "created"} successfully!`);
       }
 
       // Reset form & notify parent
       reset();
       setCurrentType("");
       onSubmitSuccess?.();
+
     } catch (error: unknown) {
-      // If it's an Axios error, we can parse further
       if (axios.isAxiosError<ApiErrorResponse>(error)) {
         const detailMsg = error.response?.data?.detail;
         const fallbackMsg = error.message || "Error";
@@ -390,17 +460,22 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           console.log("Field-specific errors:", error.response.data.errors);
         }
 
-        alert(`Failed to create transaction: ${finalMsg}`);
+        alert(`Failed to ${mode === "edit" ? "update" : "create"} transaction: ${finalMsg}`);
       } else if (error instanceof Error) {
-        // Generic JS Error
-        alert(`Failed to create transaction: ${error.message}`);
+        alert(`Failed to ${mode === "edit" ? "update" : "create"} transaction: ${error.message}`);
       } else {
-        // Non-Error object or other unexpected type
-        alert("An unexpected error occurred while creating the transaction.");
+        alert(
+          `An unexpected error occurred while ${mode === "edit" ? "updating" : "creating"} the transaction.`
+        );
       }
+    } finally {
+      onSavingStateChange?.(false);
     }
   };
 
+  // ----------------------------------------------------------------------------
+  // 4) renderDynamicFields: EXACTLY your existing code
+  // ----------------------------------------------------------------------------
   /**
    * renderDynamicFields:
    * Renders different sets of form fields depending on the user-selected `currentType`.
@@ -410,9 +485,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       case "Deposit": {
         const account = watch("account");
         const currency = watch("currency");
-
-        // Previously we had a showFee for BTC deposits, but now we've removed it
-        // so there's no dynamic fee for ANY deposit. (See new approach)
 
         // Show Source if deposit is going into BTC (Wallet or Exchange)
         const showSource =
@@ -516,10 +588,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   className="form-control"
                   {...register("costBasisUSD", { valueAsNumber: true })}
                 />
-                {/* 
-                  New note to user: If they paid any BTC fee externally, 
-                  they should add its USD value to cost basis here.
-                */}
                 <small style={{ color: "#888", display: "block", marginTop: "4px" }}>
                   If you paid a miner fee in BTC, please add that fee's USD value
                   to your Cost Basis.
@@ -926,9 +994,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   };
 
-  // ------------------------------------------------------------------------
-  // Render the main form
-  // ------------------------------------------------------------------------
+  // ----------------------------------------------------------------------------
+  // 5) RENDER THE MAIN FORM
+  // ----------------------------------------------------------------------------
   return (
     <form
       id={id || "transaction-form"}
@@ -944,6 +1012,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             value={currentType}
             onChange={onTransactionTypeChange}
             required
+            // NEW: disable if in edit mode (optional)
+            disabled={mode === "edit"}
           >
             <option value="">Select Transaction Type</option>
             <option value="Deposit">Deposit</option>
@@ -961,6 +1031,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             type="datetime-local"
             className="form-control"
             {...register("timestamp", { required: "Date & Time is required" })}
+            // optional: disable in edit mode if you don't want date changed
           />
           {errors.timestamp && (
             <span className="error-text">{errors.timestamp.message}</span>
