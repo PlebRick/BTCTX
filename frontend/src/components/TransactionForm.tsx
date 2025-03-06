@@ -285,7 +285,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
    */
   useEffect(() => {
     if (currentType !== "Transfer") return;
-
     if (fromAccountVal === "Bank") {
       setValue("fromCurrency", "USD");
       setValue("toAccount", "Exchange");
@@ -349,7 +348,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       } else {
         const feeBtc = Number(calcFee.toFixed(8)); // up to 8 decimals
         setValue("fee", feeBtc);
-
         // Example approximate price to show the user
         const mockBtcPrice = 90000; 
         const approxUsd = feeBtc * mockBtcPrice;
@@ -450,52 +448,32 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         console.log("Transaction updated:", response.data);
         alert("Transaction updated successfully!");
       } else {
-      // (6) Create new transaction and POST to the backend
-      const response = await api.post("/transactions", transactionPayload);
-      console.log("Transaction created:", response.data);
-
-      // If the server returns a realized_gain_usd, show an alert with that info
-      if (response.data) {
+        // Create new transaction
+        const response = await api.post("/transactions", transactionPayload);
+        console.log("Transaction created:", response.data);
         const createdTx = response.data as ITransactionRaw;
         const rg = createdTx.realized_gain_usd
           ? parseDecimal(createdTx.realized_gain_usd)
           : 0;
         if (rg !== 0) {
           const sign = rg >= 0 ? "+" : "";
-          alert(
-            `Transaction created successfully!\n` +
-            `Realized Gain: ${sign}${formatUsd(rg)}`
-          );
+          alert(`Transaction created successfully!\nRealized Gain: ${sign}${formatUsd(rg)}`);
         } else {
           alert("Transaction created successfully!");
         }
-      } else {
-        alert("Transaction created successfully!");
       }
 
-      // Reset form & notify parent
       reset();
       setCurrentType("");
       onSubmitSuccess?.();
     } catch (error: unknown) {
-      // If it's an Axios error, we can parse further
       if (axios.isAxiosError<ApiErrorResponse>(error)) {
-        const detailMsg = error.response?.data?.detail;
-        const fallbackMsg = error.message || "Error";
-        const finalMsg = detailMsg || fallbackMsg;
-
-        // If your backend returns field-level errors, you can log them here:
-        if (error.response?.data?.errors) {
-          console.log("Field-specific errors:", error.response.data.errors);
-        }
-
-        alert(`Failed to create transaction: ${finalMsg}`);
+        const detailMsg = error.response?.data?.detail || error.message || "Error";
+        alert(`Failed to ${transactionId ? "update" : "create"} transaction: ${detailMsg}`);
       } else if (error instanceof Error) {
-        // Generic JS Error
-        alert(`Failed to create transaction: ${error.message}`);
+        alert(`Failed to ${transactionId ? "update" : "create"} transaction: ${error.message}`);
       } else {
-        // Non-Error object or other unexpected type
-        alert("An unexpected error occurred while creating the transaction.");
+        alert(`An unexpected error occurred while ${transactionId ? "updating" : "creating"} the transaction.`);
       }
     }
   };
@@ -523,7 +501,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           currentType === "Deposit" &&
           currency === "BTC" &&
           (account === "Wallet" || account === "Exchange");
-
         return (
           <>
             {/* Account */}
@@ -1043,6 +1020,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
             value={currentType}
             onChange={onTransactionTypeChange}
             required
+            disabled={!!transactionId} // Disable when editing
           >
             <option value="">Select Transaction Type</option>
             <option value="Deposit">Deposit</option>
