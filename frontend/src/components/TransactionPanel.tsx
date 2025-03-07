@@ -6,7 +6,7 @@ interface TransactionPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmitSuccess?: () => void;
-  transactionId?: number | null; // New prop for editing
+  transactionId?: number | null; // For editing
 }
 
 const TransactionPanel: React.FC<TransactionPanelProps> = ({
@@ -17,11 +17,13 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
 }) => {
   const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [isFormDirty, setIsFormDirty] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false); // Tracks form submission status
 
   useEffect(() => {
     if (isOpen) {
       setShowDiscardModal(false);
       setIsFormDirty(false);
+      setIsUpdating(false); 
     }
   }, [isOpen]);
 
@@ -43,8 +45,13 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
   };
 
   const handleFormSubmitSuccess = () => {
+    setIsUpdating(false);
     onClose();
     onSubmitSuccess?.();
+  };
+
+  const handleUpdateStatusChange = (updating: boolean) => {
+    setIsUpdating(updating);
   };
 
   if (!isOpen) return null;
@@ -62,7 +69,8 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
             id="transaction-form"
             onDirtyChange={setIsFormDirty}
             onSubmitSuccess={handleFormSubmitSuccess}
-            transactionId={transactionId} // Pass to form
+            transactionId={transactionId}
+            onUpdateStatusChange={handleUpdateStatusChange}
           />
         </div>
 
@@ -71,8 +79,13 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
             className="save-button"
             type="submit"
             form="transaction-form"
+            disabled={isUpdating}
           >
-            {transactionId ? "Update Transaction" : "Save Transaction"}
+            {isUpdating
+              ? "Updating..."
+              : transactionId
+              ? "Update Transaction"
+              : "Save Transaction"}
           </button>
         </div>
       </div>

@@ -17,7 +17,8 @@ Final Version Tailored for Hybrid BitcoinTX:
 
 Updates:
  - Sells: fee is subtracted from proceeds before disposal logic (so net proceeds are used).
- - Buys: fee is now automatically added to the cost basis in `maybe_create_bitcoin_lot`, ensuring the user’s final lot has total = (typed cost + fee).
+ - Buys: fee is now automatically added to the cost basis in `maybe_create_bitcoin_lot`, 
+   ensuring the user’s final lot has total = (typed cost + fee).
 """
 
 from sqlalchemy.orm import Session
@@ -48,13 +49,9 @@ def get_all_transactions(db: Session):
         .all()
     )
 
-def get_transaction_by_id(transaction_id: int, db: Session):
+def get_transaction_by_id(db: Session, transaction_id: int):
     """
-    Retrieve a single Transaction by its ID, or None if not found.
-    
-    :param transaction_id: The primary key (int) for the Transaction table
-    :param db: A Session object for DB operations
-    :return: Transaction object or None
+    Retrieve a single Transaction by its ID (returns None if not found).
     """
     return db.query(Transaction).filter(Transaction.id == transaction_id).first()
 
@@ -139,8 +136,9 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
      - Possibly skip net-zero if cross-currency
      - Re-run lot creation or disposal logic if deposit/buy or withdrawal/sell
      - If it's a disposal (Sell or Withdrawal), recompute realized gains summary
+     - Recalculate all subsequent Sell and Withdrawal transactions to ripple updates forward
     """
-    tx = get_transaction_by_id(transaction_id, db)
+    tx = get_transaction_by_id(db, transaction_id)  # <--- Fix: pass (db, transaction_id)
     if not tx or tx.is_locked:
         return None
 
@@ -176,21 +174,24 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
 
     tx.updated_at = datetime.utcnow()
 
-    # Rebuild ledger lines & lot usage from scratch
+    # Rebuild ledger lines & lot usage from scratch for the current transaction
     remove_ledger_entries_for_tx(tx, db)
     remove_lot_usage_for_tx(tx, db)
     build_ledger_entries_for_transaction(tx, tx_data, db)
     _maybe_verify_balance_for_internal(tx, db)
 
-    # Re-run creation/disposal logic if deposit/buy or withdrawal/sell
+    # Re-run creation/disposal logic for the current transaction
     if tx.type in ("Deposit", "Buy"):
         maybe_create_bitcoin_lot(tx, tx_data, db)
     if tx.type in ("Withdrawal", "Sell"):
         maybe_dispose_lots_fifo(tx, tx_data, db)
 
-    # If disposal, compute realized gains summary
+    # If disposal, compute realized gains summary for the current transaction
     if tx.type in ("Sell", "Withdrawal"):
         compute_sell_summary_from_disposals(tx, db)
+
+    # Recalculate all subsequent Sell and Withdrawal transactions
+    recalculate_subsequent_transactions(tx, db)
 
     db.commit()
     db.refresh(tx)
@@ -201,7 +202,7 @@ def delete_transaction_record(transaction_id: int, db: Session):
     Delete a transaction if not locked. Also removes ledger entries,
     lots, and disposals referencing it.
     """
-    tx = get_transaction_by_id(transaction_id, db)
+    tx = get_transaction_by_id(db, transaction_id)  # <--- Fix: pass (db, transaction_id)
     if not tx or tx.is_locked:
         return False
 
@@ -439,7 +440,7 @@ def maybe_create_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     If deposit/buy => create a BitcoinLot if to_acct=BTC.
     cost_basis_usd is used to track how many USD were effectively spent.
     NEW: If the user typed a fee in USD for a Buy, we add it to the cost basis
-    so the final lot's cost_basis_usd = (typed cost_basis_usd + fee_amount).
+    so the user’s final lot's cost_basis_usd = (typed cost_basis_usd + fee_amount).
     """
     to_acct = db.query(Account).filter(Account.id == tx.to_account_id).first()
     if not to_acct or to_acct.currency != "BTC":
@@ -475,7 +476,7 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     """
     If withdrawal/sell => do a FIFO partial-lot disposal if from_acct=BTC.
 
-    Pulls 'proceeds_usd' from tx_data. For a Sell, we 
+    Pulls 'proceeds_usd' from tx_data. For a Sell, we
     just netted out the fee in build_ledger_entries_for_transaction,
     so partial-lot disposal sees net proceeds -> correct realized gains.
     """
@@ -583,6 +584,49 @@ def compute_sell_summary_from_disposals(tx: Transaction, db: Session):
         tx.holding_period = None
 
     db.flush()
+
+# --------------------------------------------------------------------------------
+# NEW: Helper Function for Ripple Updates
+# --------------------------------------------------------------------------------
+
+def recalculate_subsequent_transactions(updated_tx: Transaction, db: Session):
+    """
+    Recalculate all Sell and Withdrawal transactions that occur after the updated transaction.
+    This ensures that changes to the updated transaction ripple forward, updating cost basis,
+    lot disposals, and realized gains for all subsequent transactions.
+
+    Steps:
+    1. Query all Sell and Withdrawal transactions with timestamp > updated_tx.timestamp.
+    2. For each subsequent transaction:
+       a. Remove existing lot disposals.
+       b. Re-run FIFO disposal logic.
+       c. Recompute realized gains summary.
+    """
+    # Query all Sell and Withdrawal transactions after the updated transaction's timestamp
+    subsequent_txs = db.query(Transaction).filter(
+        Transaction.timestamp > updated_tx.timestamp,
+        Transaction.type.in_(["Sell", "Withdrawal"])
+    ).order_by(Transaction.timestamp).all()
+
+    for sub_tx in subsequent_txs:
+        # Remove existing lot disposals for this transaction
+        remove_lot_usage_for_tx(sub_tx, db)
+
+        # Re-run FIFO disposal logic for this transaction
+        # We need to pass the tx_data for the subsequent transaction
+        # Since tx_data isn't stored, we'll use the transaction's attributes
+        sub_tx_data = {
+            "amount": sub_tx.amount,
+            "proceeds_usd": sub_tx.proceeds_usd,
+            "fee_amount": sub_tx.fee_amount,
+            "fee_currency": sub_tx.fee_currency,
+            "purpose": sub_tx.purpose,
+            # Add other necessary fields if needed
+        }
+        maybe_dispose_lots_fifo(sub_tx, sub_tx_data, db)
+
+        # Recompute realized gains summary for this transaction
+        compute_sell_summary_from_disposals(sub_tx, db)
 
 # --------------------------------------------------------------------------------
 # Double-Entry (with Cross-Currency Skip) & Fee Rules

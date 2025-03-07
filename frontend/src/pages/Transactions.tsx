@@ -165,6 +165,7 @@ const Transactions: React.FC = () => {
   const [sortMode, setSortMode] = useState<SortMode>("TIMESTAMP_DESC");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false); // Added for post-update refresh
   // New state for tracking the transaction being edited
   const [editingTransactionId, setEditingTransactionId] = useState<number | null>(null);
 
@@ -212,10 +213,15 @@ const Transactions: React.FC = () => {
   };
 
   // Called after a successful form submit
-  const handleSubmitSuccess = () => {
+  const handleSubmitSuccess = async () => {
     setIsPanelOpen(false);
     setEditingTransactionId(null); // Reset after successful submit
-    fetchTransactions();
+    setIsRefreshing(true); // Start refreshing
+    try {
+      await fetchTransactions();
+    } finally {
+      setIsRefreshing(false); // Stop refreshing
+    }
   };
 
   // --------------------------------------------------
@@ -290,6 +296,12 @@ const Transactions: React.FC = () => {
       {/* Show transactions if we have them */}
       {!isLoading && !fetchError && transactions && transactions.length > 0 && (
         <div className="transactions-list">
+          {isRefreshing && (
+            <div style={{ textAlign: "center", marginBottom: "20px" }}>
+              <div className="spinner"></div>
+              <p>Refreshing transactions...</p>
+            </div>
+          )}
           {dateGroups.map(([dayLabel, txArray]) => (
             <div key={dayLabel} className="transactions-day-group">
               <h3 className="date-heading">{dayLabel}</h3>

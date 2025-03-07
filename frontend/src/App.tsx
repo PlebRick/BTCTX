@@ -15,11 +15,11 @@ const App: React.FC = () => {
       {/* Redirect the root URL ("/") to /dashboard */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-      {/* Main pages, each wrapped in layout */}
+      {/* Main pages, each wrapped in AppLayout */}
       <Route
         path="/dashboard"
         element={
-          <AppLayout pageTitle="Dashboard">
+          <AppLayout>
             <Dashboard />
           </AppLayout>
         }
@@ -27,7 +27,7 @@ const App: React.FC = () => {
       <Route
         path="/transactions"
         element={
-          <AppLayout pageTitle="Transactions">
+          <AppLayout>
             <Transactions />
           </AppLayout>
         }
@@ -35,7 +35,7 @@ const App: React.FC = () => {
       <Route
         path="/reports"
         element={
-          <AppLayout pageTitle="Reports">
+          <AppLayout>
             <Reports />
           </AppLayout>
         }
@@ -43,7 +43,7 @@ const App: React.FC = () => {
       <Route
         path="/settings"
         element={
-          <AppLayout pageTitle="Settings">
+          <AppLayout>
             <Settings />
           </AppLayout>
         }

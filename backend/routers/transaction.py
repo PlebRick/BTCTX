@@ -9,17 +9,19 @@ We keep these endpoints minimal, delegating actual multi-line ledger creation,
 BTC lot tracking (BitcoinLot), and disposal (LotDisposal) to the service layer.
 
 Refactor Notes:
- - Added 'test_*' endpoints as examples of how to create specific deposit/transfer
-   transactions for testing or demonstration. These are marked "temporary" so you
-   know they don't have to remain in production if you prefer to keep a single
-   generic POST /api/transactions for everything.
- - Retained existing create/list/update/delete endpoints as your primary interface.
- - Provided extensive docstrings to clarify usage for new developers.
+ - We ensure that all datetime fields are coerced to UTC (tzinfo=timezone.utc)
+   before returning them. Then we convert to ISO8601 with trailing 'Z' instead
+   of '+00:00'.
+ - This applies to both the "list" route and "get by ID" route, ensuring
+   consistent format across the entire API.
+ - Added a 404 check in get_transaction(tx_id).
+ - Otherwise, we've retained your existing create, update, and delete endpoints.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 
 # The Pydantic schemas for transaction CRUD
 from backend.schemas.transaction import (
@@ -37,16 +39,69 @@ from backend.database import get_db
 # Create a router instance
 router = APIRouter(tags=["transactions"])
 
+
+def _attach_utc_and_build_read_model(tx) -> TransactionRead:
+    """
+    Utility function to:
+      1) Attach tzinfo=UTC to timestamp, created_at, updated_at if missing
+      2) Convert to TransactionRead Pydantic model
+      3) Replace '+00:00' with 'Z' in the resulting dict
+      4) Return a new TransactionRead object with corrected ISO strings
+    """
+    # 1) Ensure UTC tzinfo
+    if tx.timestamp and tx.timestamp.tzinfo is None:
+        tx.timestamp = tx.timestamp.replace(tzinfo=timezone.utc)
+    if tx.created_at and tx.created_at.tzinfo is None:
+        tx.created_at = tx.created_at.replace(tzinfo=timezone.utc)
+    if tx.updated_at and tx.updated_at.tzinfo is None:
+        tx.updated_at = tx.updated_at.replace(tzinfo=timezone.utc)
+
+    # 2) Convert to Pydantic
+    pyd_model = TransactionRead.from_orm(tx)
+    data = pyd_model.dict()
+
+    # 3) Turn any '+00:00' suffix into 'Z'
+    for field in ["timestamp", "created_at", "updated_at"]:
+        val = data.get(field)
+        if isinstance(val, datetime):
+            iso_str = val.isoformat()
+            if iso_str.endswith("+00:00"):
+                iso_str = iso_str[:-6] + "Z"
+            data[field] = iso_str
+
+    # 4) Return a new TransactionRead
+    return TransactionRead(**data)
+
+
 @router.get("", response_model=List[TransactionRead])
 def list_transactions(db: Session = Depends(get_db)):
     """
-    List all transactions, typically in descending order by timestamp.
-    
-    - Returns a list of TransactionRead schemas, each representing a "header"
-      with potential behind-the-scenes LedgerEntries, BTC lot usage, etc.
-    - This is a standard "production" endpoint.
+    List all transactions in the database, ensuring each timestamp
+    is returned with a 'Z' suffix (UTC).
     """
-    return tx_service.get_all_transactions(db)
+    raw_txs = tx_service.get_all_transactions(db)
+
+    # Apply the same logic to each transaction
+    results = []
+    for tx in raw_txs:
+        final_model = _attach_utc_and_build_read_model(tx)
+        results.append(final_model)
+
+    return results
+
+
+@router.get("/{tx_id}", response_model=TransactionRead)
+def get_transaction(tx_id: int, db: Session = Depends(get_db)):
+    """
+    Retrieve a single transaction by ID, ensuring
+    timestamps have 'Z' (UTC) in the final JSON.
+    """
+    tx = tx_service.get_transaction_by_id(db, tx_id)
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+
+    final_model = _attach_utc_and_build_read_model(tx)
+    return final_model
 
 
 @router.post("", response_model=TransactionRead)
@@ -63,16 +118,13 @@ def create_transaction(tx: TransactionCreate, db: Session = Depends(get_db)):
            computing partial or final cost basis if desired.
         4) Runs the double-entry balance check (if both sides are internal).
     - Returns the newly created Transaction with an 'id'.
-
-    This endpoint is considered "production" and is the primary way to create
-    any new transaction type. It's flexible enough to handle deposits, withdrawals,
-    transfers, buys, sells, etc., depending on the data provided.
     """
     tx_data = tx.dict()
     new_tx = tx_service.create_transaction_record(tx_data, db)
     if not new_tx:
         raise HTTPException(status_code=400, detail="Transaction creation failed.")
-    return new_tx
+    # Ensure we return timestamps with 'Z' if needed
+    return _attach_utc_and_build_read_model(new_tx)
 
 
 @router.put("/{transaction_id}", response_model=TransactionRead)
@@ -88,7 +140,8 @@ def update_transaction(transaction_id: int, tx: TransactionUpdate, db: Session =
     updated_tx = tx_service.update_transaction_record(transaction_id, tx_data, db)
     if not updated_tx:
         raise HTTPException(status_code=404, detail="Transaction not found or is locked.")
-    return updated_tx
+    return _attach_utc_and_build_read_model(updated_tx)
+
 
 @router.delete("/delete_all", status_code=204)
 def delete_all_transactions_endpoint(db: Session = Depends(get_db)):
