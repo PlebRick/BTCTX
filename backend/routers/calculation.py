@@ -20,7 +20,8 @@ from decimal import Decimal
 from backend.services.calculation import (
     get_account_balance,
     get_all_account_balances,
-    get_gains_and_losses
+    get_gains_and_losses,
+    get_average_cost_basis
 )
 
 # Import the database session dependency.
@@ -73,6 +74,22 @@ def api_get_all_account_balances(db: Session = Depends(get_db)) -> List[Dict]:
     for item in results:
         item["balance"] = float(item["balance"])
     return results
+
+@router.get("/average-cost-basis")
+def api_get_average_cost_basis(db: Session = Depends(get_db)) -> Dict:
+    """
+    API endpoint that returns the average USD cost basis per BTC
+    across all currently held BTC lots.
+
+    Returns:
+        {
+          "averageCostBasis": float
+        }
+    """
+    average_basis_decimal = get_average_cost_basis(db)
+    average_basis = float(average_basis_decimal)  # Convert Decimal -> float
+
+    return {"averageCostBasis": average_basis}
 
 
 @router.get("/gains-and-losses")

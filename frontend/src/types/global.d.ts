@@ -17,6 +17,10 @@ declare global {
     balance: number | string; // parseDecimal
   }
 
+  interface AverageCostBasis {
+    averageCostBasis: number; 
+  }
+
   interface GainsAndLossesRaw {
     // -- Legacy fields
     sells_proceeds?: string | number;
