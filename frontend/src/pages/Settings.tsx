@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import api from "../api"; // Centralized API client
-import "../styles/Settings.css"; 
+import "../styles/settings.css"; 
 
 // ✅ Define the API error response type
 interface ApiErrorResponse {
