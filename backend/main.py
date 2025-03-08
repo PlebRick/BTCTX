@@ -107,6 +107,20 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     """
     return verify_access_token(token)
 
+# ---------------------------------------------------------
+# Database: Create Tables at Startup
+# ---------------------------------------------------------
+from backend.database import create_tables
+
+@app.on_event("startup")
+def startup_event():
+    """
+    Ensures tables are created (if not already) when FastAPI starts.
+    This won't delete or overwrite existing data; it's idempotent.
+    """
+    print("Running create_tables() at startup...")
+    create_tables()
+    print("Database tables created or verified.")
 
 # ---------------------------------------------------------
 # Include Routers
