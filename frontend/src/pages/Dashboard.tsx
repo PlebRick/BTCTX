@@ -79,24 +79,23 @@ const Dashboard: React.FC = () => {
       });
   }, []);
 
-  // Fetch account balances
-  useEffect(() => {
-    api
-      .get("/calculations/accounts/balances")
-      .then((response) => {
-        const data = response.data;
-        console.log("Fetched balances data:", data);
+  /// Fetch account balances
+useEffect(() => {
+  api
+    .get("/calculations/accounts/balances")
+    .then((response) => {
+      const data = response.data;
 
-        if (!Array.isArray(data)) {
-          throw new Error("Data is not an array. Received: " + JSON.stringify(data));
-        }
-        setBalances(data as AccountBalance[]);
-      })
-      .catch((err) => {
-        console.error("Error fetching balances:", err);
-        setFetchError(String(err));
-      });
-  }, []);
+      if (!Array.isArray(data)) {
+        throw new Error("Data is not an array. Received: " + JSON.stringify(data));
+      }
+      setBalances(data as AccountBalance[]);
+    })
+    .catch((err) => {
+      console.error("Error fetching balances:", err);
+      setFetchError(String(err));
+    });
+}, []);
 
   // Compute totals after balances are fetched
   useEffect(() => {
