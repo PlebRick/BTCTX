@@ -52,3 +52,6 @@ $RECYCLE.BIN/
 *.iws
 *.idea/
 *.vscode/
+
+.env
+.env.*  # Sometimes you might have .env.dev, .env.prod
