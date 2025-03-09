@@ -1,15 +1,18 @@
 # backend/models/__init__.py
 
-# This __init__.py file ensures that models and database components are available
-# for import throughout the backend application. It helps keep the codebase modular
-# and consistent by centralizing model imports.
+"""
+This __init__.py file ensures that models and database components are available
+for import throughout the backend application. It helps keep the codebase modular
+and consistent by centralizing model imports.
+"""
 
-from .user import User               # Import the User model from models/user.py
-from .account import Account, AccountType  # Import the Account model and AccountType enum from models/account.py
+from backend.database import Base
 
-# Only import 'Transaction' now. We have removed TransactionSource or other old enums,
-# since our final refactor stores 'source' and 'type' as simple string fields.
-from .transaction import Transaction
+# Models from user.py
+from .user import User
 
-from backend.database import Base     # Import the SQLAlchemy Base for model inheritance
+# Models (and enums) from account.py
+from .account import Account, AccountType
+
+# Models from transaction.py
 from .transaction import Transaction, LedgerEntry, BitcoinLot, LotDisposal
