@@ -12,3 +12,4 @@ from .account import Account, AccountType  # Import the Account model and Accoun
 from .transaction import Transaction
 
 from backend.database import Base     # Import the SQLAlchemy Base for model inheritance
+from .transaction import Transaction, LedgerEntry, BitcoinLot, LotDisposal
