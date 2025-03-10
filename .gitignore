@@ -67,3 +67,4 @@ backend/create_db.py        # Temporary or test database scripts (if not needed)
 commands.md
 frontend/temp_frontend/
 .env
+.env
