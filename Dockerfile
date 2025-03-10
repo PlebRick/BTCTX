@@ -27,12 +27,11 @@
     # Copy backend code
     COPY backend/ ./backend/
     
-    # Copy frontend build from first stage into the backend
+    # Copy frontend build from first stage into the backend's dist directory
     COPY --from=build-frontend /app/frontend/dist ./frontend/dist
     
-    # Expose port 80 (or 8000 if needed)
+    # Expose port 80 (or choose another if needed)
     EXPOSE 80
     
-    # Start FastAPI with Uvicorn
+    # Start FastAPI with Uvicorn on port 80
     CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "80"]
-    
