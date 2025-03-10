@@ -10,6 +10,7 @@
         "dotenv",
         "ehthumbs",
         "fastapi",
+        "htmlcov",
         "httpx",
         "njsproj",
         "ntvs",
