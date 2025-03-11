@@ -12,6 +12,7 @@
         "fastapi",
         "htmlcov",
         "httpx",
+        "itsdangerous",
         "njsproj",
         "ntvs",
         "oaicite",
