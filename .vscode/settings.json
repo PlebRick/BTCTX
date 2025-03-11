@@ -13,6 +13,7 @@
         "htmlcov",
         "httpx",
         "itsdangerous",
+        "MREV",
         "njsproj",
         "ntvs",
         "oaicite",
