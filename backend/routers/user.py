@@ -3,17 +3,23 @@ backend/routers/user.py
 
 Handles user-related endpoints (registration, listing users, etc.).
 Now uses session-based logic (in main.py), so we've removed JWT references.
+
+Refactored to add:
+ - PATCH /users/{user_id}: partial update of username/password
+ - DELETE /users/{user_id}: remove a user entirely
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
-from backend.schemas.user import UserCreate, UserRead
+from backend.schemas.user import UserCreate, UserRead, UserUpdate
 from backend.services.user import (
     get_user_by_username,
     create_user,
-    get_all_users
+    get_all_users,
+    update_user as update_user_service,
+    delete_user as delete_user_service
 )
 from backend.database import SessionLocal
 
@@ -59,3 +65,32 @@ def get_users(db: Session = Depends(get_db)):
     (In single-user mode, you likely won't use this in production.)
     """
     return get_all_users(db)
+
+@router.patch("/users/{user_id}", response_model=UserRead)
+def patch_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db)):
+    """
+    Partially update a user's fields (username or password) using UserUpdate.
+    If the user isn't found, returns 404.
+    On success, returns the updated user record (UserRead).
+    
+    Example JSON body:
+      {
+        "username": "NewName",
+        "password": "NewPass123"
+      }
+    """
+    updated_user = update_user_service(user_id, user_data, db)
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return updated_user
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    """
+    Delete an existing user by ID. If user doesn't exist, raises 404.
+    Returns 204 No Content on successful deletion.
+    """
+    success = delete_user_service(user_id, db)
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found or cannot be deleted.")
+    return

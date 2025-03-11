@@ -1,73 +1,120 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import "./styles/app.css"; // Ensures global + layout CSS is loaded
 import { Routes, Route, Navigate } from "react-router-dom";
+import axios from "axios";
 
-// Existing components
 import AppLayout from "./components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
-import TransactionForm from "./components/TransactionForm"; // The form
+import TransactionForm from "./components/TransactionForm";
 
-// New login & register pages
 import LoginPage from "./pages/Login";
 import RegisterPage from "./pages/Register";
+
+/**
+ * PrivateRoute component:
+ * 1. Checks if the user is authenticated by calling a protected endpoint.
+ * 2. While loading, shows a "Checking auth..." message.
+ * 3. If not authenticated, redirects to /login.
+ * 4. Otherwise, renders the children (protected component).
+ */
+const PrivateRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    // Check session status by hitting a protected route
+    axios
+      .get("/api/protected", { withCredentials: true })
+      .then(() => {
+        setIsAuthenticated(true);
+        setLoading(false);
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return <div style={{ textAlign: "center", marginTop: "2rem" }}>Checking auth...</div>;
+  }
+
+  if (!isAuthenticated) {
+    // Not logged in => redirect to /login
+    return <Navigate to="/login" replace />;
+  }
+
+  // Authenticated => render the intended page
+  return children;
+};
 
 const App: React.FC = () => {
   return (
     <Routes>
-      {/* 
-        Redirect the root URL ("/") to /dashboard by default.
-        If you want unauthenticated users to land at /login instead,
-        you can change this. 
+      {/*
+        Redirect root URL ("/") to /dashboard by default.
+        But if user isn't logged in, PrivateRoute will bounce them to /login.
       */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-      {/* Main app pages, each wrapped in AppLayout */}
+      {/* PROTECTED ROUTES: wrapped in PrivateRoute */}
       <Route
         path="/dashboard"
         element={
-          <AppLayout>
-            <Dashboard />
-          </AppLayout>
+          <PrivateRoute>
+            <AppLayout>
+              <Dashboard />
+            </AppLayout>
+          </PrivateRoute>
         }
       />
       <Route
         path="/transactions"
         element={
-          <AppLayout>
-            <Transactions />
-          </AppLayout>
+          <PrivateRoute>
+            <AppLayout>
+              <Transactions />
+            </AppLayout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/transactions/new"
+        element={
+          <PrivateRoute>
+            <TransactionForm />
+          </PrivateRoute>
         }
       />
       <Route
         path="/reports"
         element={
-          <AppLayout>
-            <Reports />
-          </AppLayout>
+          <PrivateRoute>
+            <AppLayout>
+              <Reports />
+            </AppLayout>
+          </PrivateRoute>
         }
       />
       <Route
         path="/settings"
         element={
-          <AppLayout>
-            <Settings />
-          </AppLayout>
+          <PrivateRoute>
+            <AppLayout>
+              <Settings />
+            </AppLayout>
+          </PrivateRoute>
         }
       />
 
-      {/* Dedicated route to access the transaction form directly (for dev/testing) */}
-      <Route path="/transactions/new" element={<TransactionForm />} />
-
-      {/* -------------------------------------------------------------
-         NEW ROUTES: Login & Register
-         ------------------------------------------------------------- */}
+      {/* PUBLIC ROUTES: Login & Register */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
-      {/* Fallback catch-all: back to dashboard if unknown route */}
+      {/* Fallback catch-all: back to /dashboard (which is also protected) */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
