@@ -5,20 +5,17 @@ main.py
 Sets up the FastAPI application for BitcoinTX, a double-entry Bitcoin portfolio tracker.
 
 Key Roles:
- - Load environment variables & configure JWT authentication
- - Add CORS middleware for frontend integration
- - Include the 'transaction', 'account', 'user', and now 'bitcoin' routers,
-   which implement multi-line ledger entries, BTC lot tracking, and live BTC price data.
- - Serve the Vite frontend static files for SPA routing
+ - Loads environment variables & configures session-based authentication
+ - Adds CORS middleware for frontend integration
+ - Includes 'transaction', 'account', 'user', 'bitcoin', and calculation routers
+ - Serves the Vite frontend static files for SPA routing
 """
 
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
+from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import FileResponse
@@ -27,13 +24,12 @@ from starlette.responses import FileResponse
 load_dotenv()
 
 # ---------------------------------------------------------
-# JWT & Auth Configuration
+# Session Configuration
 # ---------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")  # Fallback if not set
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+# We use SECRET_KEY to sign session cookies. Starlette stores sessions in-memory by default.
 
-# Default CORS origins if none specified
+# Default CORS origins if none specified (e.g., dev environment)
 default_origins = (
     "http://127.0.0.1:3000,"
     "http://localhost:3000,"
@@ -43,21 +39,29 @@ default_origins = (
 raw_origins = os.getenv("CORS_ALLOW_ORIGINS", default_origins)
 ALLOWED_ORIGINS = [origin.strip() for origin in raw_origins.split(",")]
 
-# OAuth2 scheme for protected endpoints (JWT bearer token)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
-
 # ---------------------------------------------------------
 # Initialize the FastAPI application
 # ---------------------------------------------------------
 app = FastAPI(
     title="BitcoinTX Portfolio Tracker API",
     description=(
-        "API for managing Bitcoin transactions and accounts with a "
-        "fully double-entry system, plus FIFO cost basis for BTC. "
-        "Handles user authentication via JWT."
+        "API for managing Bitcoin transactions/accounts with a "
+        "double-entry system and FIFO cost basis. Session-based auth."
     ),
     version="1.0",
     debug=True
+)
+
+# ---------------------------------------------------------
+# Add Session Middleware
+# ---------------------------------------------------------
+# This middleware automatically sets/respects a signed cookie
+# named "btc_session_id" (you can rename if desired).
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    session_cookie="btc_session_id",
+    https_only=False  # Set to True in production if you serve over HTTPS
 )
 
 # ---------------------------------------------------------
@@ -70,42 +74,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ---------------------------------------------------------
-# JWT Helper Functions
-# ---------------------------------------------------------
-def create_access_token(data: dict) -> str:
-    """
-    Create a JWT access token using SECRET_KEY.
-    The double-entry design does not affect auth, but
-    we keep it consistent so that only authenticated
-    users can access certain routes if desired.
-    """
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-def verify_access_token(token: str) -> str:
-    """
-    Verify a JWT, extracting the 'sub' (username).
-    Raises HTTPException(401) if invalid.
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return username
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
-    """
-    Dependency for protected endpoints:
-    verifies the token and returns the username.
-    """
-    return verify_access_token(token)
 
 # ---------------------------------------------------------
 # Database: Create Tables at Startup
@@ -123,20 +91,31 @@ def startup_event():
     print("Database tables created or verified.")
 
 # ---------------------------------------------------------
-# Include Routers
+# Routers (Transaction, User, Account, Calculation, Bitcoin)
 # ---------------------------------------------------------
-# We import the transaction, user, account, calculation, and bitcoin routers,
-# each referencing the multi-line ledger or user/account logic, plus BTC price data.
 from backend.routers import transaction, user, account, calculation, bitcoin
 
 app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
 app.include_router(user.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
 app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"])
-
-# Bitcoin router for live BTC price & historical data
 app.include_router(bitcoin.router, prefix="/api", tags=["Bitcoin"])
 
+# ---------------------------------------------------------
+# Session-Based Auth Helpers
+# ---------------------------------------------------------
+def get_current_user(request: Request) -> str:
+    """
+    Session-based "get_current_user" dependency.
+    Looks up 'user_id' in request.session. If not found,
+    raises 401. Otherwise, returns the user_id (or username).
+    
+    In a real app, you might store a "username" or full user object.
+    """
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user_id
 
 # ---------------------------------------------------------
 # Protected Route Example
@@ -144,13 +123,33 @@ app.include_router(bitcoin.router, prefix="/api", tags=["Bitcoin"])
 @app.get("/api/protected")
 def read_protected_route(current_user: str = Depends(get_current_user)):
     """
-    Demonstration of a JWT-protected endpoint.
-    The double-entry system is unaffected by auth logic,
-    but you could restrict transaction creation to authenticated
-    users only, for example.
+    Demonstration of a session-protected endpoint.
+    If 'user_id' isn't in the session, we raise 401.
+    Otherwise, we greet the logged-in user.
     """
-    return {"message": f"Hello, {current_user}. You have access to this route!"}
+    return {"message": f"Hello, user {current_user}. You have access to this route!"}
 
+# ---------------------------------------------------------
+# Login / Logout Example Endpoints
+# ---------------------------------------------------------
+@app.post("/api/login")
+def login(request: Request, response: Response, username: str):
+    """
+    Simple example of session-based login:
+      1. Verify credentials (skipped here for brevity).
+      2. If valid, store user_id or username in session.
+    """
+    # TODO: Check user in DB, verify password, etc. For now, just store "username"
+    request.session["user_id"] = username
+    return {"detail": f"Logged in as {username}"}
+
+@app.post("/api/logout")
+def logout(request: Request, response: Response):
+    """
+    Clear the session to log out the user.
+    """
+    request.session.clear()
+    return {"detail": "Logged out successfully"}
 
 # ---------------------------------------------------------
 # Serve Vite Frontend Static Files with SPA Routing
@@ -185,4 +184,4 @@ if __name__ == "__main__":
     import sys
     sys.path.append(os.getenv("PYTHONPATH", "."))
     # e.g. run: uvicorn main:app --reload
-    # The double-entry system is loaded in the transaction, account, user routers.
+    # Session-based auth is now set up in place of JWT.
