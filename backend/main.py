@@ -20,6 +20,10 @@ from starlette.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import FileResponse
 
+# ---------------- NEW IMPORTS for JSON-based login & DB usage ----------------
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
 # Load environment variables from a .env file at the project root
 load_dotenv()
 
@@ -78,7 +82,7 @@ app.add_middleware(
 # ---------------------------------------------------------
 # Database: Create Tables at Startup
 # ---------------------------------------------------------
-from backend.database import create_tables
+from backend.database import create_tables, get_db
 
 @app.on_event("startup")
 def startup_event():
@@ -110,7 +114,7 @@ def get_current_user(request: Request) -> str:
     Looks up 'user_id' in request.session. If not found,
     raises 401. Otherwise, returns the user_id (or username).
     
-    In a real app, you might store a "username" or full user object.
+    In a real app, you might store a "username" or a full user object.
     """
     user_id = request.session.get("user_id")
     if not user_id:
@@ -130,18 +134,50 @@ def read_protected_route(current_user: str = Depends(get_current_user)):
     return {"message": f"Hello, user {current_user}. You have access to this route!"}
 
 # ---------------------------------------------------------
-# Login / Logout Example Endpoints
+# LoginRequest Pydantic Model
 # ---------------------------------------------------------
+class LoginRequest(BaseModel):
+    """
+    Schema for login JSON:
+      { "username": "someName", "password": "somePass" }
+    """
+    username: str
+    password: str
+
+# ---------------------------------------------------------
+# Production-Ready Login / Logout Endpoints
+# ---------------------------------------------------------
+from backend.services.user import get_user_by_username  # for verifying credentials
+
 @app.post("/api/login")
-def login(request: Request, response: Response, username: str):
+def login(
+    login_req: LoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db)
+):
     """
-    Simple example of session-based login:
-      1. Verify credentials (skipped here for brevity).
-      2. If valid, store user_id or username in session.
+    Production-level session-based login:
+      1) Accepts JSON { "username": "...", "password": "..." }
+      2) Look up the user in the DB, check hashed password
+      3) If valid, store user.id in session
+      4) Return success message
     """
-    # TODO: Check user in DB, verify password, etc. For now, just store "username"
-    request.session["user_id"] = username
-    return {"detail": f"Logged in as {username}"}
+    # 1) Get user from DB by username
+    user = get_user_by_username(login_req.username, db)
+    if not user:
+        # For security, don't reveal which part is invalid
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+    # 2) Check password with passlib
+    if not user.verify_password(login_req.password):
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+    # 3) Store user.id in session (or store username if you prefer)
+    request.session["user_id"] = user.id
+
+    # 4) Return success
+    return {"detail": f"Logged in as {user.username}"}
 
 @app.post("/api/logout")
 def logout(request: Request, response: Response):
