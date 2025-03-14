@@ -590,9 +590,6 @@ def compute_sell_summary_from_disposals(tx: Transaction, db: Session):
     db.flush()
 
 def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
-    """
-    Transfer BTC between accounts, updating lots and cost basis (restored from past functionality).
-    """
     from_acct = db.query(Account).filter(Account.id == tx.from_account_id).first()
     to_acct = db.query(Account).filter(Account.id == tx.to_account_id).first()
     if not from_acct or from_acct.currency != "BTC" or not to_acct or to_acct.currency != "BTC":
@@ -604,7 +601,6 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     if btc_outflow <= 0 or btc_received <= 0:
         return
     
-    # Find source lots (FIFO)
     lots = db.query(BitcoinLot).filter(
         BitcoinLot.remaining_btc > 0,
         BitcoinLot.created_txn_id.in_(
@@ -623,7 +619,7 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
             continue
         
         btc_to_use = min(lot_rem, remaining_outflow)
-        fraction = btc_to_use / lot_rem
+        fraction = btc_to_use / lot_rem  # Full precision
         cost_basis_portion = lot.cost_basis_usd * fraction
         transferred_cost_basis += cost_basis_portion
         
@@ -634,19 +630,17 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     if remaining_outflow > 0:
         raise HTTPException(status_code=400, detail=f"Not enough BTC to transfer {btc_outflow}")
     
-    # Create destination lot
-    new_lot_cost_basis = transferred_cost_basis * (btc_received / btc_outflow)
+    new_lot_cost_basis = transferred_cost_basis * (btc_received / btc_outflow)  # Full precision
     new_lot = BitcoinLot(
         created_txn_id=tx.id,
         acquired_date=tx.timestamp,
         total_btc=btc_received,
         remaining_btc=btc_received,
-        cost_basis_usd=new_lot_cost_basis,
+        cost_basis_usd=new_lot_cost_basis,  # DB truncates to 2 decimals
     )
     db.add(new_lot)
     
-    # Update transaction
-    tx.cost_basis_usd = new_lot_cost_basis
+    tx.cost_basis_usd = new_lot_cost_basis  # DB truncates to 2 decimals
     db.add(tx)
 
 # --------------------------------------------------------------------------------

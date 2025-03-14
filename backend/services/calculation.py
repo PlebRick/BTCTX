@@ -42,20 +42,23 @@ def get_all_account_balances(db: Session) -> List[Dict]:
 
 def get_average_cost_basis(db: Session) -> Decimal:
     """
-    Returns the average USD cost basis per BTC *across all current lots*.
-    That is, total leftover cost basis divided by total remaining BTC.
-
-    E.g. if you have two lots:
-      • 0.5 BTC left with total cost basis of $10,000 (meaning $20k for the original 1 BTC)
-      • 1.0 BTC left with total cost basis of $25,000 (no partial disposal)
-    total leftover BTC = 1.5
-    total leftover cost basis = (0.5 * 20k) + 25k = 10k + 25k = 35k
-    => average cost basis = 35k / 1.5 = ~$23,333.33
+    Returns the average USD cost basis per BTC across all current lots.
+    Total leftover cost basis divided by total remaining BTC, rounded to 2 decimals for display.
     """
     lots = db.query(BitcoinLot).filter(BitcoinLot.remaining_btc > 0).all()
-
     total_btc_remaining = Decimal("0")
     total_cost_basis_remaining = Decimal("0")
+
+    for lot in lots:
+        fraction_left = (lot.remaining_btc / lot.total_btc).quantize(Decimal("0.00000001"))  # BTC to 8 decimals
+        leftover_cost_basis = lot.cost_basis_usd * fraction_left
+        total_btc_remaining += lot.remaining_btc
+        total_cost_basis_remaining += leftover_cost_basis
+
+    if total_btc_remaining == 0:
+        return Decimal("0")
+    
+    return (total_cost_basis_remaining / total_btc_remaining).quantize(Decimal("0.01"))
 
     for lot in lots:
         # fraction_left = how much of the original lot is still left
