@@ -1,5 +1,5 @@
 /**
- * Dashboard.tsx
+ * frontend/src/pages/Dashboard.tsx
  *
  * Displays portfolio overview, balances, realized gains, etc.
  * Now also shows a live BTC price (replacing the placeholder).

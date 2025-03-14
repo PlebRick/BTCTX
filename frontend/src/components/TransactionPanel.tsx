@@ -1,3 +1,4 @@
+//frontend/src/components/TransactionPanel.tsx
 import React, { useEffect, useState } from "react";
 import "../styles/transactionPanel.css";
 import TransactionForm from "./TransactionForm";

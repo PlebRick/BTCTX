@@ -1,5 +1,5 @@
 /**
- * global.d.ts
+ * frontend/src/types/global.d.ts
  *
  * Ambient type declarations for the entire frontend.
  * Make sure this file is included in tsconfig.json ("include") so TypeScript picks it up.

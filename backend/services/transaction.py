@@ -105,18 +105,22 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
     remove_ledger_entries_for_tx(new_tx, db)
     build_ledger_entries_for_transaction(new_tx, tx_data, db)
 
-    # Step 6: Possibly skip net-zero check if cross-currency
+   # Step 6: Possibly skip net-zero check if cross-currency (Buy/Sell)
     _maybe_verify_balance_for_internal(new_tx, db)
 
-    # Step 7: If depositing or buying BTC, create a BitcoinLot
+    # Steps 7-9: Handle lot creation, disposal, or transfer based on transaction type
     if new_tx.type in ("Deposit", "Buy"):
+        # Step 7: If depositing or buying BTC, create a BitcoinLot
         maybe_create_bitcoin_lot(new_tx, tx_data, db)
-
-    # Step 8: If withdrawing or selling BTC, do a FIFO disposal
-    if new_tx.type in ("Withdrawal", "Sell"):
+    elif new_tx.type in ("Withdrawal", "Sell"):
+        # Step 8: If withdrawing or selling BTC, do a FIFO disposal
         maybe_dispose_lots_fifo(new_tx, tx_data, db)
+        compute_sell_summary_from_disposals(new_tx, db)
+    elif new_tx.type == "Transfer":
+        # Step 9: If transferring BTC, move lots and update cost basis
+        maybe_transfer_bitcoin_lot(new_tx, tx_data, db)
 
-    # Step 9: For Sell or Withdrawal, compute realized gain summary
+    # Step 10: For Sell or Withdrawal, compute realized gain summary (post-disposal)
     if new_tx.type in ("Sell", "Withdrawal"):
         compute_sell_summary_from_disposals(new_tx, db)
 
@@ -584,6 +588,66 @@ def compute_sell_summary_from_disposals(tx: Transaction, db: Session):
         tx.holding_period = None
 
     db.flush()
+
+def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
+    """
+    Transfer BTC between accounts, updating lots and cost basis (restored from past functionality).
+    """
+    from_acct = db.query(Account).filter(Account.id == tx.from_account_id).first()
+    to_acct = db.query(Account).filter(Account.id == tx.to_account_id).first()
+    if not from_acct or from_acct.currency != "BTC" or not to_acct or to_acct.currency != "BTC":
+        return
+    
+    btc_outflow = Decimal(tx.amount or 0)
+    fee_amount = Decimal(tx.fee_amount or 0) if tx.fee_currency == "BTC" else Decimal(0)
+    btc_received = btc_outflow - fee_amount
+    if btc_outflow <= 0 or btc_received <= 0:
+        return
+    
+    # Find source lots (FIFO)
+    lots = db.query(BitcoinLot).filter(
+        BitcoinLot.remaining_btc > 0,
+        BitcoinLot.created_txn_id.in_(
+            db.query(Transaction.id).filter(Transaction.to_account_id == tx.from_account_id)
+        )
+    ).order_by(BitcoinLot.acquired_date).all()
+    
+    remaining_outflow = btc_outflow
+    transferred_cost_basis = Decimal("0")
+    
+    for lot in lots:
+        if remaining_outflow <= 0:
+            break
+        lot_rem = lot.remaining_btc
+        if lot_rem <= 0:
+            continue
+        
+        btc_to_use = min(lot_rem, remaining_outflow)
+        fraction = btc_to_use / lot_rem
+        cost_basis_portion = lot.cost_basis_usd * fraction
+        transferred_cost_basis += cost_basis_portion
+        
+        lot.remaining_btc -= btc_to_use
+        remaining_outflow -= btc_to_use
+        db.add(lot)
+    
+    if remaining_outflow > 0:
+        raise HTTPException(status_code=400, detail=f"Not enough BTC to transfer {btc_outflow}")
+    
+    # Create destination lot
+    new_lot_cost_basis = transferred_cost_basis * (btc_received / btc_outflow)
+    new_lot = BitcoinLot(
+        created_txn_id=tx.id,
+        acquired_date=tx.timestamp,
+        total_btc=btc_received,
+        remaining_btc=btc_received,
+        cost_basis_usd=new_lot_cost_basis,
+    )
+    db.add(new_lot)
+    
+    # Update transaction
+    tx.cost_basis_usd = new_lot_cost_basis
+    db.add(tx)
 
 # --------------------------------------------------------------------------------
 # NEW: Helper Function for Ripple Updates

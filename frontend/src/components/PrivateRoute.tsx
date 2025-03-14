@@ -1,4 +1,4 @@
-// PrivateRoute.tsx
+// frontend/src/components/PrivateRoute.tsx
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Navigate } from 'react-router-dom';
