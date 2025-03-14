@@ -590,6 +590,10 @@ def compute_sell_summary_from_disposals(tx: Transaction, db: Session):
     db.flush()
 
 def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
+    """
+    Transfer BTC between accounts, updating lots and cost basis.
+    Maintains full precision internally, rounds to schema precision at storage.
+    """
     from_acct = db.query(Account).filter(Account.id == tx.from_account_id).first()
     to_acct = db.query(Account).filter(Account.id == tx.to_account_id).first()
     if not from_acct or from_acct.currency != "BTC" or not to_acct or to_acct.currency != "BTC":
@@ -630,17 +634,19 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     if remaining_outflow > 0:
         raise HTTPException(status_code=400, detail=f"Not enough BTC to transfer {btc_outflow}")
     
-    new_lot_cost_basis = transferred_cost_basis * (btc_received / btc_outflow)  # Full precision
+    # Calculate new lot cost basis with full precision, round only at storage
+    new_lot_cost_basis = transferred_cost_basis * (btc_received / btc_outflow)
     new_lot = BitcoinLot(
         created_txn_id=tx.id,
         acquired_date=tx.timestamp,
-        total_btc=btc_received,
-        remaining_btc=btc_received,
-        cost_basis_usd=new_lot_cost_basis,  # DB truncates to 2 decimals
+        total_btc=btc_received.quantize(Decimal("0.00000001")),  # BTC to 8 decimals
+        remaining_btc=btc_received.quantize(Decimal("0.00000001")),
+        cost_basis_usd=new_lot_cost_basis.quantize(Decimal("0.01")),  # USD to 2 decimals
     )
     db.add(new_lot)
     
-    tx.cost_basis_usd = new_lot_cost_basis  # DB truncates to 2 decimals
+    # Update transaction with rounded cost basis
+    tx.cost_basis_usd = new_lot_cost_basis.quantize(Decimal("0.01"))  # Matches DB schema
     db.add(tx)
 
 # --------------------------------------------------------------------------------
