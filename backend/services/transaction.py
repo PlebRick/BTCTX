@@ -655,42 +655,48 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
 
 def recalculate_subsequent_transactions(updated_tx: Transaction, db: Session):
     """
-    Recalculate all Sell and Withdrawal transactions that occur after the updated transaction.
+    Recalculate all Sell, Withdrawal, and Transfer transactions that occur after the updated transaction's timestamp.
     This ensures that changes to the updated transaction ripple forward, updating cost basis,
-    lot disposals, and realized gains for all subsequent transactions.
+    lot disposals, and realized gains/losses for all subsequent transactions.
 
     Steps:
-    1. Query all Sell and Withdrawal transactions with timestamp > updated_tx.timestamp.
+    1. Query all Sell, Withdrawal, and Transfer transactions with timestamp >= updated_tx.timestamp.
     2. For each subsequent transaction:
        a. Remove existing lot disposals.
-       b. Re-run FIFO disposal logic.
-       c. Recompute realized gains summary.
+       b. Re-run FIFO disposal or transfer logic based on transaction type.
+       c. Recompute realized gains summary for Sell/Withdrawal.
     """
-    # Query all Sell and Withdrawal transactions after the updated transaction's timestamp
+    # Query all Sell, Withdrawal, and Transfer transactions after or on the updated transaction's timestamp
     subsequent_txs = db.query(Transaction).filter(
-        Transaction.timestamp > updated_tx.timestamp,
-        Transaction.type.in_(["Sell", "Withdrawal"])
-    ).order_by(Transaction.timestamp).all()
+        Transaction.timestamp >= updated_tx.timestamp,
+        Transaction.id > updated_tx.id,  # Tiebreaker for same timestamp
+        Transaction.type.in_(["Sell", "Withdrawal", "Transfer"])
+    ).order_by(Transaction.timestamp, Transaction.id).all()
 
     for sub_tx in subsequent_txs:
-        # Remove existing lot disposals for this transaction
+        # Remove existing lot usage for this transaction
         remove_lot_usage_for_tx(sub_tx, db)
 
-        # Re-run FIFO disposal logic for this transaction
-        # We need to pass the tx_data for the subsequent transaction
-        # Since tx_data isn't stored, we'll use the transaction's attributes
+        # Rebuild sub_tx_data with all necessary fields
         sub_tx_data = {
+            "from_account_id": sub_tx.from_account_id,
+            "to_account_id": sub_tx.to_account_id,
+            "type": sub_tx.type,
             "amount": sub_tx.amount,
-            "proceeds_usd": sub_tx.proceeds_usd,
             "fee_amount": sub_tx.fee_amount,
             "fee_currency": sub_tx.fee_currency,
+            "proceeds_usd": sub_tx.proceeds_usd,
             "purpose": sub_tx.purpose,
-            # Add other necessary fields if needed
+            "timestamp": sub_tx.timestamp,
+            "cost_basis_usd": sub_tx.cost_basis_usd
         }
-        maybe_dispose_lots_fifo(sub_tx, sub_tx_data, db)
 
-        # Recompute realized gains summary for this transaction
-        compute_sell_summary_from_disposals(sub_tx, db)
+        # Re-run appropriate logic based on transaction type
+        if sub_tx.type == "Transfer":
+            maybe_transfer_bitcoin_lot(sub_tx, sub_tx_data, db)
+        elif sub_tx.type in ("Sell", "Withdrawal"):
+            maybe_dispose_lots_fifo(sub_tx, sub_tx_data, db)
+            compute_sell_summary_from_disposals(sub_tx, db)
 
 # --------------------------------------------------------------------------------
 # Double-Entry (with Cross-Currency Skip) & Fee Rules
