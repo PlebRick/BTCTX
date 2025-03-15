@@ -1,70 +1,62 @@
-/* Centers the calculator horizontally in its parent 
-   (if the parent has space for it). 
-   If you're already wrapping .calculator in .sidebar-calculator 
-   with "justify-content: center", this is optional. 
-*/
+/* Centers the calculator horizontally */
 .sidebar-calculator {
   margin-top: 0rem;
   width: 100%;
   display: flex;
-  justify-content: center; 
+  justify-content: center;
 }
 
 /* 
   The calculator box:
-  - Smaller width & height (keeping a ~2:3 ratio, e.g., 140x210).
-  - Border color #4a4b4b to match nav hover color.
-  - Everything smaller but still proportionate.
+  - Increased width and height to match the larger sidebar.
 */
 .calculator {
-  width: 170px; 
-  height: 250px;
+  width: 250px;         /* Increased from 170px */
+  height: 350px;        /* Increased from 250px */
   border: 1px solid #4a4b4b;
   background: #1e1e1e;
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  padding: 8px; 
-  box-sizing: border-box; 
+  padding: 12px;        /* Increased from 8px */
+  box-sizing: border-box;
 }
 
 /* Display at the top, center-justified text */
 .display {
-  text-align: center;         /* center the "0" or any typed numbers */
-  margin: 0 0 6px 0; 
-  padding: 6px;
-  border: 1px solid #4a4b4b;  /* same color as outer border */
+  text-align: center;
+  margin: 0 0 8px 0;   /* Increased from 6px */
+  padding: 8px;        /* Increased from 6px */
+  border: 1px solid #4a4b4b;
   background: #2a2a2a;
-  font-size: 0.8em;           /* smaller text */
+  font-size: 1em;      /* Increased from 0.8em */
   color: #d4d4d4;
   border-radius: 4px;
 }
 
 /* 
   Buttons laid out in a 4x5 grid:
-  - We have 17 total buttons, so 16 fill the first 4 rows 
-    and the 17th (the "C" key) will sit alone in row 5. 
+  - Adjusted to fit the larger container.
 */
 .buttons {
-  flex: 1; /* take remaining vertical space */
+  flex: 1;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  /* Force a 5th row so "C" doesn't overflow horizontally */
   grid-template-rows: repeat(5, 1fr);
-  gap: 4px;
-  margin: 0; /* consistent spacing around the grid */
+  gap: 6px;            /* Increased from 4px */
+  margin: 0;
 }
 
-/* Individual button styling, smaller font, border color #4a4b4b */
+/* Individual button styling */
 .buttons button {
-  padding: 6px;
-  font-size: 0.8em;
+  padding: 8px;        /* Increased from 6px */
+  font-size: 1em;      /* Increased from 0.8em */
   background: #333;
   color: #d4d4d4;
   border: 1px solid #4a4b4b;
   border-radius: 4px;
   cursor: pointer;
-  text-align: center; /* center the symbols on the button */
+  text-align: center;
   transition: background 0.3s;
 }
 
