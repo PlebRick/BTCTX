@@ -195,3 +195,77 @@
   text-decoration: underline;
   color: var(--color-accent-hover);
 }
+
+/* This container holds the label and the show/hide link on the same line */
+.password-label-row {
+  display: flex;            /* place label + link side-by-side */
+  justify-content: space-between;
+  align-items: baseline;    /* aligns label text with link text nicely */
+  margin-bottom: 0.5rem;    /* space below before the input */
+}
+
+/* Style the button or link for show/hide password */
+.toggle-password-btn {
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  margin: 0;
+  /* If you want a hover color change: */
+  transition: color 0.2s;
+}
+.toggle-password-btn:hover {
+  color: var(--color-accent-hover);
+}
+
+/* Just an example snippet to demonstrate the new elements */
+
+/* Group container for each label+input pair */
+.login-form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1.5rem; /* Enough spacing between fields */
+}
+
+/* Small row above the label for the "Show Password" link or icon */
+.show-password-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+/* The toggle button itself */
+.toggle-password-btn {
+  background: none;
+  border: none;
+  color: var(--color-accent); /* or any color you want */
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  padding: 0;
+  margin: 0;
+}
+
+/* 
+  The label & input remain the same 
+  so the field matches the username field in size & style
+*/
+.login-label {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 1rem;
+}
+
+.login-input {
+  padding: 0.75rem;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: #333;
+  color: #ffffff;
+  font-size: 1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
