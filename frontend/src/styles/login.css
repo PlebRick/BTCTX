@@ -1,55 +1,110 @@
 /* login.css */
 
-/* Container for the whole login screen */
+/* 
+  1) CSS Variables (Theme Colors)
+  Feel free to customize these for the entire app's color palette. 
+*/
+:root {
+  --color-bg: #121212;       /* Main background */
+  --color-panel: #1c1c1c;    /* Card/Panel background */
+  --color-header: #121212;   /* Header background or references */
+  --color-text: #ffffff;     /* Primary text color */
+  --color-text-dim: #cfcfcf; /* Dimmed text for secondary content */
+
+  /* Accent colors */
+  --color-accent: #d9a75f;
+  --color-accent-hover: #e0b76b;
+
+  /* Bitcoin orange for primary call-to-action (Log In button) */
+  --color-bitcoin-orange: #f7931a;
+  --color-bitcoin-orange-hover: #e5830f; /* Slightly darker on hover */
+}
+
+/* 
+  2) Overall Container
+  - 3-stop vertical gradient to minimize visible banding
+  - Center content with flex
+*/
 .login-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%); /* Subtle gradient background */
+  
+  /* Three-step vertical gradient:
+     - var(--color-bg) at the top
+     - #1a1a1a in the middle (~40% or 50%)
+     - #2a2a2a at the bottom for a subtle shift */
+  background: linear-gradient(
+    to bottom,
+    var(--color-bg) 0%,
+    #1a1a1a 50%,
+    #2a2a2a 100%
+  );
 }
 
-/* Header (logo + title) above the card */
+/* 
+  3) Header (Logo + Title)
+  - Placed above the card
+  - Extra spacing to visually separate from the card
+*/
 .login-header {
   display: flex;
   align-items: center;
-  margin-bottom: 2rem; /* More space below */
+  margin-bottom: 2rem; /* More space below the header */
 }
 
 .login-logo {
-  width: 50px; /* Slightly larger logo */
+  width: 50px;
   height: 50px;
   margin-right: 1rem;
 }
 
 .login-title {
-  font-size: 2.5rem; /* Larger title */
-  font-weight: 700; /* Bold for emphasis */
-  color: #ffffff; /* White as requested */
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Subtle shadow for depth */
+  font-family: 'Poppins', sans-serif; /* Or your preferred modern font */
+  font-size: 2.4rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Subtle depth */
+  margin: 0; /* Remove default heading margin */
 }
 
-/* The main "card" containing form fields */
+/* 
+  4) The "Card" Container
+  - Slightly lighter background than the page BG
+  - Rounded corners, strong shadow for emphasis
+*/
 .login-card {
-  background-color: #252525; /* Darker panel to match dashboard */
-  border-radius: 10px; /* Softer corners */
-  padding: 2.5rem; /* More padding for comfort */
-  width: 400px; /* Larger card width */
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); /* Stronger shadow for depth */
-  border: 1px solid #333; /* Subtle border for definition */
+  width: 400px;
+  background-color: var(--color-panel);
+  border-radius: 10px;
+  padding: 2.5rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); /* Stronger shadow for depth */
+  border: 1px solid rgba(255, 255, 255, 0.08); /* Subtle border for definition */
+
+  /* Center its contents in vertical flow */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .login-card-title {
   margin-top: 0;
-  margin-bottom: 1.5rem; /* More spacing */
-  font-size: 1.5rem; /* Larger title */
+  margin-bottom: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 600;
+  color: var(--color-text);
   text-align: center;
-  color: #ffffff; /* White for contrast */
+  font-family: 'Poppins', sans-serif;
 }
 
+/* 
+  5) The Login Form + Fields
+  - Make form fill the card width with comfortable spacing
+*/
 .login-form {
+  width: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -57,57 +112,68 @@
 .login-form-group {
   display: flex;
   flex-direction: column;
-  margin-bottom: 1.5rem; /* More spacing between fields */
+  margin-bottom: 1.5rem;
 }
 
 .login-label {
-  margin-bottom: 0.75rem; /* More spacing below label */
+  margin-bottom: 0.5rem;
   font-weight: 600;
-  color: #ffffff; /* White for readability */
+  color: var(--color-text);
   font-size: 1rem;
 }
 
 .login-input {
-  padding: 0.75rem; /* More padding for comfort */
-  border: 1px solid #444; /* Slightly lighter border */
-  border-radius: 6px; /* Softer corners */
-  background: #333; /* Darker input background */
-  color: #ffffff; /* White text */
+  padding: 0.75rem;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: #333;
+  color: var(--color-text);
   font-size: 1rem;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease; /* Smooth hover effect */
+
+  /* Smooth transitions on focus/hover */
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .login-input:focus {
   outline: none;
-  border-color: var(--color-accent); /* Highlight on focus */
-  box-shadow: 0 0 5px rgba(255, 204, 0, 0.3); /* Subtle glow */
+  border-color: var(--color-accent);
+  box-shadow: 0 0 6px rgba(217, 167, 95, 0.4); /* Subtle glow using accent color */
 }
 
-/* Ensure .accent-btn matches your dashboard style */
+/* 
+  6) Login Button
+  - Use Bitcoin orange for the login button
+  - Crisp hover effect
+*/
 .accent-btn.login-btn {
   width: 100%;
   padding: 0.75rem;
   font-size: 1.1rem;
   font-weight: 600;
-  background-color: var(--color-accent);
   color: #1a1a1a; /* Dark text for contrast */
+  background-color: var(--color-bitcoin-orange);
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.1s ease;
+  text-transform: uppercase; /* Optional for a bold CTA */
+  transition: background-color 0.25s ease, transform 0.1s ease;
 }
 
 .accent-btn.login-btn:hover {
-  background-color: #e6b800; /* Slightly darker accent on hover */
+  background-color: var(--color-bitcoin-orange-hover);
   transform: translateY(-1px); /* Subtle lift effect */
 }
 
 .accent-btn.login-btn:active {
-  transform: translateY(0); /* Reset on click */
+  transform: translateY(0);
 }
 
-/* Create account row */
+/* 
+  7) Create Account Link
+  - Simple row below the button to direct to signup
+*/
 .login-create-account {
+  width: 100%;
   display: flex;
   justify-content: space-between;
   margin-top: 1.5rem;
@@ -115,17 +181,17 @@
 }
 
 .create-account-text {
-  color: #aaaaaa; /* Dimmed text for contrast */
+  color: var(--color-text-dim);
 }
 
 .create-account-link {
   color: var(--color-accent);
   text-decoration: none;
   font-weight: 500;
+  transition: color 0.2s ease;
 }
 
 .create-account-link:hover {
   text-decoration: underline;
-  color: #e6b800; /* Match button hover */
+  color: var(--color-accent-hover);
 }
-
