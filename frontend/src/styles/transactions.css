@@ -1,15 +1,15 @@
 /* ==========================
    transactions.css
-   Styling for the Transactions page
+   Styling for the Transactions page:
    - transaction list
    - date headings
    - row styles
-   - optional pagination
+   - pagination
 ========================== */
 
 /* 1) Transactions Page Container */
 .transactions-page {
-  background-color: transparent; 
+  background-color: transparent;
   color: var(--color-text);
   padding: 1rem;
 }
@@ -62,7 +62,6 @@
   flex-direction: column;
   gap: 2rem; /* space between date groups */
 }
-
 .transactions-day-group {
   /* each date group can be separated or left alone */
 }
@@ -78,18 +77,18 @@
 /* 4) Transaction Row / Card */
 .transaction-card {
   display: grid;
-  /* For wide screens, define columns 
+  /* For wide screens, define columns
      (time, type, account, amount, fee, extra, disposal, edit button).
   */
   grid-template-columns:
-    80px  /* time-col */
-    80px  /* type-col */
-    160px /* account-col */
-    300px /* amount-col */
-    160px /* fee-col */
-    1fr   /* extra col */
-    300px /* disposal col */
-    45px; /* edit button */
+    80px   /* time-col */
+    80px   /* type-col */
+    160px  /* account-col */
+    300px  /* amount-col */
+    160px  /* fee-col */
+    1fr    /* extra col */
+    300px  /* disposal col */
+    45px;  /* edit button */
 
   align-items: center;
   gap: 1rem;
@@ -98,14 +97,12 @@
   /* 
     5) Alternating row colors:
     We'll color them differently using nth-child. 
-    Remove your direct background here,
-    so that nth-child can do it.
+    No direct background here, so nth-child can do it.
   */
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   margin-bottom: 0.4rem;
-  font-size: 1rem; /* or 1rem if you want bigger text */
-
+  font-size: 1rem;
   transition: background-color 0.2s;
 }
 
@@ -144,7 +141,7 @@
   border-radius: 4px;
   padding: 0.4rem 0.6rem;
   cursor: pointer;
-  font-size: .9rem;
+  font-size: 0.9rem;
   transition: background-color 0.2s;
 }
 .edit-button:hover {
@@ -157,7 +154,7 @@
 */
 @media (max-width: 800px) {
   .transaction-card {
-    grid-template-columns: 1fr 45px; 
+    grid-template-columns: 1fr 45px;
     gap: 0.75rem;
   }
 
@@ -198,13 +195,15 @@
   }
 }
 
-/* 7) (Optional) Pagination styling */
+/* 7) Pagination styling */
 .pagination-container {
   display: flex;
   justify-content: center;
   align-items: center;
   margin-top: 1rem;
 }
+
+/* Buttons for pagination controls */
 .pagination-button {
   background-color: #333;
   color: #fff;
@@ -215,6 +214,13 @@
   cursor: pointer;
   transition: background-color 0.2s;
 }
+
 .pagination-button:hover {
   background-color: #4a4a4a;
+}
+
+/* Disabled state: fade out & disallow clicks */
+.pagination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
