@@ -4,7 +4,7 @@
 .transaction-panel-overlay {
   position: fixed;
   top: 0;
-  left: 210px; /* the width of your sidebar */
+  left: 360px; /* the width of your sidebar */
   right: 0;
   bottom: 0;
   background-color: rgba(0,0,0,0.5);
@@ -72,6 +72,8 @@ Panel Container
   border: none;
   border-radius: 4px;
   padding: 0.5rem 1rem;
+  font-size: 1rem;
+  font-bold: 600;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s;

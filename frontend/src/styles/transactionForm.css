@@ -6,7 +6,7 @@
   flex-direction: column;
   gap: 1rem;
   color: var(--color-text);
-  font-size: 0.85rem;
+  font-size: 1rem;
 }
 
 /* The grid wrapper for all fields */
@@ -36,7 +36,7 @@
   color: var(--color-text);
   border: 1px solid #444;
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: 1rem;
   outline: none;
   transition: border-color 0.2s, background-color 0.2s;
 }
