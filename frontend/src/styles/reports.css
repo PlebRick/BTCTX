@@ -1,61 +1,69 @@
 /* Reports container */
 .reports-container {
-    max-width: 600px;
-    margin: 20px;
-    padding: 20px;
-    background-color: #1c1c1e;
-    border-radius: 10px;
-    color: white;
-    font-family: Arial, sans-serif;
-  }
-  
-  /* Title */
-  .reports-title {
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 10px;
-  }
-  
-  /* Description */
-  .reports-description {
-    font-size: 16px;
-    color: #a1a1a1;
-    margin-bottom: 20px;
-  }
-  
-  /* Reports section */
-  .reports-section {
-    background: #2c2c2e;
-    padding: 15px;
-    border-radius: 8px;
-  }
-  
-  /* Individual report option */
-  .report-option {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 0;
-    border-top: 1px solid #3a3a3c;
-  }
-  
-  /* Report title */
-  .report-title {
-    font-size: 16px;
-    font-weight: bold;
-  }
-  
-  /* Report subtitle */
-  .report-subtitle {
-    font-size: 14px;
-    color: #a1a1a1;
-  }
-  
-  /* Report button */
-  .report-button {
-    background: #3a3a3c;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    bor
-  
+  max-width: 600px;
+  margin: 20px;
+  padding: 20px;
+  background-color: var(--color-panel); /* Match Settings container background */
+  border-radius: 10px;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+/* Title */
+.reports-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+/* Description */
+.reports-description {
+  font-size: 16px;
+  color: var(--color-text-dim); /* Match Settings dimmed text color */
+  margin-bottom: 20px;
+}
+
+/* Reports section */
+.reports-section {
+  background: #2c2c2e; /* Already matches Settings section background */
+  padding: 15px;
+  border-radius: 8px;
+}
+
+/* Individual report option */
+.report-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-top: 1px solid #3a3a3c;
+  background: none; /* Ensure no background override */
+}
+
+/* Report title */
+.report-title {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Report subtitle */
+.report-subtitle {
+  font-size: 14px;
+  color: var(--color-text-dim); /* Match Settings dimmed text color */
+}
+
+/* Report button */
+.report-button {
+  background: #3a3a3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.report-button:hover {
+  background: #4a4a4c; /* Slightly lighter gray for hover effect */
+}

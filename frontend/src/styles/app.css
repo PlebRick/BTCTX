@@ -1,200 +1,246 @@
-/* =======================
-   Theme & Global
-======================= */
+/* ================================
+   app.css 
+   Global layout, sidebar, header, 
+   converter & calculator styling
+================================= */
+
+/* 1) Global CSS Variables & Base Styles */
 :root {
-  --color-bg: #121212;       /* main page background */
-  --color-panel: #1c1c1c;    /* sidebar background */
-  --color-header: #121212;   /* header background in-between */
-  --color-text: #ffffff;
-  --color-text-dim: #cfcfcf;
-  --color-accent: #d9a75f;
-  --color-accent-hover: #e0b76b;
+  /* 
+    Use these for easy theming:
+  */
+  --color-bg: #121212;            /* Main page background */
+  --color-panel: #1c1c1c;         /* Sidebar (panel) background */
+  --color-header: #121212;        /* Header background */
+  --color-text: #ffffff;          /* Main text color */
+  --color-text-dim: #cfcfcf;      /* Dimmed text for secondary content */
+  --color-accent: #d9a75f;        /* Gold accent */
+  --color-accent-hover: #e0b76b;  /* Hover state for accent */
+
+  /* Additional variables */
+  --bitcoin-orange: #f7931a;           /* Another accent if needed */
+  --bitcoin-orange-hover: #e5830f;     /* Hover for the orange */
+
+  /* Easily adjustable sidebar width & base font size */
+  --sidebar-width: 360px;
+  --base-font-size: 20px;
 }
 
+/* Base font sizing & body defaults */
 body {
   margin: 0;
   padding: 0;
   background-color: var(--color-bg);
   color: var(--color-text);
   font-family: sans-serif;
+  font-size: var(--base-font-size);
+  line-height: 1.4;
 }
 
-/* =======================
-   Layout Container
-======================= */
+/* Flex container for sidebar + main content */
 .app-container {
-  display: flex; /* Sidebar on left, content on right */
+  display: flex;
+  min-height: 100vh; /* so the container spans full screen height */
 }
 
-/* =======================
-   Sidebar (Left)
-======================= */
+/* ===============================
+   2) Sidebar
+=============================== */
 .sidebar {
+  width: var(--sidebar-width);
   background-color: var(--color-panel);
-  width: 225px;
-  min-height: 100vh; /* full vertical height */
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 0; /* no pinned items */
+  padding: 0;
 }
 
-/* Brand area at the top of the sidebar */
+/* Example brand area at top */
 .sidebar-brand {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 64px; /* matches header height */
-  padding-left: 0rem;
-  padding-top: 1rem;
+  height: 64px; 
+  margin-bottom: 1rem; /* space below brand */
 }
 
 .sidebar-logo {
   width: 35px;
   height: 35px;
-  border-radius: 50%;
   object-fit: cover;
-  transform: translateY(-1px);
+  border-radius: 50%;
+  margin-right: 0.5rem;
 }
 
 .sidebar-title {
-  font-size: 1.8rem;
+  font-size: 1.4rem;
   font-weight: bold;
-  color: #fff; 
-  margin-left: 0.5rem;
+  color: var(--color-text);
 }
 
-/* Optional divider */
+/* Divider line if desired */
 .sidebar-divider {
-  border: none;
   border-top: 1px solid #333;
-  margin: 0;
+  margin: 0 1rem;
 }
 
-/* =======================
-   Tools Section
+/* ===============================
+   3) Tools Section in Sidebar
    (Converter + Calculator)
-======================= */
+=============================== */
 .sidebar-tools {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;  /* small gap between converter & calculator */
-  padding-bottom: 20px;
+  gap: 1rem;
+  padding: 1rem;
 }
 
-.sidebar-converter {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  margin-top: 1rem; /* margin to keep it near the brand area */
+/* Converter container */
+.converter {
+  width: 190px; 
+  background-color: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
 }
 
-.sidebar-calculator {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-}
-
-/* If your converter component uses a .converter-title class */
+/* Title for converter if you use it */
 .converter-title {
-  font-size: 0.8rem;   /* smaller than typical nav text */
-  font-weight: normal; /* not too bold */
+  color: var(--color-text-dim);
+  font-size: 1rem;
+  margin-bottom: 1rem;
   text-align: center;
 }
 
-/* =======================
-   Header (Top)
-======================= */
+.converter-row {
+  margin-bottom: 0.75rem;
+}
+.converter-row label {
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+  margin-bottom: 0.25rem;
+  display: block;
+}
+.converter-row input {
+  width: 100%;
+  padding: 0.4rem;
+  font-size: 0.9rem;
+  background-color: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #d4d4d4;
+}
+
+/* Calculator container */
+.calculator {
+  width: 170px; 
+  height: 250px;
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* The display area at top of the calculator */
+.display {
+  text-align: center;
+  margin-bottom: 6px;
+  padding: 6px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #d4d4d4;
+}
+
+/* Grid of buttons */
+.buttons {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 4px;
+}
+.buttons button {
+  background: #333;
+  color: #d4d4d4;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+}
+.buttons button:hover {
+  background: #4a4a4a;
+}
+
+/* ===============================
+   4) Header (Top)
+=============================== */
 .header {
-  background: linear-gradient(to bottom, #000000, #121212);
+  background: #121212;
   height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 .1rem;
+  padding: 0 1rem;
 }
 
-/* Page title in header (left side) */
-.header-title {
-  color: var(--color-text-dim);
-  font-size: 1rem;
-  font-weight: bold;
-  margin: 0;
-}
-
-/* 
-  NEW: Horizontal nav in the header
-  (replaces old sidebar nav).
-*/
+/* Navigation links in header */
 .header-nav {
   display: flex;
-  gap: 1rem; /* space between links */
-  align-items: center;
+  gap: 1.5rem;
 }
-
-/* Individual header nav link */
 .header-nav-item {
   color: var(--color-text-dim);
-  font-size: 1rem;
-  padding: 0.5rem;
-  border-radius: 4px;
-  transition: color 0.2s, background-color 0.2s;
-  text-decoration: none; /* remove underline */
-  margin-left: 35px;
-}
-
-.header-nav {
-  display: flex;
-  gap: 1.5rem; /* horizontal space between links */
-}
-
-.header-nav-item:hover {
-  color: var(--color-text);
-  background-color: #4a4a4a;
-}
-
-/* Active route in #e0b76b (gold-like) */
-.header-nav-item.active {
-  color: #c39b33;
-}
-
-.header-nav-item {
-  color: #cfcfcf;    /* dim white */
   text-decoration: none;
-  font-size: 0.9rem; /* adjust as you like */
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
   border-radius: 4px;
-  padding: 0.25rem 0.5rem;
   transition: background-color 0.2s, color 0.2s;
 }
+.header-nav-item:hover {
+  color: var(--color-text);
+  background-color: #2a2a2a;
+}
+.header-nav-item.active {
+  color: var(--color-accent);
+  background-color: #333;
+}
 
-/* =======================
-   Content Area (Right)
-======================= */
+/* ===============================
+   5) Main Content Area
+=============================== */
 .content-area {
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
-/* Main content below header */
 .main-content {
   flex: 1;
-  padding: 0rem;
+  padding: 1rem;
 }
 
-/* =======================
-   Accent Buttons (Optional)
-======================= */
+/* ===============================
+   6) Reusable Buttons
+=============================== */
 .accent-btn {
   background-color: var(--color-accent);
   color: #000;
   border: none;
   border-radius: 4px;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform 0.1s ease;
 }
 .accent-btn:hover {
   background-color: var(--color-accent-hover);
+  transform: translateY(-1px);
 }
+

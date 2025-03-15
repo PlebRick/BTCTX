@@ -34,8 +34,7 @@ const Settings: React.FC = () => {
   };
 
   // -------------------------------------------------------
-  // 2) Reset Username & Password (without deleting transactions)
-  //    For single-user scenario: fetch the user, patch them
+  // 2) Reset Username & Password
   // -------------------------------------------------------
   const handleResetCredentials = async (): Promise<void> => {
     const confirmed = window.confirm(
@@ -52,7 +51,7 @@ const Settings: React.FC = () => {
 
       if (users.length > 0) {
         const userId = users[0].id;
-        // 2) Prompt for new username/password or just set placeholders
+        // 2) Prompt for new username/password
         const newUsername = prompt("Enter new username", "NewUser");
         if (!newUsername) {
           setMessage("Username reset canceled.");
@@ -67,8 +66,7 @@ const Settings: React.FC = () => {
           return;
         }
 
-        // 3) Update user with new credentials
-        // This assumes a PATCH or PUT /users/{userId} can accept { username, password }
+        // 3) Update user
         await api.patch(`/users/${userId}`, {
           username: newUsername,
           password: newPassword
@@ -87,11 +85,11 @@ const Settings: React.FC = () => {
   };
 
   // -------------------------------------------------------
-  // 3) Delete All Transactions (keeps user & credentials)
+  // 3) Delete All Transactions
   // -------------------------------------------------------
   const handleDeleteTransactions = async (): Promise<void> => {
     const confirmed = window.confirm(
-      "Are you sure you want to delete ALL transactions? This action cannot be undone."
+      "Are you sure you want to delete ALL transactions? This cannot be undone."
     );
     if (!confirmed) return;
 
@@ -100,7 +98,7 @@ const Settings: React.FC = () => {
     try {
       await api.delete<ApiErrorResponse>("/transactions/delete_all");
       setMessage("All transactions have been successfully deleted.");
-    } catch (error: unknown) {
+    } catch (error) {
       console.error("Error deleting transactions:", error);
       if (axios.isAxiosError<ApiErrorResponse>(error)) {
         const detailMsg = error.response?.data?.detail;
@@ -117,10 +115,7 @@ const Settings: React.FC = () => {
   };
 
   // -------------------------------------------------------
-  // 4) Reset Account:
-  //    - Delete all transactions
-  //    - Delete the single user
-  //    - Redirect to /register
+  // 4) Reset Account (Delete user + transactions)
   // -------------------------------------------------------
   const handleResetAccount = async (): Promise<void> => {
     const confirmed = window.confirm(
@@ -167,7 +162,7 @@ const Settings: React.FC = () => {
 
         {/* 1) Logout */}
         <div className="settings-option">
-          <div>
+          <div className="option-info">
             <span className="settings-option-title">Logout</span>
             <p className="settings-option-subtitle">Sign out of your account.</p>
           </div>
@@ -182,10 +177,10 @@ const Settings: React.FC = () => {
 
         {/* 2) Reset Username & Password */}
         <div className="settings-option">
-          <div>
+          <div className="option-info">
             <span className="settings-option-title">Reset Username & Password</span>
             <p className="settings-option-subtitle">
-              Change your username and password without deleting transactions.
+              Change your username and password without deleting any transactions.
             </p>
           </div>
           <button
@@ -193,7 +188,7 @@ const Settings: React.FC = () => {
             disabled={loading}
             className="settings-button"
           >
-            {loading ? "Processing..." : "Reset Credentials"}
+            {loading ? "Processing..." : "Change"}
           </button>
         </div>
       </div>
@@ -206,25 +201,27 @@ const Settings: React.FC = () => {
 
         {/* 3) Delete All Transactions */}
         <div className="settings-option">
-          <div>
+          <div className="option-info">
             <span className="settings-option-title">Delete All Transactions</span>
-            <p className="settings-option-subtitle">Removes all transaction history. This cannot be undone.</p>
+            <p className="settings-option-subtitle">
+              Remove all transaction history. This action cannot be undone.
+            </p>
           </div>
           <button
             onClick={handleDeleteTransactions}
             disabled={loading}
             className="settings-button danger"
           >
-            {loading ? "Processing..." : "Delete Transactions"}
+            {loading ? "Processing..." : "Delete"}
           </button>
         </div>
 
         {/* 4) Reset Account */}
         <div className="settings-option">
-          <div>
+          <div className="option-info">
             <span className="settings-option-title">Reset Account</span>
             <p className="settings-option-subtitle">
-              Delete all transactions AND remove the user account, allowing new registration.
+              Delete all transactions AND remove the user account, allowing a fresh start.
             </p>
           </div>
           <button
@@ -232,10 +229,9 @@ const Settings: React.FC = () => {
             disabled={loading}
             className="settings-button danger"
           >
-            {loading ? "Processing..." : "Reset Account"}
+            {loading ? "Processing..." : "Reset"}
           </button>
         </div>
-
       </div>
 
       {/* =========================
@@ -244,15 +240,17 @@ const Settings: React.FC = () => {
       <div className="settings-section">
         <h3>Application</h3>
         <div className="settings-option">
-          <div>
+          <div className="option-info">
             <span className="settings-option-title">Uninstall</span>
-            <p className="settings-option-subtitle">Remove the application. (Placeholder)</p>
+            <p className="settings-option-subtitle">
+              Remove the application. (Placeholder)
+            </p>
           </div>
           <button className="settings-button danger">Uninstall</button>
         </div>
       </div>
 
-      {/* Display any status/error messages */}
+      {/* Status/Error messages */}
       {message && <p className="settings-message">{message}</p>}
     </div>
   );
