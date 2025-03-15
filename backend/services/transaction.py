@@ -17,15 +17,16 @@ Final Version Tailored for Hybrid BitcoinTX:
 """
 
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_DOWN
 from backend.models.transaction import (Transaction, LedgerEntry, BitcoinLot, LotDisposal)
 from backend.models.account import Account
 from backend.schemas.transaction import TransactionCreate
 from collections import defaultdict
 from fastapi import HTTPException
-import requests
 from typing import Optional
+import requests
+import logging
 
 # --------------------------------------------------------------------------------
 # Public Functions
@@ -110,7 +111,15 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
         maybe_dispose_lots_fifo(new_tx, tx_data, db)
         compute_sell_summary_from_disposals(new_tx, db)
     elif new_tx.type == "Transfer":
-        # Step 9: If transferring BTC, move lots and update cost basis
+        # Ensure fee_amount and fee_currency are valid for BTC transfers
+        from_acct = db.query(Account).filter(Account.id == new_tx.from_account_id).first()
+        if from_acct and from_acct.currency == "BTC":
+            if new_tx.fee_amount is None or new_tx.fee_amount <= 0:
+                # Safeguard: If frontend didn’t provide a fee, log an error or set default
+                logging.warning(f"Transfer {new_tx.id} missing fee_amount; defaulting to 0")
+                new_tx.fee_amount = Decimal("0")
+            if not new_tx.fee_currency:
+                new_tx.fee_currency = "BTC"  # Enforce for BTC transfers
         maybe_transfer_bitcoin_lot(new_tx, tx_data, db)
 
     # Step 10: For Sell or Withdrawal, compute realized gain summary (post-disposal)
@@ -598,10 +607,8 @@ def get_btc_price(timestamp: datetime, db: Session) -> Decimal:
 
 def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     """
-    Transfer BTC between accounts, updating lots and cost basis.
-    Transfers the full amount to the destination account, disposes of the fee to BTC Fees account.
-    Calculates capital gain/loss on fee disposal based on fair market value at timestamp.
-    Maintains full precision internally, rounds to schema precision at storage.
+    Handle Bitcoin transfers between accounts. Since all accounts are a single inventory,
+    only the fee disposal affects lots. No new lot is created for the transfer itself.
     """
     from_acct = db.query(Account).filter(Account.id == tx.from_account_id).first()
     to_acct = db.query(Account).filter(Account.id == tx.to_account_id).first()
@@ -611,69 +618,16 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     btc_outflow = Decimal(tx.amount or 0)
     fee_amount = Decimal(tx.fee_amount or 0) if tx.fee_currency == "BTC" else Decimal(0)
     btc_received = btc_outflow - fee_amount
-    if btc_outflow <= 0 or btc_received <= 0:
+    if btc_outflow <= 0 or btc_received < 0:
         return
-    
-    lots = db.query(BitcoinLot).filter(
-        BitcoinLot.remaining_btc > 0,
-        BitcoinLot.created_txn_id.in_(
-            db.query(Transaction.id).filter(Transaction.to_account_id == tx.from_account_id)
-        )
-    ).order_by(BitcoinLot.acquired_date).all()
-    
-    remaining_outflow = btc_outflow
-    transferred_cost_basis = Decimal("0")
-    
-    # Step 1: Calculate cost basis for the full outflow
-    for lot in lots:
-        if remaining_outflow <= 0:
-            break
-        lot_rem = lot.remaining_btc
-        if lot_rem <= 0:
-            continue
-        
-        btc_to_use = min(lot_rem, remaining_outflow)
-        original_cost_per_btc = lot.cost_basis_usd / lot.total_btc
-        cost_basis_portion = (original_cost_per_btc * btc_to_use).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
-        transferred_cost_basis += cost_basis_portion
-        
-        lot.remaining_btc -= btc_to_use
-        remaining_outflow -= btc_to_use
-        db.add(lot)
-    
-    if remaining_outflow > 0:
-        raise HTTPException(status_code=400, detail=f"Not enough BTC to transfer {btc_outflow}")
-    
-    # Step 2: Create new lot in destination account with full cost basis
-    new_lot_cost_basis = transferred_cost_basis.quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
-    new_lot = BitcoinLot(
-        created_txn_id=tx.id,
-        acquired_date=tx.timestamp,
-        total_btc=btc_received.quantize(Decimal("0.00000001")),  # BTC to 8 decimals
-        remaining_btc=btc_received.quantize(Decimal("0.00000001")),
-        cost_basis_usd=new_lot_cost_basis,
-    )
-    db.add(new_lot)
-    
-    tx.cost_basis_usd = new_lot_cost_basis
-    db.add(tx)
 
-    # Step 3: Dispose of the fee to BTC Fees account (ID 5) and calculate gain/loss
     if fee_amount > 0:
-        fee_account = db.query(Account).filter(Account.id == 5).first()  # BTC Fees account
+        fee_account = db.query(Account).filter(Account.name == "BTC Fees").first()
         if not fee_account:
             raise HTTPException(status_code=500, detail="BTC Fees account not found")
 
-        # Fetch BTC price at the transaction timestamp
         btc_price = get_btc_price(tx.timestamp, db)
-
-        # Recalculate lots for fee disposal
-        lots = db.query(BitcoinLot).filter(
-            BitcoinLot.remaining_btc > 0,
-            BitcoinLot.created_txn_id.in_(
-                db.query(Transaction.id).filter(Transaction.to_account_id == tx.from_account_id)
-            )
-        ).order_by(BitcoinLot.acquired_date).all()
+        lots = db.query(BitcoinLot).filter(BitcoinLot.remaining_btc > 0).order_by(BitcoinLot.acquired_date).all()
         
         remaining_fee = fee_amount
         for lot in lots:
@@ -687,18 +641,12 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
             original_cost_per_btc = lot.cost_basis_usd / lot.total_btc
             disposal_basis = (original_cost_per_btc * btc_to_use).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
             
-            # Calculate fair market value of the fee disposal
             proceeds = (btc_price * btc_to_use).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
             realized_gain = proceeds - disposal_basis
-
-            # Calculate holding period based on acquisition date
-            holding_period = "SHORT"
-            if lot.acquired_date:
-                delta = tx.timestamp - lot.acquired_date
-                if delta.days >= 365:  # 1 year or more
-                    holding_period = "LONG"
-
-            # Create a LotDisposal entry for the fee
+            
+            acquired_date = lot.acquired_date.replace(tzinfo=timezone.utc) if lot.acquired_date.tzinfo is None else lot.acquired_date
+            holding_period = "SHORT" if (tx.timestamp - acquired_date).days < 365 else "LONG"
+            
             disp = LotDisposal(
                 lot_id=lot.id,
                 transaction_id=tx.id,
