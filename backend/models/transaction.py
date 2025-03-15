@@ -337,9 +337,7 @@ class LotDisposal(Base):
     realized_gain_usd can store partial calculations if you want to see
     exact results for each chunk.
 
-    CHANGED: We removed 'account_id' and 'account' from this model, since
-    the double-entry logic references accounts via LedgerEntry. A disposal
-    references only which lot is used and which transaction triggers it.
+    CHANGED: Added 'holding_period' to track short-term vs. long-term gains/losses.
     """
 
     __tablename__ = "lot_disposals"
@@ -383,6 +381,12 @@ class LotDisposal(Base):
         doc="Slice of total proceeds allocated to this partial disposal."
     )
 
+    holding_period = Column(
+        String(10),
+        nullable=True,
+        doc="Holding period of the disposed BTC, e.g., 'SHORT' or 'LONG' (1 year threshold)."
+    )
+
     # Relationship to the lot from which BTC is disposed
     lot = relationship(
         "BitcoinLot",
@@ -399,5 +403,6 @@ class LotDisposal(Base):
     def __repr__(self):
         return (
             f"<LotDisposal(id={self.id}, lot_id={self.lot_id}, txn_id={self.transaction_id}, "
-            f"disposed_btc={self.disposed_btc}, realized_gain_usd={self.realized_gain_usd})>"
+            f"disposed_btc={self.disposed_btc}, realized_gain_usd={self.realized_gain_usd}, "
+            f"holding_period={self.holding_period})>"
         )

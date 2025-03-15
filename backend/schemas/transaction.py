@@ -313,6 +313,10 @@ class LotDisposalBase(BaseModel):
         ...,
         description="How many BTC from this lot were applied to the disposal."
     )
+    holding_period: Optional[str] = Field(
+        default=None,
+        description="Holding period of the disposed BTC, e.g., 'SHORT' or 'LONG' (1 year threshold)."
+    )
 
     @field_validator("disposed_btc")
     def validate_disposed_btc(cls, v: Decimal) -> Decimal:
