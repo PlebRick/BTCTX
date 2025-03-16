@@ -9,18 +9,22 @@ BASE_URL = "http://localhost:8000"  # Adjust if your FastAPI server is on anothe
 def main():
     """
     Fetch and print all relevant BitcoinTX data:
-      1. Transactions ( /api/transactions )
-      2. Lots (  /api/debug/lots )       [dev-only router]
-      3. Disposals ( /api/debug/disposals )  [dev-only router]
-      4. Ledger Entries ( /api/debug/ledger-entries ) [dev-only router]
-      5. Account Balances ( /api/calculations/accounts/balances )
-      6. Gains & Losses ( /api/calculations/gains-and-losses )
-      7. (Optional) Average Cost Basis ( /api/calculations/average-cost-basis )
-    Prints each section as JSON in the terminal for easy inspection.
+      1. Transactions                ( /api/transactions )
+      2. Lots                        ( /api/debug/lots )
+      3. Disposals                   ( /api/debug/disposals )
+      4. Ledger Entries              ( /api/debug/ledger-entries )
+      5. Account Balances            ( /api/calculations/accounts/balances )
+      6. Gains & Losses              ( /api/calculations/gains-and-losses )
+      7. Average Cost Basis          ( /api/calculations/average-cost-basis )
+
+    Prints each section in pretty-printed JSON for easy inspection.
+    Matches the style of your new FIFO test script.
     """
 
-    # A small helper to do GET
     def get_json(endpoint: str):
+        """
+        Helper to GET <BASE_URL + endpoint> and return JSON data or None on failure.
+        """
         url = f"{BASE_URL}{endpoint}"
         resp = requests.get(url)
         if not resp.ok:
@@ -28,48 +32,45 @@ def main():
             return None
         return resp.json()
 
-    print("----- 1) /api/transactions -----")
+    def print_json(data, label: str):
+        """
+        Helper to pretty-print JSON. If 'data' is None, indicates failure.
+        """
+        print(f"\n----- {label} -----")
+        if data is None:
+            print("  (No data or request failed)")
+            return
+        print(json.dumps(data, indent=2))
+
+    # 1) Transactions
     tx_data = get_json("/api/transactions")
-    print_json(tx_data)
+    print_json(tx_data, "1) /api/transactions")
 
-    # The following debug endpoints presumably exist in your "routers.debug.py" or similar dev routers.
-    # If you named them differently, just adjust the paths:
-    print("\n----- 2) /api/debug/lots -----")
+    # 2) Lots (debug)
     lots_data = get_json("/api/debug/lots")
-    print_json(lots_data)
+    print_json(lots_data, "2) /api/debug/lots")
 
-    print("\n----- 3) /api/debug/disposals -----")
+    # 3) Disposals (debug)
     disposals_data = get_json("/api/debug/disposals")
-    print_json(disposals_data)
+    print_json(disposals_data, "3) /api/debug/disposals")
 
-    print("\n----- 4) /api/debug/ledger-entries -----")
+    # 4) Ledger Entries (debug)
     ledger_data = get_json("/api/debug/ledger-entries")
-    print_json(ledger_data)
+    print_json(ledger_data, "4) /api/debug/ledger-entries")
 
-    print("\n----- 5) /api/calculations/accounts/balances -----")
+    # 5) Account Balances
     balances_data = get_json("/api/calculations/accounts/balances")
-    print_json(balances_data)
+    print_json(balances_data, "5) /api/calculations/accounts/balances")
 
-    print("\n----- 6) /api/calculations/gains-and-losses -----")
+    # 6) Gains & Losses
     gains_data = get_json("/api/calculations/gains-and-losses")
-    print_json(gains_data)
+    print_json(gains_data, "6) /api/calculations/gains-and-losses")
 
-    print("\n----- 7) /api/calculations/average-cost-basis -----")
+    # 7) Average Cost Basis
     acb_data = get_json("/api/calculations/average-cost-basis")
-    print_json(acb_data)
+    print_json(acb_data, "7) /api/calculations/average-cost-basis")
 
     print("\nAll data fetched and displayed.\n")
-
-
-def print_json(data):
-    """
-    Helper function to pretty-print JSON. If 'data' is None, it means the endpoint failed.
-    """
-    if data is None:
-        print("  (No data or request failed)")
-        return
-    print(json.dumps(data, indent=2))
-
 
 if __name__ == "__main__":
     main()

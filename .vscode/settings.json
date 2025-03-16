@@ -5,6 +5,7 @@
         "BTCTX",
         "coindesk",
         "condecimal",
+        "dateutil",
         "dbaeumer",
         "disp",
         "dotenv",
