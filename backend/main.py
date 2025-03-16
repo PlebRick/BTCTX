@@ -97,8 +97,8 @@ def startup_event():
 # ---------------------------------------------------------
 # Routers (Transaction, User, Account, Calculation, Bitcoin)
 # ---------------------------------------------------------
-from backend.routers import transaction, user, account, calculation, bitcoin
-
+from backend.routers import transaction, user, account, calculation, bitcoin, debug
+app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
 app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
 app.include_router(user.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])

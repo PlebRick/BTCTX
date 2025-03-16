@@ -184,6 +184,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     watch,
     setValue,
     reset,
+    getValues,
     formState: { errors, isDirty },
   } = useForm<TransactionFormData>({
     defaultValues: {
@@ -329,11 +330,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   ) => {
     const newType = e.target.value as TransactionType;
     setCurrentType(newType);
-
-    // Reset form to default values for that new type
+  
+    // Get the current values from the form
+    const currentValues = getValues();
+  
+    // Partially reset: preserve existing values (including timestamp),
+    // but override type, fee, costBasisUSD, proceeds_usd, etc.
     reset({
+      ...currentValues,
       type: newType,
-      timestamp: new Date().toISOString().slice(0, 16),
       fee: 0,
       costBasisUSD: 0,
       proceeds_usd: 0,
