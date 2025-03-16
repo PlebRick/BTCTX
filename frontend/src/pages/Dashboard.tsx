@@ -1,10 +1,4 @@
-/**
- * frontend/src/pages/Dashboard.tsx
- *
- * Displays portfolio overview, balances, realized gains, etc.
- * Now also shows a live BTC price (replacing the placeholder).
- */
-
+//frontend/src/pages/Dashboard.tsx
 import React, { useEffect, useState } from "react";
 import api from "../api"; // Centralized API client
 import "../styles/dashboard.css";
@@ -17,13 +11,8 @@ import {
   parseGainsAndLosses,
 } from "../utils/format";
 
-// Define the Dashboard component
 const Dashboard: React.FC = () => {
-  // ===========================================================================
-  // State Declarations
-  // ===========================================================================
-
-  // Account Balances
+  // ------------------ 1) STATE DECLARATIONS ------------------
   const [balances, setBalances] = useState<AccountBalance[] | null>(null);
   const [bankBalance, setBankBalance] = useState<number>(0);
   const [exchangeUSDBalance, setExchangeUSDBalance] = useState<number>(0);
@@ -32,75 +21,65 @@ const Dashboard: React.FC = () => {
   const [totalBTC, setTotalBTC] = useState<number>(0);
   const [totalUSD, setTotalUSD] = useState<number>(0);
 
-  // Cost Basis and Gains
+  // Cost basis & Gains
   const [averageBtcCostBasis, setAverageBtcCostBasis] = useState<number | null>(null);
   const [gainsAndLosses, setGainsAndLosses] = useState<GainsAndLosses | null>(null);
 
-  // BTC Price and Errors
+  // BTC Price & error states
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [currentBtcPrice, setCurrentBtcPrice] = useState<number | null>(null);
-  const [isPriceLoading, setIsPriceLoading] = useState(true); // Added to track BTC price loading
+  const [isPriceLoading, setIsPriceLoading] = useState(true);
 
-  // ===========================================================================
-  // Effects for Data Fetching
-  // ===========================================================================
-
-  // Fetch live BTC price
+  // ------------------ 2) FETCH LIVE BTC PRICE ------------------
   useEffect(() => {
     setIsPriceLoading(true);
     api
       .get("/bitcoin/price") // => GET /api/bitcoin/price
       .then((res) => {
-        // Should get { "USD": <some number> }
         if (res.data && res.data.USD) {
           setCurrentBtcPrice(res.data.USD);
         }
       })
       .catch((err) => {
         console.error("Error fetching live BTC price:", err);
-        // Could handle errors or set a fallback price if desired
       })
       .finally(() => {
         setIsPriceLoading(false);
       });
   }, []);
 
-  // Fetch average cost basis
+  // ------------------ 3) FETCH AVERAGE COST BASIS ------------------
   useEffect(() => {
     api
       .get<AverageCostBasis>("/calculations/average-cost-basis")
       .then((res) => {
-        // Now res.data has shape { averageCostBasis: number }
         setAverageBtcCostBasis(res.data.averageCostBasis);
       })
       .catch((err) => {
         console.error("Error fetching average cost basis:", err);
-        // You could set a fallback or handle error if desired
       });
   }, []);
 
-  /// Fetch account balances
-useEffect(() => {
-  api
-    .get("/calculations/accounts/balances")
-    .then((response) => {
-      const data = response.data;
+  // ------------------ 4) FETCH ACCOUNT BALANCES ------------------
+  useEffect(() => {
+    api
+      .get("/calculations/accounts/balances")
+      .then((response) => {
+        const data = response.data;
+        if (!Array.isArray(data)) {
+          throw new Error("Data is not an array. Received: " + JSON.stringify(data));
+        }
+        setBalances(data as AccountBalance[]);
+      })
+      .catch((err) => {
+        console.error("Error fetching balances:", err);
+        setFetchError(String(err));
+      });
+  }, []);
 
-      if (!Array.isArray(data)) {
-        throw new Error("Data is not an array. Received: " + JSON.stringify(data));
-      }
-      setBalances(data as AccountBalance[]);
-    })
-    .catch((err) => {
-      console.error("Error fetching balances:", err);
-      setFetchError(String(err));
-    });
-}, []);
-
-  // Compute totals after balances are fetched
+  // ------------------ 5) CALCULATE TOTALS ------------------
   useEffect(() => {
     if (!balances) return;
-
     let bank = 0;
     let exchUSD = 0;
     let exchBTC = 0;
@@ -114,12 +93,10 @@ useEffect(() => {
         console.warn("NaN balance for account:", acc);
         return;
       }
-
       // Skip fee accounts
       if (acc.name === "BTC Fees" || acc.name === "USD Fees") {
         return;
       }
-
       // Identify known accounts
       if (acc.name === "Bank" && acc.currency === "USD") {
         bank = numericBalance;
@@ -130,7 +107,6 @@ useEffect(() => {
       } else if (acc.name === "Exchange BTC" && acc.currency === "BTC") {
         exchBTC = numericBalance;
       }
-
       // Tally totals
       if (acc.currency === "BTC") {
         totalBtcTemp += numericBalance;
@@ -139,7 +115,6 @@ useEffect(() => {
       }
     });
 
-    // Update state
     setBankBalance(bank);
     setExchangeUSDBalance(exchUSD);
     setExchangeBTCBalance(exchBTC);
@@ -148,12 +123,11 @@ useEffect(() => {
     setTotalUSD(totalUsdTemp);
   }, [balances]);
 
-  // Fetch gains and losses
+  // ------------------ 6) FETCH GAINS & LOSSES ------------------
   useEffect(() => {
     api
       .get<GainsAndLossesRaw>("/calculations/gains-and-losses")
       .then((response) => {
-        console.log("Fetched gains/losses:", response.data);
         const parsed = parseGainsAndLosses(response.data);
         setGainsAndLosses(parsed);
       })
@@ -163,11 +137,7 @@ useEffect(() => {
       });
   }, []);
 
-  // ===========================================================================
-  // Render Logic
-  // ===========================================================================
-
-  // Handle error state
+  // ------------------ 7) ERROR / LOADING HANDLING ------------------
   if (fetchError) {
     return (
       <div style={{ color: "red", margin: "2rem" }}>
@@ -177,7 +147,6 @@ useEffect(() => {
     );
   }
 
-  // Handle loading state for balances and gainsAndLosses
   if (balances === null || gainsAndLosses === null) {
     return (
       <div className="dashboard">
@@ -186,7 +155,7 @@ useEffect(() => {
     );
   }
 
-  // Render the dashboard
+  // ------------------ 8) RENDER DASHBOARD ------------------
   return (
     <div className="dashboard">
       {/* =================== Top Row =================== */}
@@ -194,8 +163,22 @@ useEffect(() => {
         {/* Portfolio Overview Card */}
         <div className="card portfolio-overview">
           <h3>Portfolio Overview</h3>
+
+          {/* 1) BTC Balance */}
           <p>BTC Balance: {formatBtc(totalBTC)}</p>
+
+          {/* 2) BTC Cost Basis (new line just below BTC Balance) */}
+          <p>
+            BTC Cost Basis:{" "}
+            {averageBtcCostBasis !== null
+              ? formatUsd(averageBtcCostBasis)
+              : "Loading..."}
+          </p>
+
+          {/* 3) USD Balance */}
           <p>USD Balance: {formatUsd(totalUSD)}</p>
+
+          {/* 4) Unrealized Gains/Losses */}
           {isPriceLoading || currentBtcPrice === null || averageBtcCostBasis === null ? (
             <p>Unrealized Gains/Losses: Loading...</p>
           ) : (
@@ -215,6 +198,7 @@ useEffect(() => {
               })()}
             </p>
           )}
+
           {/* Placeholder for portfolio chart */}
           <div className="portfolio-chart-placeholder">
             <p>Portfolio Holdings Chart (Placeholder)</p>
@@ -240,7 +224,6 @@ useEffect(() => {
               "Error fetching price"
             )}
           </p>
-          {/* Placeholder for BTC price chart */}
           <div className="btc-price-chart-placeholder">
             <p>Live BTC Price Chart (Placeholder)</p>
           </div>
@@ -262,7 +245,7 @@ useEffect(() => {
 
         {/* Realized Gains/Losses Card */}
         <div className="card realized-gains-container">
-          <h3>Realized Gains/Losses</h3>
+          <h3>Realized Gains/Losses (FIFO)</h3>
           <p>
             <strong>Short‐Term Gains:</strong>{" "}
             <span style={{ color: gainsAndLosses.short_term_gains > 0 ? "green" : "white" }}>
@@ -277,7 +260,16 @@ useEffect(() => {
           </p>
           <p>
             <strong>Net Short‐Term:</strong>{" "}
-            <span style={{ color: gainsAndLosses.short_term_net > 0 ? "green" : gainsAndLosses.short_term_net < 0 ? "red" : "white" }}>
+            <span
+              style={{
+                color:
+                  gainsAndLosses.short_term_net > 0
+                    ? "green"
+                    : gainsAndLosses.short_term_net < 0
+                    ? "red"
+                    : "white",
+              }}
+            >
               {formatUsd(gainsAndLosses.short_term_net)}
             </span>
           </p>
@@ -296,14 +288,32 @@ useEffect(() => {
           </p>
           <p>
             <strong>Net Long‐Term:</strong>{" "}
-            <span style={{ color: gainsAndLosses.long_term_net > 0 ? "green" : gainsAndLosses.long_term_net < 0 ? "red" : "white" }}>
+            <span
+              style={{
+                color:
+                  gainsAndLosses.long_term_net > 0
+                    ? "green"
+                    : gainsAndLosses.long_term_net < 0
+                    ? "red"
+                    : "white",
+              }}
+            >
               {formatUsd(gainsAndLosses.long_term_net)}
             </span>
           </p>
           <hr />
           <p>
             <strong>Total Net Capital Gains:</strong>{" "}
-            <span style={{ color: gainsAndLosses.total_net_capital_gains > 0 ? "green" : gainsAndLosses.total_net_capital_gains < 0 ? "red" : "white" }}>
+            <span
+              style={{
+                color:
+                  gainsAndLosses.total_net_capital_gains > 0
+                    ? "green"
+                    : gainsAndLosses.total_net_capital_gains < 0
+                    ? "red"
+                    : "white",
+              }}
+            >
               {formatUsd(gainsAndLosses.total_net_capital_gains)}
             </span>
           </p>
@@ -331,7 +341,10 @@ useEffect(() => {
               (not added to income or gains)
             </span>
           </p>
-          <p>Total Income (Income+Interest+Rewards): {formatUsd(gainsAndLosses.total_income)}</p>
+          <p>
+            Total Income (Income+Interest+Rewards):{" "}
+            {formatUsd(gainsAndLosses.total_income)}
+          </p>
           <br />
           <h4>Fees</h4>
           <p>Fees (USD): {formatUsd(gainsAndLosses.fees.USD)}</p>
@@ -341,7 +354,9 @@ useEffect(() => {
           ) : currentBtcPrice !== null ? (
             <p>
               Total Fees in USD (approx):{" "}
-              {formatUsd(gainsAndLosses.fees.USD + gainsAndLosses.fees.BTC * currentBtcPrice)}
+              {formatUsd(
+                gainsAndLosses.fees.USD + gainsAndLosses.fees.BTC * currentBtcPrice
+              )}
             </p>
           ) : (
             <p>Total Fees in USD: N/A</p>
