@@ -68,3 +68,6 @@ commands.md
 frontend/temp_frontend/
 .env
 .env
+
+# --- Debug SwaggerUI router endpoints ---
+backend/routers/debug.py
