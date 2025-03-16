@@ -227,7 +227,7 @@ const Transactions: React.FC = () => {
     <div className="transactions-page">
       {/* Header row with Add button (left) and sort dropdown (right) */}
       <div className="transactions-header">
-        <button className="accent-btn" onClick={openPanel}>
+        <button className="add-transaction-btn" onClick={openPanel}>
           Add Transaction
         </button>
 
