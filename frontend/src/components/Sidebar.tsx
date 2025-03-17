@@ -3,7 +3,7 @@ import React from 'react';
 import logo from '../assets/logo.svg';
 import Calculator from './Calculator';
 import BtcConverter from './BtcConverter';
-import "../styles/App.css";
+import "../styles/app.css";
 
 /**
  * Renders the top brand row of the sidebar,
