@@ -22,7 +22,7 @@ FIFO acquisitions/disposals are in BitcoinLot and LotDisposal schemas.
 
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 # -------------------------------------------------
@@ -30,14 +30,13 @@ from decimal import Decimal
 # -------------------------------------------------
 # If you want to strictly enforce max_digits=18, decimal_places=8 (BTC)
 # or decimal_places=2 (USD), you can write validators like below.
-# For demonstration, here's a BTC validator:
+
 def validate_btc_decimal(value: Decimal) -> Decimal:
     """
     Example check: disallow more than 8 decimal places,
     and disallow total digits > 18. If you'd rather not
     enforce these at the schema level, remove or modify.
     """
-    # Convert to string to check places
     s = str(value)
     if '.' in s:
         integer_part, frac_part = s.split('.', 1)
@@ -60,6 +59,7 @@ def validate_usd_decimal(value: Decimal) -> Decimal:
         if len(integer_part.replace('-', '')) > 16:  # 16 + 2 = 18
             raise ValueError("USD amount cannot exceed 18 total digits.")
     return value
+
 
 # -------------------------------------------------
 # TRANSACTION SCHEMAS
@@ -109,20 +109,18 @@ class TransactionBase(BaseModel):
     )
     holding_period: Optional[str] = None
 
-    # OPTIONAL validators
-    # e.g., only if you want to validate strictly for BTC or USD decimal logic:
+    # OPTIONAL validators for decimals
     @field_validator("amount")
     def validate_amount(cls, v: Decimal | None) -> Decimal | None:
         if v is not None:
-            # Decide if you want to treat 'amount' as BTC or not
-            # For demonstration, let's assume it's BTC. Adjust as needed.
+            # If you consider 'amount' as BTC, do BTC validation
             return validate_btc_decimal(v)
         return v
 
     @field_validator("fee_amount")
     def validate_fee_amount(cls, v: Decimal | None) -> Decimal | None:
         if v is not None:
-            # Assume BTC fees. Or skip if fees can be USD, etc.
+            # If fees can be BTC, do BTC validation
             return validate_btc_decimal(v)
         return v
 
@@ -139,7 +137,19 @@ class TransactionCreate(TransactionBase):
     Since the front-end may supply only partial info, everything is optional
     except 'type'. We can refine if certain transaction types need fields.
     """
-    pass
+    @field_validator("timestamp")
+    def force_utc_timestamp(cls, v: datetime | None) -> datetime | None:
+        """
+        Ensures any inbound timestamp is offset-aware UTC.
+        If it's naive, we attach tz=UTC. If it has another offset, convert to UTC.
+        """
+        if v is None:
+            return None
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        else:
+            v = v.astimezone(timezone.utc)
+        return v
 
 
 class TransactionUpdate(BaseModel):
@@ -164,7 +174,20 @@ class TransactionUpdate(BaseModel):
     realized_gain_usd: Optional[Decimal] = None
     holding_period: Optional[str] = None
 
-    # If you'd like the same validation as TransactionBase, you can do so:
+    @field_validator("timestamp")
+    def force_utc_timestamp(cls, v: datetime | None) -> datetime | None:
+        """
+        Same approach as in TransactionCreate: unify all inbound timestamps to UTC.
+        """
+        if v is None:
+            return None
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        else:
+            v = v.astimezone(timezone.utc)
+        return v
+
+    # Reuse the same decimal validations
     @field_validator("amount")
     def validate_amount(cls, v: Decimal | None) -> Decimal | None:
         if v is not None:
@@ -285,6 +308,19 @@ class BitcoinLotCreate(BitcoinLotBase):
     """
     created_txn_id: int
     acquired_date: Optional[datetime] = None
+
+    @field_validator("acquired_date")
+    def force_utc_acquired_date(cls, v: datetime | None) -> datetime | None:
+        """
+        Ensure the lot's acquired_date is also stored as offset-aware UTC.
+        """
+        if v is None:
+            return None
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        else:
+            v = v.astimezone(timezone.utc)
+        return v
 
 
 class BitcoinLotRead(BitcoinLotBase):

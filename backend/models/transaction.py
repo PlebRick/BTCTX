@@ -1,5 +1,5 @@
 """
-transaction.py
+backend/models/transaction.py
 
 Refactored to incorporate the full double-entry design with separate models:
 1) Transaction (header record)
@@ -8,30 +8,36 @@ Refactored to incorporate the full double-entry design with separate models:
 4) LotDisposal (partial usage of BitcoinLots on disposal)
 
 We keep everything in one file to maintain your 3-file approach:
-(transaction.py, account.py, user.py). Extensive comments clarify each model and its fields.
+(transaction.py, account.py, user.py). Extensive comments clarify each model
+and its fields.
 
 CHANGES:
-- Removed 'account_id' and 'account' from LotDisposal. 
-- Added a 'account = relationship("Account", back_populates="ledger_entries")' in LedgerEntry
-  so it matches account.py's 'ledger_entries = relationship(..., back_populates="account")'.
-This resolves the "Mapper ... has no property 'account'" error and adheres to 
+- Removed 'account_id' and 'account' from LotDisposal.
+- Added a 'account = relationship("Account", back_populates="ledger_entries")'
+  in LedgerEntry so it matches account.py's 'ledger_entries = relationship(..., back_populates="account")'.
+This resolves the "Mapper ... has no property 'account'" error and adheres to
 standard double-entry design.
+- NOW storing all DateTime columns as offset‐aware UTC, using timezone=True
+  and server_default=func.now().
 """
 
 import enum
-from datetime import datetime
 from sqlalchemy import (
     Column,
     Integer,
     String,
-    DateTime,
     Boolean,
     Numeric,
-    ForeignKey
+    ForeignKey,
+    func
 )
 from sqlalchemy.orm import relationship
+from datetime import datetime
 
+# IMPORTANT: We keep this import from backend.database, plus the new UTCDateTime
 from backend.database import Base
+from backend.utils.custom_types import UTCDateTime
+
 
 # ========================================================================
 # (Optional) ENUM CLASSES
@@ -76,8 +82,8 @@ class Transaction(Base):
 
     # When the user says this transaction occurred
     timestamp = Column(
-        DateTime,
-        default=datetime.utcnow,
+        UTCDateTime,        # CHANGED from DateTime(timezone=True)
+        server_default=func.now(),
         nullable=False,
         doc="When the transaction actually occurred (user-facing)."
     )
@@ -92,15 +98,15 @@ class Transaction(Base):
 
     # Audit fields
     created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
+        UTCDateTime,        # CHANGED from DateTime(timezone=True)
+        server_default=func.now(),
         nullable=False,
         doc="Auto-set creation time."
     )
     updated_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        UTCDateTime,        # CHANGED from DateTime(timezone=True)
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
         doc="Auto-set last update time."
     )
@@ -285,8 +291,8 @@ class BitcoinLot(Base):
     )
 
     acquired_date = Column(
-        DateTime,
-        default=datetime.utcnow,
+        UTCDateTime,        # CHANGED from DateTime(timezone=True)
+        server_default=func.now(),
         nullable=False,
         doc="When the BTC was acquired. Usually equals transaction's timestamp."
     )

@@ -43,24 +43,20 @@ router = APIRouter(tags=["transactions"])
 def _attach_utc_and_build_read_model(tx) -> TransactionRead:
     """
     Utility function to:
-      1) Attach tzinfo=UTC to timestamp, created_at, updated_at if missing
+      1) (Previously) attach tzinfo=UTC if missing, but now we store offset-aware in DB
       2) Convert to TransactionRead Pydantic model
       3) Replace '+00:00' with 'Z' in the resulting dict
       4) Return a new TransactionRead object with corrected ISO strings
-    """
-    # 1) Ensure UTC tzinfo
-    if tx.timestamp and tx.timestamp.tzinfo is None:
-        tx.timestamp = tx.timestamp.replace(tzinfo=timezone.utc)
-    if tx.created_at and tx.created_at.tzinfo is None:
-        tx.created_at = tx.created_at.replace(tzinfo=timezone.utc)
-    if tx.updated_at and tx.updated_at.tzinfo is None:
-        tx.updated_at = tx.updated_at.replace(tzinfo=timezone.utc)
 
-    # 2) Convert to Pydantic
+    We still do the final step of turning '+00:00' into 'Z' for a clean UTC display,
+    but no longer force tzinfo=UTC since our DB / schemas already handle that.
+    """
+
+    # 1) Convert to Pydantic
     pyd_model = TransactionRead.from_orm(tx)
     data = pyd_model.dict()
 
-    # 3) Turn any '+00:00' suffix into 'Z'
+    # 2) Turn any '+00:00' suffix into 'Z'
     for field in ["timestamp", "created_at", "updated_at"]:
         val = data.get(field)
         if isinstance(val, datetime):
@@ -69,7 +65,7 @@ def _attach_utc_and_build_read_model(tx) -> TransactionRead:
                 iso_str = iso_str[:-6] + "Z"
             data[field] = iso_str
 
-    # 4) Return a new TransactionRead
+    # 3) Return a new TransactionRead
     return TransactionRead(**data)
 
 
@@ -81,7 +77,6 @@ def list_transactions(db: Session = Depends(get_db)):
     """
     raw_txs = tx_service.get_all_transactions(db)
 
-    # Apply the same logic to each transaction
     results = []
     for tx in raw_txs:
         final_model = _attach_utc_and_build_read_model(tx)
@@ -123,7 +118,6 @@ def create_transaction(tx: TransactionCreate, db: Session = Depends(get_db)):
     new_tx = tx_service.create_transaction_record(tx_data, db)
     if not new_tx:
         raise HTTPException(status_code=400, detail="Transaction creation failed.")
-    # Ensure we return timestamps with 'Z' if needed
     return _attach_utc_and_build_read_model(new_tx)
 
 
@@ -131,7 +125,7 @@ def create_transaction(tx: TransactionCreate, db: Session = Depends(get_db)):
 def update_transaction(transaction_id: int, tx: TransactionUpdate, db: Session = Depends(get_db)):
     """
     Update an existing transaction's data if it's not locked.
-    
+
     - The service might remove old ledger lines/lot usage and re-create them
       if the user changed critical fields like amount or type.
     - If the transaction is locked or nonexistent, return 404 or 400.

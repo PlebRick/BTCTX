@@ -20,9 +20,14 @@ def filter_payload(tx):
 def main():
     """
     Seed a new set of chronological transactions (covering >2 yrs),
-    ensuring both short-term and long-term gains. This is our final test
-    that uses your custom transaction set with deposit, transfer, buy, sell,
-    and withdrawal scenarios in chronological order.
+    ensuring both short-term and long-term gains. Uses offset-aware
+    timestamps (with 'Z') for the new UTC time model.
+
+    1) Delete all existing transactions
+    2) Define a chronological list of transactions with 'Z' suffix
+       in ISO8601. 
+    3) Sort by timestamp ascending and POST each one to the server
+    4) Print aggregator results and final balances
     """
 
     # 1) Clear existing transactions
@@ -34,8 +39,7 @@ def main():
         sys.exit(1)
     print("All transactions cleared successfully.\n")
 
-    # 2) Define the new transaction list (currently includes
-    #    items in possibly random order, we will sort by timestamp).
+    # 2) Define new transaction list 
     tx_payloads = [
         {
             "type": "Deposit",
@@ -286,7 +290,6 @@ def main():
     # 4) POST them in order
     print("Posting each transaction in chronological order...\n")
     for i, raw_tx in enumerate(sorted_txs, start=1):
-        # Filter out server-generated fields
         payload = filter_payload(raw_tx)
 
         url = f"{BASE_URL}/api/transactions"

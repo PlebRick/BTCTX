@@ -1,4 +1,4 @@
-# backend/services/transaction.py
+# FILE: backend/services/transaction.py
 
 """
 backend/services/transaction.py
@@ -75,6 +75,7 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
     _enforce_fee_rules(tx_data, db)
 
     # Step 4: Create the Transaction row
+    now_utc = datetime.now(timezone.utc)
     new_tx = Transaction(
         from_account_id = tx_data.get("from_account_id"),
         to_account_id   = tx_data.get("to_account_id"),
@@ -82,14 +83,14 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
         amount          = tx_data.get("amount"),
         fee_amount      = tx_data.get("fee_amount"),
         fee_currency    = tx_data.get("fee_currency"),
-        timestamp       = tx_data.get("timestamp", datetime.utcnow()),
+        timestamp       = tx_data.get("timestamp", now_utc),
         source          = tx_data.get("source"),
         purpose         = tx_data.get("purpose"),
         cost_basis_usd  = tx_data.get("cost_basis_usd"),
         proceeds_usd    = tx_data.get("proceeds_usd"),
         is_locked       = tx_data.get("is_locked", False),
-        created_at      = datetime.utcnow(),
-        updated_at      = datetime.utcnow()
+        created_at      = now_utc,
+        updated_at      = now_utc
     )
     db.add(new_tx)
     db.flush()  # get new_tx.id from DB
@@ -179,7 +180,7 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
     if "proceeds_usd" in tx_data:
         tx.proceeds_usd = tx_data["proceeds_usd"]
 
-    tx.updated_at = datetime.utcnow()
+    tx.updated_at = datetime.now(timezone.utc)
 
     # Rebuild ledger lines & lot usage from scratch
     remove_ledger_entries_for_tx(tx, db)
@@ -466,7 +467,7 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     """
     For a Sell or Withdrawal from a BTC account, dispose BTC in FIFO order.
     Creates partial-lot disposal records, each with a holding_period based on
-    the difference between tx.timestamp and lot.acquired_date.
+    (tx.timestamp - lot.acquired_date).days
     """
     from_acct = db.query(Account).filter(Account.id == tx.from_account_id).first()
     if not from_acct or from_acct.currency != "BTC":
@@ -514,14 +515,14 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
         if tx.type == "Withdrawal" and withdrawal_purpose in ("Gift", "Donation", "Lost"):
             disposal_gain = Decimal("0.0")
 
-        # Compute holding period
+        # Force lot.acquired_date to UTC if it's naive
         acquired_date = lot.acquired_date
         if acquired_date.tzinfo is None:
             acquired_date = acquired_date.replace(tzinfo=timezone.utc)
+
         days_held = (tx.timestamp - acquired_date).days
         hp = "LONG" if days_held >= 365 else "SHORT"
 
-        # Create partial-lot disposal
         disp = LotDisposal(
             lot_id=lot.id,
             transaction_id=tx.id,
@@ -529,11 +530,10 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
             disposal_basis_usd=disposal_basis,
             proceeds_usd_for_that_portion=partial_proceeds,
             realized_gain_usd=disposal_gain,
-            holding_period=hp  # <--- always set
+            holding_period=hp
         )
         db.add(disp)
 
-        # Reduce the original lot
         lot.remaining_btc = Decimal(lot_rem - can_use)
         remaining_outflow -= can_use
 
@@ -620,7 +620,6 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
       3) partial-lot disposal for fee, new partial-lot for the rest
       4) set holding_period=SHORT/LONG for the fee disposal
     """
-
     from_acct = db.query(Account).filter(Account.id == tx.from_account_id).first()
     to_acct = db.query(Account).filter(Account.id == tx.to_account_id).first()
     if not (from_acct and to_acct):
@@ -677,11 +676,12 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
             proceeds_for_fee = (btc_unit_price * portion_for_fee).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
             realized_gain = proceeds_for_fee - disposal_basis
 
-            # holding period
+            # Force to UTC if old lot is naive
             acquired_date = lot.acquired_date
             if acquired_date.tzinfo is None:
                 acquired_date = acquired_date.replace(tzinfo=timezone.utc)
             days_held = (tx.timestamp - acquired_date).days
+
             hp = "LONG" if days_held >= 365 else "SHORT"
 
             disp = LotDisposal(
@@ -714,6 +714,8 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
 
     # create new partial-lot(s)
     for (orig_lot, amt_btc, cost_per_btc, acquired_date) in transfers_for_destination:
+        if acquired_date.tzinfo is None:
+            acquired_date = acquired_date.replace(tzinfo=timezone.utc)
         cost_portion = (cost_per_btc * amt_btc).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
         new_lot = BitcoinLot(
             created_txn_id=tx.id,

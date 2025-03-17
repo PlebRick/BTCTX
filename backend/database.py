@@ -21,6 +21,13 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 
+# ------------------------------------------------------------------
+# NEW: We import the necessary pieces to define a custom TypeDecorator
+# for offset-aware UTC datetimes in SQLite.
+# ------------------------------------------------------------------
+from sqlalchemy.types import TypeDecorator, String
+import datetime
+
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -85,9 +92,36 @@ SessionLocal = sessionmaker(
 )
 logger.debug("SessionLocal factory created")
 
-# A 'Base' class for our ORM models to inherit.
 Base = declarative_base()
 logger.debug("Base class defined for ORM models")
+
+# ------------------------------------------------------------------
+# NEW: A full custom TypeDecorator for offset-aware UTC in SQLite
+# ------------------------------------------------------------------
+class UTCDateTime(TypeDecorator):
+    """
+    Stores Python datetime objects as ISO8601 strings with 'Z' in SQLite,
+    ensuring we read them back as offset-aware datetimes in UTC.
+    """
+    impl = String  # We'll store as TEXT under the hood.
+
+    def process_bind_param(self, value, dialect):
+        """Convert Python datetime -> string before saving to DB."""
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            # If it's naive, assume it's in UTC
+            value = value.replace(tzinfo=datetime.timezone.utc)
+        # Convert to ISO8601 with a 'Z' suffix
+        return value.isoformat().replace("+00:00", "Z")
+
+    def process_result_value(self, value, dialect):
+        """Convert string -> Python datetime (UTC) after fetching from DB."""
+        if value is None:
+            return None
+        # Replace 'Z' with '+00:00' so datetime.fromisoformat can parse
+        value = value.replace("Z", "+00:00")
+        return datetime.datetime.fromisoformat(value)
 
 # ---------------------------------------------------------
 # 3) Dependency Injection for FastAPI
@@ -135,7 +169,6 @@ def create_tables():
     Base.metadata.create_all(bind=engine)
     logger.debug("Executed Base.metadata.create_all to create tables")
     
-    # Add logging and explicit account creation to debug and extend
     db = SessionLocal()
     try:
         # Log existing accounts before any creation
