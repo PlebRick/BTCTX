@@ -17,8 +17,7 @@ CHANGES:
   in LedgerEntry so it matches account.py's 'ledger_entries = relationship(..., back_populates="account")'.
 This resolves the "Mapper ... has no property 'account'" error and adheres to
 standard double-entry design.
-- NOW storing all DateTime columns as offset‐aware UTC, using timezone=True
-  and server_default=func.now().
+- NOW storing all DateTime columns as offset‐aware UTC by using UTCDateTime from database.py
 """
 
 import enum
@@ -34,9 +33,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-# IMPORTANT: We keep this import from backend.database, plus the new UTCDateTime
-from backend.database import Base
-from backend.utils.custom_types import UTCDateTime
+# We import Base and UTCDateTime from database.py
+from backend.database import Base, UTCDateTime
 
 
 # ========================================================================
@@ -82,7 +80,7 @@ class Transaction(Base):
 
     # When the user says this transaction occurred
     timestamp = Column(
-        UTCDateTime,        # CHANGED from DateTime(timezone=True)
+        UTCDateTime,        # REPLACED DateTime(timezone=True) with UTCDateTime
         server_default=func.now(),
         nullable=False,
         doc="When the transaction actually occurred (user-facing)."
@@ -98,13 +96,13 @@ class Transaction(Base):
 
     # Audit fields
     created_at = Column(
-        UTCDateTime,        # CHANGED from DateTime(timezone=True)
+        UTCDateTime,        # REPLACED DateTime(timezone=True) with UTCDateTime
         server_default=func.now(),
         nullable=False,
         doc="Auto-set creation time."
     )
     updated_at = Column(
-        UTCDateTime,        # CHANGED from DateTime(timezone=True)
+        UTCDateTime,        # REPLACED DateTime(timezone=True) with UTCDateTime
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
@@ -291,7 +289,7 @@ class BitcoinLot(Base):
     )
 
     acquired_date = Column(
-        UTCDateTime,        # CHANGED from DateTime(timezone=True)
+        UTCDateTime,        # REPLACED DateTime(timezone=True) with UTCDateTime
         server_default=func.now(),
         nullable=False,
         doc="When the BTC was acquired. Usually equals transaction's timestamp."
