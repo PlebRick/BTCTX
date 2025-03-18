@@ -1,5 +1,3 @@
-# FILE: backend/services/transaction.py
-
 """
 backend/services/transaction.py
 
@@ -16,6 +14,12 @@ Final Version Tailored for Hybrid BitcoinTX:
  - Buy/Sell: from=3->4 or 4->3, skip net-zero checks to avoid cross-currency mismatch
  - Fee rules: Buy/Sell => fee=USD, Transfer => fee matches from_acct currency
  - Holding period (SHORT/LONG) is always set for partial-lot disposals.
+
+Implementation Note (Approach #2, "Scorched Earth" for Recalculating):
+ - After editing a transaction, we remove *all* ledger entries, partial-lot disposals,
+   and BitcoinLots, then re-build them in strict chronological order (timestamp, id).
+ - This ensures any backdated or changed transaction re-lots all subsequent data.
+ - This is acceptable for a single-user system with a relatively small dataset.
 """
 
 from sqlalchemy.orm import Session
@@ -55,68 +59,64 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
     """
     Creates a new Transaction in the hybrid multi-line ledger system.
 
-    1) Check/ensure "BTC Fees" account for fee ledger lines
-    2) Validate transaction type usage (_enforce_transaction_type_rules)
-    3) Validate fee rules by type (_enforce_fee_rules)
-    4) Create Transaction row in DB
-    5) Convert single-entry fields => multiple ledger lines (build_ledger_entries_for_transaction)
-    6) Possibly skip net-zero check if cross-currency (Buy/Sell) (_maybe_verify_balance_for_internal)
-    7) If Deposit/Buy => create BTC lot if to_acct=BTC (maybe_create_bitcoin_lot)
-    8) If Withdrawal/Sell => do FIFO disposal if from_acct=BTC (maybe_dispose_lots_fifo)
-    9) If it's a disposal (Withdrawal or Sell), compute realized gains summary (compute_sell_summary_from_disposals).
+    Steps:
+     1) Ensure "BTC Fees" account exists.
+     2) Validate transaction type usage.
+     3) Validate fee usage for transaction type.
+     4) Create Transaction row in DB.
+     5) Convert single-entry fields => multiple ledger lines.
+     6) Possibly skip net-zero check if cross-currency (Buy/Sell).
+     7) If Deposit/Buy => create BTC lot if to_acct=BTC
+     8) If Withdrawal/Sell => do FIFO disposal if from_acct=BTC
+     9) If disposal => compute realized gains summary
     """
-    # Step 1: Ensure "BTC Fees" account exists (for storing fees in ledger)
+    # Step 1
     ensure_fee_account_exists(db)
 
-    # Step 2: Validate transaction type usage
+    # Step 2 & 3
     _enforce_transaction_type_rules(tx_data, db)
-
-    # Step 3: Validate fee rules by transaction type
     _enforce_fee_rules(tx_data, db)
 
-    # Step 4: Create the Transaction row
+    # Step 4
     now_utc = datetime.now(timezone.utc)
     new_tx = Transaction(
-        from_account_id = tx_data.get("from_account_id"),
-        to_account_id   = tx_data.get("to_account_id"),
-        type            = tx_data.get("type"),
-        amount          = tx_data.get("amount"),
-        fee_amount      = tx_data.get("fee_amount"),
-        fee_currency    = tx_data.get("fee_currency"),
-        timestamp       = tx_data.get("timestamp", now_utc),
-        source          = tx_data.get("source"),
-        purpose         = tx_data.get("purpose"),
-        cost_basis_usd  = tx_data.get("cost_basis_usd"),
-        proceeds_usd    = tx_data.get("proceeds_usd"),
-        is_locked       = tx_data.get("is_locked", False),
-        created_at      = now_utc,
-        updated_at      = now_utc
+        from_account_id=tx_data.get("from_account_id"),
+        to_account_id=tx_data.get("to_account_id"),
+        type=tx_data.get("type"),
+        amount=tx_data.get("amount"),
+        fee_amount=tx_data.get("fee_amount"),
+        fee_currency=tx_data.get("fee_currency"),
+        timestamp=tx_data.get("timestamp", now_utc),
+        source=tx_data.get("source"),
+        purpose=tx_data.get("purpose"),
+        cost_basis_usd=tx_data.get("cost_basis_usd"),
+        proceeds_usd=tx_data.get("proceeds_usd"),
+        is_locked=tx_data.get("is_locked", False),
+        created_at=now_utc,
+        updated_at=now_utc
     )
     db.add(new_tx)
-    db.flush()  # get new_tx.id from DB
+    db.flush()  # get new_tx.id
 
     # Optional grouping usage
     new_tx.group_id = new_tx.id
 
-    # Step 5: Clear any old ledger lines (shouldn't be any for a new Tx) then rebuild
+    # Step 5
     remove_ledger_entries_for_tx(new_tx, db)
     build_ledger_entries_for_transaction(new_tx, tx_data, db)
 
-    # Step 6: Possibly skip net-zero check if cross-currency (Buy/Sell)
+    # Step 6
     _maybe_verify_balance_for_internal(new_tx, db)
 
-    # Steps 7-9: Handle lot creation, disposal, or transfer based on transaction type
+    # Steps 7-9: partial-lot logic
     if new_tx.type in ("Deposit", "Buy"):
-        # Step 7: If depositing or buying BTC, create a BitcoinLot
         maybe_create_bitcoin_lot(new_tx, tx_data, db)
     elif new_tx.type in ("Withdrawal", "Sell"):
-        # Step 8: If withdrawing or selling BTC, do a FIFO disposal
         maybe_dispose_lots_fifo(new_tx, tx_data, db)
         compute_sell_summary_from_disposals(new_tx, db)
     elif new_tx.type == "Transfer":
         from_acct = db.query(Account).filter(Account.id == new_tx.from_account_id).first()
         if from_acct and from_acct.currency == "BTC":
-            # Safeguard if fee wasn't provided
             if new_tx.fee_amount is None or new_tx.fee_amount <= 0:
                 logging.warning(f"Transfer {new_tx.id} missing fee_amount; defaulting to 0")
                 new_tx.fee_amount = Decimal("0")
@@ -124,7 +124,7 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
                 new_tx.fee_currency = "BTC"
         maybe_transfer_bitcoin_lot(new_tx, tx_data, db)
 
-    # Step 10: For Sell or Withdrawal, compute realized gain summary (post-disposal)
+    # If disposal => finalize realized gain summary
     if new_tx.type in ("Sell", "Withdrawal"):
         compute_sell_summary_from_disposals(new_tx, db)
 
@@ -137,26 +137,32 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
     Update an existing Transaction (if not locked).
 
     Steps:
-     - If transaction is locked, return None
+     - If locked => return None
      - Re-validate usage & fee rules if relevant fields changed
-     - Overwrite header fields on the existing Transaction
-     - Rebuild ledger lines from scratch
-     - Possibly skip net-zero if cross-currency
-     - Re-run lot creation or disposal logic if deposit/buy or withdrawal/sell
-     - If it's a disposal (Sell or Withdrawal), recompute realized gains summary
-     - Recalculate all subsequent Sell and Withdrawal transactions to ripple updates forward
+     - Overwrite transaction fields
+     - Rebuild ledger lines
+     - Possibly skip net-zero if cross-currency (Buy/Sell)
+     - Re-run partial-lot logic for each relevant type
+     - If disposal => compute realized gain summary
+     - "Scorched earth": recalculate ALL transactions in strict chronological order
+     - (NEW) Compare old vs. new timestamp; if we backdate, we also illustrate partial-lot
+       recalculation from earliest_of(old, new).
+       *We still call recalculate_all_transactions(...) to preserve original logic.*
     """
     tx = get_transaction_by_id(db, transaction_id)
     if not tx or tx.is_locked:
         return None
 
-    # Re-validate transaction type & fee if changed
-    if any(k in tx_data for k in ("type","from_account_id","to_account_id")):
+    # Store old timestamp for backdate comparison
+    old_timestamp = tx.timestamp
+
+    # Re-validate usage & fee rules if certain fields changed
+    if any(k in tx_data for k in ("type", "from_account_id", "to_account_id")):
         _enforce_transaction_type_rules(tx_data, db)
-    if any(k in tx_data for k in ("fee_amount","fee_currency","type")):
+    if any(k in tx_data for k in ("fee_amount", "fee_currency", "type")):
         _enforce_fee_rules(tx_data, db)
 
-    # Overwrite relevant fields on Transaction
+    # Update fields
     if "from_account_id" in tx_data:
         tx.from_account_id = tx_data["from_account_id"]
     if "to_account_id" in tx_data:
@@ -182,24 +188,47 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
 
     tx.updated_at = datetime.now(timezone.utc)
 
-    # Rebuild ledger lines & lot usage from scratch
+    # Remove ledger entries & partial-lot usage for this tx
     remove_ledger_entries_for_tx(tx, db)
     remove_lot_usage_for_tx(tx, db)
+
+    # Rebuild ledger lines
     build_ledger_entries_for_transaction(tx, tx_data, db)
     _maybe_verify_balance_for_internal(tx, db)
 
-    # Re-run creation/disposal logic
+    # Partial-lot logic
     if tx.type in ("Deposit", "Buy"):
         maybe_create_bitcoin_lot(tx, tx_data, db)
-    if tx.type in ("Withdrawal", "Sell"):
+    elif tx.type == "Transfer":
+        maybe_transfer_bitcoin_lot(tx, tx_data, db)
+    elif tx.type in ("Sell", "Withdrawal"):
         maybe_dispose_lots_fifo(tx, tx_data, db)
-
-    # If disposal, compute realized gains summary
-    if tx.type in ("Sell", "Withdrawal"):
         compute_sell_summary_from_disposals(tx, db)
 
-    # Recalculate subsequent
-    recalculate_subsequent_transactions(tx, db)
+    # -------------------------------------------------------------------------
+    # Step 7 addition: Compare old vs. new timestamps to detect backdating
+    # -------------------------------------------------------------------------
+    new_timestamp = tx.timestamp
+    earliest_timestamp = min(old_timestamp, new_timestamp)
+    if new_timestamp < old_timestamp:
+        # We are explicitly backdating, so let's illustrate partial-lot re-lot
+        logging.info(
+            f"[Backdating Detected] Transaction {tx.id} moved from {old_timestamp} "
+            f"to {new_timestamp}. Re-lot from earliest={earliest_timestamp}"
+        )
+        recalculate_subsequent_transactions(db, earliest_timestamp)
+    else:
+        # If it's not backdated, you could still partial-lot re-lot if you want:
+        logging.info(
+            f"[Timestamp Forward/Unchanged] Transaction {tx.id} moved from {old_timestamp} "
+            f"to {new_timestamp}. (No partial-lot re-lot needed unless desired.)"
+        )
+
+    # -------------------------------------------------------------------------
+    # Preserve old "scorched earth" approach:
+    # -------------------------------------------------------------------------
+    recalculate_all_transactions(db)
+    # -------------------------------------------------------------------------
 
     db.commit()
     db.refresh(tx)
@@ -224,7 +253,7 @@ def delete_transaction_record(transaction_id: int, db: Session):
 
 def ensure_fee_account_exists(db: Session):
     """
-    If a 'BTC Fees' account doesn't exist, create it. 
+    If a 'BTC Fees' account doesn't exist, create it.
     Allows any fee ledger line referencing 'BTC Fees' to avoid FK issues.
     """
     fee_acct = db.query(Account).filter_by(name="BTC Fees").first()
@@ -240,13 +269,17 @@ def ensure_fee_account_exists(db: Session):
     return fee_acct
 
 def remove_ledger_entries_for_tx(tx: Transaction, db: Session):
-    """Remove all LedgerEntry lines for this transaction."""
+    """
+    Remove all LedgerEntry lines for this transaction.
+    """
     for entry in list(tx.ledger_entries):
         db.delete(entry)
     db.flush()
 
 def remove_lot_usage_for_tx(tx: Transaction, db: Session):
-    """Remove any partial-lot disposals or newly created lots for this transaction."""
+    """
+    Remove any partial-lot disposals or newly created lots for this transaction.
+    """
     for disp in list(tx.lot_disposals):
         db.delete(disp)
     for lot in list(tx.bitcoin_lots_created):
@@ -255,21 +288,21 @@ def remove_lot_usage_for_tx(tx: Transaction, db: Session):
 
 def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Session):
     """
-    Convert single-entry style fields => multi-line ledger. 
+    Convert single-entry fields => multi-line ledger.
     Subtract the fee from proceeds in a Sell, so net is credited to 'to_acct'.
     """
     from_acct_id = tx_data.get("from_account_id")
-    to_acct_id   = tx_data.get("to_account_id")
-    tx_type      = tx_data.get("type", "")
-    amount       = Decimal(tx_data.get("amount", 0))
-    fee_amount   = Decimal(tx_data.get("fee_amount", 0))
+    to_acct_id = tx_data.get("to_account_id")
+    tx_type = tx_data.get("type", "")
+    amount = Decimal(tx_data.get("amount", 0))
+    fee_amount = Decimal(tx_data.get("fee_amount", 0))
     fee_currency = (tx_data.get("fee_currency") or "BTC").upper()
 
     proceeds_str = tx_data.get("proceeds_usd", "0")
     proceeds_usd = Decimal(proceeds_str) if proceeds_str else Decimal("0")
 
     from_acct = db.query(Account).filter(Account.id == from_acct_id).first() if from_acct_id else None
-    to_acct   = db.query(Account).filter(Account.id == to_acct_id).first()   if to_acct_id else None
+    to_acct = db.query(Account).filter(Account.id == to_acct_id).first() if to_acct_id else None
 
     # Transfer with BTC fee
     if (
@@ -312,7 +345,7 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
         and from_acct and from_acct.currency == "BTC"
         and to_acct and to_acct.currency == "USD"
     ):
-        # subtract the BTC
+        # Subtract BTC
         if amount > 0:
             db.add(LedgerEntry(
                 transaction_id=tx.id,
@@ -321,15 +354,16 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
                 currency="BTC",
                 entry_type="MAIN_OUT"
             ))
-
         net_usd_in = proceeds_usd
         if fee_currency == "USD":
             net_usd_in = proceeds_usd - fee_amount
             if net_usd_in < 0:
                 net_usd_in = Decimal("0")
 
+        # Overwrite with new net proceeds
         tx_data["proceeds_usd"] = str(net_usd_in)
 
+        # Add USD in
         if net_usd_in > 0:
             db.add(LedgerEntry(
                 transaction_id=tx.id,
@@ -338,7 +372,6 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
                 currency="USD",
                 entry_type="MAIN_IN"
             ))
-
         # Fee line to "USD Fees"
         if fee_amount > 0 and fee_currency == "USD":
             fee_acct = db.query(Account).filter_by(name="USD Fees").first()
@@ -356,14 +389,16 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
     # Buy => from USD to BTC
     if (
         tx_type == "Buy"
-        and from_acct and from_acct.currency == "USD"
-        and to_acct and to_acct.currency == "BTC"
+        and from_acct
+        and from_acct.currency == "USD"
+        and to_acct
+        and to_acct.currency == "BTC"
     ):
-        amount_btc      = Decimal(tx_data.get("amount", "0"))
-        fee_amount      = Decimal(tx_data.get("fee_amount", "0"))
-        cost_basis_usd  = Decimal(tx_data.get("cost_basis_usd", "0"))
+        amount_btc = Decimal(tx_data.get("amount", "0"))
+        fee_amt = Decimal(tx_data.get("fee_amount", "0"))
+        cost_basis_usd = Decimal(tx_data.get("cost_basis_usd", "0"))
 
-        total_usd_out = cost_basis_usd + fee_amount
+        total_usd_out = cost_basis_usd + fee_amt
 
         db.add(LedgerEntry(
             transaction_id=tx.id,
@@ -372,7 +407,6 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
             currency="USD",
             entry_type="MAIN_OUT"
         ))
-
         if amount_btc > 0:
             db.add(LedgerEntry(
                 transaction_id=tx.id,
@@ -381,21 +415,20 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
                 currency="BTC",
                 entry_type="MAIN_IN"
             ))
-
-        if fee_amount > 0 and fee_currency == "USD":
+        if fee_amt > 0 and fee_currency == "USD":
             fee_acct = db.query(Account).filter_by(name="USD Fees").first()
             if fee_acct:
                 db.add(LedgerEntry(
                     transaction_id=tx.id,
                     account_id=fee_acct.id,
-                    amount=fee_amount,
+                    amount=fee_amt,
                     currency="USD",
                     entry_type="FEE"
                 ))
         db.flush()
         return
 
-    # Fallback for deposits/withdrawals/other
+    # Fallback: deposits, withdrawals, or any other type
     if from_acct and amount > 0:
         main_out_amt = -(amount + fee_amount)
         db.add(LedgerEntry(
@@ -405,7 +438,6 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
             currency=from_acct.currency,
             entry_type="MAIN_OUT"
         ))
-
     if to_acct and amount > 0:
         db.add(LedgerEntry(
             transaction_id=tx.id,
@@ -414,13 +446,11 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
             currency=to_acct.currency,
             entry_type="MAIN_IN"
         ))
-
     if fee_amount > 0:
         if fee_currency == "BTC":
             fee_acct = db.query(Account).filter_by(name="BTC Fees").first()
         else:
             fee_acct = db.query(Account).filter_by(name="USD Fees").first()
-
         if fee_acct:
             db.add(LedgerEntry(
                 transaction_id=tx.id,
@@ -433,7 +463,7 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
 
 def maybe_create_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     """
-    If deposit/buy => create a BitcoinLot if to_acct=BTC.
+    If Deposit/Buy => create a BitcoinLot if to_acct=BTC.
     cost_basis_usd is used to track how many USD were effectively spent.
     If fee is USD for a Buy, add it to cost basis automatically.
     """
@@ -449,7 +479,7 @@ def maybe_create_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     fee_cur = (tx_data.get("fee_currency") or "").upper()
     fee_amt = Decimal(tx_data.get("fee_amount", "0"))
 
-    # If it's a Buy w/ USD fee, add fee to cost basis
+    # If it's a Buy w/ USD fee, add that fee to cost basis
     if tx.type == "Buy" and fee_cur == "USD":
         cost_basis += fee_amt
 
@@ -479,6 +509,7 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
 
     total_proceeds = float(tx_data.get("proceeds_usd", 0))
     withdrawal_purpose = (tx.purpose or "").strip()
+    # If "Spent" => reduce net proceeds by BTC fee
     if tx.type == "Withdrawal" and withdrawal_purpose == "Spent":
         fee_btc = float(tx.fee_amount or 0)
         fee_cur = (tx.fee_currency or "").upper()
@@ -497,7 +528,6 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     for lot in lots:
         if remaining_outflow <= 0:
             break
-
         lot_rem = float(lot.remaining_btc)
         if lot_rem <= 0:
             continue
@@ -506,16 +536,18 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
         original_cost_per_btc = Decimal(lot.cost_basis_usd) / Decimal(lot.total_btc)
         disposal_basis = (original_cost_per_btc * Decimal(can_use)).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
 
+        # Calculate partial proceeds proportionally
         partial_proceeds = Decimal("0.0")
         if total_outflow > 0:
             ratio = Decimal(can_use) / Decimal(total_outflow)
             partial_proceeds = (ratio * Decimal(total_proceeds)).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
 
         disposal_gain = partial_proceeds - disposal_basis
+        # Zero out gain if Gift/Donation/Lost
         if tx.type == "Withdrawal" and withdrawal_purpose in ("Gift", "Donation", "Lost"):
             disposal_gain = Decimal("0.0")
 
-        # Force lot.acquired_date to UTC if it's naive
+        # Ensure acquired_date is UTC
         acquired_date = lot.acquired_date
         if acquired_date.tzinfo is None:
             acquired_date = acquired_date.replace(tzinfo=timezone.utc)
@@ -555,17 +587,18 @@ def compute_sell_summary_from_disposals(tx: Transaction, db: Session):
     earliest_date = None
 
     for disp in disposals:
-        total_basis    += (disp.disposal_basis_usd or Decimal("0"))
-        total_gain     += (disp.realized_gain_usd or Decimal("0"))
+        total_basis += (disp.disposal_basis_usd or Decimal("0"))
+        total_gain += (disp.realized_gain_usd or Decimal("0"))
         total_proceeds += (disp.proceeds_usd_for_that_portion or Decimal("0"))
 
         lot = db.query(BitcoinLot).get(disp.lot_id)
         if lot and (earliest_date is None or lot.acquired_date < earliest_date):
             earliest_date = lot.acquired_date
 
-    tx.cost_basis_usd    = total_basis
+    tx.cost_basis_usd = total_basis
     tx.realized_gain_usd = total_gain
 
+    # Only overwrite proceeds if partial-lot proceeds > 0
     if total_proceeds > 0:
         tx.proceeds_usd = total_proceeds
 
@@ -585,7 +618,6 @@ def get_btc_price(timestamp: datetime, db: Session) -> Decimal:
     Falls back to live price if historical fails.
     """
     try:
-        # Format timestamp as YYYY-MM-DD for /api/bitcoin/price/history
         timestamp_str = timestamp.strftime("%Y-%m-%d")
         response = requests.get(
             "http://localhost:8000/api/bitcoin/price/history",
@@ -597,32 +629,35 @@ def get_btc_price(timestamp: datetime, db: Session) -> Decimal:
             raise ValueError("USD price not found in response")
         return Decimal(str(price_data["USD"]))
     except (requests.RequestException, ValueError, KeyError) as e:
-        # Fallback to live
+        # Attempt fallback to live
         try:
-            live_response = requests.get("http://localhost:8000/api/bitcoin/price")
-            live_response.raise_for_status()
-            live_price_data = live_response.json()
+            live_resp = requests.get("http://localhost:8000/api/bitcoin/price")
+            live_resp.raise_for_status()
+            live_price_data = live_resp.json()
             if "USD" in live_price_data:
                 return Decimal(str(live_price_data["USD"]))
         except (requests.RequestException, ValueError, KeyError):
-            raise HTTPException(status_code=500, detail=f"Failed to fetch BTC price: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch BTC price: {str(e)}"
+            )
 
 def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     """
     Splits source lots when transferring BTC internally between two BTC accounts.
-    - The main transferred portion is *not* a disposal
-    - The fee portion is a disposal
-    - We create new partial-lot(s) in the destination
+     - Main transferred portion is *not* a disposal
+     - Fee portion is a disposal
+     - Create new partial-lot(s) in the destination for the remainder
 
     Steps:
       1) total_outflow = (transfer amount + fee)
       2) gather lots (FIFO)
-      3) partial-lot disposal for fee, new partial-lot for the rest
+      3) partial-lot disposal for fee, new partial-lot for remainder
       4) set holding_period=SHORT/LONG for the fee disposal
     """
     from_acct = db.query(Account).filter(Account.id == tx.from_account_id).first()
     to_acct = db.query(Account).filter(Account.id == tx.to_account_id).first()
-    if not (from_acct and to_acct):
+    if not from_acct or not to_acct:
         return
     if from_acct.currency != "BTC" or to_acct.currency != "BTC":
         return
@@ -636,13 +671,13 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     # Gather all lots from 'from_acct' in FIFO
     lots = (
         db.query(BitcoinLot)
-          .join(Transaction, Transaction.id == BitcoinLot.created_txn_id)
-          .filter(
-              BitcoinLot.remaining_btc > 0,
-              Transaction.to_account_id == tx.from_account_id
-          )
-          .order_by(BitcoinLot.acquired_date.asc())
-          .all()
+        .join(Transaction, Transaction.id == BitcoinLot.created_txn_id)
+        .filter(
+            BitcoinLot.remaining_btc > 0,
+            Transaction.to_account_id == tx.from_account_id
+        )
+        .order_by(BitcoinLot.acquired_date.asc())
+        .all()
     )
 
     remaining_outflow = total_outflow
@@ -662,7 +697,7 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
             cost_per_btc = Decimal("0")
         cost_portion = (cost_per_btc * btc_to_use).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
 
-        lot.remaining_btc -= btc_to_use
+        lot.remaining_btc = lot.remaining_btc - Decimal(btc_to_use)
         db.add(lot)
         remaining_outflow -= btc_to_use
 
@@ -676,18 +711,16 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
             proceeds_for_fee = (btc_unit_price * portion_for_fee).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
             realized_gain = proceeds_for_fee - disposal_basis
 
-            # Force to UTC if old lot is naive
             acquired_date = lot.acquired_date
             if acquired_date.tzinfo is None:
                 acquired_date = acquired_date.replace(tzinfo=timezone.utc)
             days_held = (tx.timestamp - acquired_date).days
-
             hp = "LONG" if days_held >= 365 else "SHORT"
 
             disp = LotDisposal(
                 lot_id=lot.id,
                 transaction_id=tx.id,
-                disposed_btc=portion_for_fee,
+                disposed_btc=Decimal(portion_for_fee),
                 disposal_basis_usd=disposal_basis,
                 proceeds_usd_for_that_portion=proceeds_for_fee,
                 realized_gain_usd=realized_gain,
@@ -700,19 +733,19 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
         if portion_for_dest > 0:
             transfers_for_destination.append((lot, portion_for_dest, cost_per_btc, lot.acquired_date))
 
+    # If not enough BTC to cover fee or total outflow, raise error
     if remaining_fee > 0:
         raise HTTPException(
             status_code=400,
             detail=f"Not enough BTC to cover fee {fee_btc}"
         )
-
     if remaining_outflow > 0:
         raise HTTPException(
             status_code=400,
             detail=f"Not enough BTC to transfer {btc_outflow} + fee {fee_btc}"
         )
 
-    # create new partial-lot(s)
+    # Create new partial-lot(s) for destination
     for (orig_lot, amt_btc, cost_per_btc, acquired_date) in transfers_for_destination:
         if acquired_date.tzinfo is None:
             acquired_date = acquired_date.replace(tzinfo=timezone.utc)
@@ -720,50 +753,117 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
         new_lot = BitcoinLot(
             created_txn_id=tx.id,
             acquired_date=acquired_date,
-            total_btc=amt_btc,
-            remaining_btc=amt_btc,
+            total_btc=Decimal(amt_btc),
+            remaining_btc=Decimal(amt_btc),
             cost_basis_usd=cost_portion
         )
         db.add(new_lot)
 
     db.flush()
 
-# --------------------------------------------------------------------------------
-# NEW: Helper Function for Ripple Updates
-# --------------------------------------------------------------------------------
-
-def recalculate_subsequent_transactions(updated_tx: Transaction, db: Session):
+def recalculate_all_transactions(db: Session):
     """
-    Recalculate all Sell, Withdrawal, and Transfer transactions that occur
-    after or on the updated transaction's timestamp. Removes prior lot usage
-    and re-runs the partial-lot disposal logic to keep cost basis consistent.
+    "Scorched Earth" Re-lot Approach:
+     1) Remove ALL ledger entries, lot disposals, and Bitcoin lots
+     2) Fetch every transaction in ascending order (timestamp, id)
+     3) Re-build ledger lines & partial-lot logic for each transaction
     """
-    subsequent_txs = db.query(Transaction).filter(
-        Transaction.timestamp >= updated_tx.timestamp,
-        Transaction.id > updated_tx.id,
-        Transaction.type.in_(["Sell", "Withdrawal", "Transfer"])
-    ).order_by(Transaction.timestamp, Transaction.id).all()
+    db.query(LedgerEntry).delete()
+    db.query(LotDisposal).delete()
+    db.query(BitcoinLot).delete()
+    db.flush()
 
-    for sub_tx in subsequent_txs:
-        remove_lot_usage_for_tx(sub_tx, db)
+    all_txs = (
+        db.query(Transaction)
+        .order_by(Transaction.timestamp.asc(), Transaction.id.asc())
+        .all()
+    )
+
+    for rec_tx in all_txs:
         sub_tx_data = {
-            "from_account_id": sub_tx.from_account_id,
-            "to_account_id": sub_tx.to_account_id,
-            "type": sub_tx.type,
-            "amount": sub_tx.amount,
-            "fee_amount": sub_tx.fee_amount,
-            "fee_currency": sub_tx.fee_currency,
-            "proceeds_usd": sub_tx.proceeds_usd,
-            "purpose": sub_tx.purpose,
-            "timestamp": sub_tx.timestamp,
-            "cost_basis_usd": sub_tx.cost_basis_usd
+            "from_account_id": rec_tx.from_account_id,
+            "to_account_id": rec_tx.to_account_id,
+            "type": rec_tx.type,
+            "amount": rec_tx.amount,
+            "fee_amount": rec_tx.fee_amount,
+            "fee_currency": rec_tx.fee_currency,
+            "cost_basis_usd": rec_tx.cost_basis_usd,
+            "proceeds_usd": rec_tx.proceeds_usd,
+            "timestamp": rec_tx.timestamp,
+            "source": rec_tx.source,
+            "purpose": rec_tx.purpose,
         }
+        build_ledger_entries_for_transaction(rec_tx, sub_tx_data, db)
+        _maybe_verify_balance_for_internal(rec_tx, db)
 
-        if sub_tx.type == "Transfer":
-            maybe_transfer_bitcoin_lot(sub_tx, sub_tx_data, db)
-        elif sub_tx.type in ("Sell", "Withdrawal"):
-            maybe_dispose_lots_fifo(sub_tx, sub_tx_data, db)
-            compute_sell_summary_from_disposals(sub_tx, db)
+        if rec_tx.type in ("Deposit", "Buy"):
+            maybe_create_bitcoin_lot(rec_tx, sub_tx_data, db)
+        elif rec_tx.type in ("Sell", "Withdrawal"):
+            maybe_dispose_lots_fifo(rec_tx, sub_tx_data, db)
+            compute_sell_summary_from_disposals(rec_tx, db)
+        elif rec_tx.type == "Transfer":
+            maybe_transfer_bitcoin_lot(rec_tx, sub_tx_data, db)
+
+    db.flush()
+
+# ------------------------------------------------------------------------------
+# (NEW) PARTIAL REALLOCATION FUNCTION FOR STEP 7 BACKDATING
+# ------------------------------------------------------------------------------
+def recalculate_subsequent_transactions(db: Session, from_timestamp: datetime):
+    """
+    Example partial-lot re-lot approach from Step 7:
+     - Only re-lot transactions whose timestamp >= from_timestamp.
+     - This can be more efficient than "scorched earth" for large datasets.
+     - We preserve recalculate_all_transactions(...) for completeness.
+    """
+    logging.info(
+        f"[Partial Re-Lot] Starting from timestamp={from_timestamp.isoformat()}"
+    )
+
+    # 1) Gather all transactions from that timestamp forward
+    affected_txs = (
+        db.query(Transaction)
+        .filter(Transaction.timestamp >= from_timestamp)
+        .order_by(Transaction.timestamp.asc(), Transaction.id.asc())
+        .all()
+    )
+
+    # 2) Remove ledger entries, disposals, lots only for these affected transactions
+    #    so we can re-lot them in correct chronological order
+    tx_ids = [t.id for t in affected_txs]
+    db.query(LedgerEntry).filter(LedgerEntry.transaction_id.in_(tx_ids)).delete(synchronize_session=False)
+    db.query(LotDisposal).filter(LotDisposal.transaction_id.in_(tx_ids)).delete(synchronize_session=False)
+    db.query(BitcoinLot).filter(BitcoinLot.created_txn_id.in_(tx_ids)).delete(synchronize_session=False)
+    db.flush()
+
+    # 3) Rebuild each transaction’s ledger and partial-lot usage
+    for rec_tx in affected_txs:
+        sub_tx_data = {
+            "from_account_id": rec_tx.from_account_id,
+            "to_account_id": rec_tx.to_account_id,
+            "type": rec_tx.type,
+            "amount": rec_tx.amount,
+            "fee_amount": rec_tx.fee_amount,
+            "fee_currency": rec_tx.fee_currency,
+            "cost_basis_usd": rec_tx.cost_basis_usd,
+            "proceeds_usd": rec_tx.proceeds_usd,
+            "timestamp": rec_tx.timestamp,
+            "source": rec_tx.source,
+            "purpose": rec_tx.purpose,
+        }
+        build_ledger_entries_for_transaction(rec_tx, sub_tx_data, db)
+        _maybe_verify_balance_for_internal(rec_tx, db)
+
+        if rec_tx.type in ("Deposit", "Buy"):
+            maybe_create_bitcoin_lot(rec_tx, sub_tx_data, db)
+        elif rec_tx.type in ("Sell", "Withdrawal"):
+            maybe_dispose_lots_fifo(rec_tx, sub_tx_data, db)
+            compute_sell_summary_from_disposals(rec_tx, db)
+        elif rec_tx.type == "Transfer":
+            maybe_transfer_bitcoin_lot(rec_tx, sub_tx_data, db)
+
+    db.flush()
+    logging.info("[Partial Re-Lot] Completed partial-lot recalculation.")
 
 # --------------------------------------------------------------------------------
 # Double-Entry (with Cross-Currency Skip) & Fee Rules
@@ -771,14 +871,18 @@ def recalculate_subsequent_transactions(updated_tx: Transaction, db: Session):
 
 def _maybe_verify_balance_for_internal(tx: Transaction, db: Session):
     """
-    If type=Buy or Sell => skip net-zero check, cross-currency doesn't net to zero in this approach.
-    Otherwise, enforce net=0 for internal (non-99) accounts.
+    If type=Buy or Sell => skip net-zero check; cross-currency doesn't net to zero.
+    Otherwise, for internal accounts, enforce net=0 by currency (except external=99).
     """
     if tx.type in ("Buy", "Sell"):
         return
     _verify_double_entry_balance_for_internal(tx, db)
 
 def _verify_double_entry_balance_for_internal(tx: Transaction, db: Session):
+    """
+    Ensure ledger entries net to zero by currency for internal transactions
+    (i.e., from_acct != 99, to_acct != 99).
+    """
     if tx.from_account_id == 99 or tx.to_account_id == 99:
         return
 
@@ -805,7 +909,7 @@ def _enforce_fee_rules(tx_data: dict, db: Session):
     tx_type = tx_data.get("type")
     from_id = tx_data.get("from_account_id")
     fee_amount = Decimal(tx_data.get("fee_amount", 0))
-    fee_currency = tx_data.get("fee_currency", "USD")
+    fee_currency = (tx_data.get("fee_currency") or "USD").upper()
 
     if fee_amount <= 0:
         return
@@ -814,18 +918,18 @@ def _enforce_fee_rules(tx_data: dict, db: Session):
         if not from_id or from_id == 99:
             return
         from_acct = db.query(Account).filter(Account.id == from_id).first()
-        if from_acct and from_acct.currency == "BTC" and fee_currency.upper() != "BTC":
+        if from_acct and from_acct.currency == "BTC" and fee_currency != "BTC":
             raise HTTPException(
                 status_code=400,
                 detail="Transfer from BTC => fee must be BTC."
             )
-        if from_acct and from_acct.currency == "USD" and fee_currency.upper() != "USD":
+        if from_acct and from_acct.currency == "USD" and fee_currency != "USD":
             raise HTTPException(
                 status_code=400,
                 detail="Transfer from USD => fee must be USD."
             )
     elif tx_type in ("Buy", "Sell"):
-        if fee_currency.upper() != "USD":
+        if fee_currency != "USD":
             raise HTTPException(
                 status_code=400,
                 detail=f"{tx_type} => fee must be USD."
@@ -860,7 +964,7 @@ def _enforce_transaction_type_rules(tx_data: dict, db: Session):
         if not from_id or from_id == 99 or not to_id or to_id == 99:
             raise HTTPException(status_code=400, detail="Transfer => both from/to must be internal.")
         db_from = db.query(Account).get(from_id)
-        db_to   = db.query(Account).get(to_id)
+        db_to = db.query(Account).get(to_id)
         if db_from and db_to and db_from.currency != db_to.currency:
             raise HTTPException(status_code=400, detail="Transfer => same currency required.")
 
