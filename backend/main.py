@@ -20,7 +20,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import FileResponse
 
-# ---------------- NEW IMPORTS for JSON-based login & DB usage ----------------
+# NEW IMPORTS for JSON-based login & DB usage
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -31,7 +31,6 @@ load_dotenv()
 # Session Configuration
 # ---------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")  # Fallback if not set
-# We use SECRET_KEY to sign session cookies. Starlette stores sessions in-memory by default.
 
 # Default CORS origins if none specified (e.g., dev environment)
 default_origins = (
@@ -59,8 +58,6 @@ app = FastAPI(
 # ---------------------------------------------------------
 # Add Session Middleware
 # ---------------------------------------------------------
-# This middleware automatically sets/respects a signed cookie
-# named "btc_session_id" (you can rename if desired).
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
@@ -104,6 +101,17 @@ app.include_router(user.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
 app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"])
 app.include_router(bitcoin.router, prefix="/api", tags=["Bitcoin"])
+
+# ---------------------------------------------------------
+# Reports Router
+# ---------------------------------------------------------
+# If you placed the `reports_router` in backend/routers/reports.py
+# add it here:
+try:
+    from backend.routers.reports import reports_router
+    app.include_router(reports_router, prefix="/reports", tags=["reports"])
+except ImportError:
+    print("WARNING: Could not import 'reports_router'. Make sure 'backend/routers/reports.py' exists.")
 
 # ---------------------------------------------------------
 # Session-Based Auth Helpers
