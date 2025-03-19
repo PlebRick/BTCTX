@@ -84,3 +84,28 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Styling for the delete button */
+.delete-button {
+  background-color: #d9534f; /* Red color */
+  color: white;
+  border: none;
+  border-radius: 6px; /* Slightly larger rounded corners */
+  padding: 0.85rem 1.5rem; /* Increase padding to make it larger */
+  font-size: 1rem; /* Maintain readable text */
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+/* Hover effect */
+.delete-button:hover {
+  background-color: #c9302c; /* Darker red */
+  transform: scale(1.05); /* Slight scale-up effect */
+}
+
+/* Active click effect */
+.delete-button:active {
+  background-color: #a52a2a; /* Even darker red */
+  transform: scale(0.98); /* Slightly shrink */
+}

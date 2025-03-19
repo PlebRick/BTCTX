@@ -486,6 +486,27 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   };
 
+  const handleDeleteClick = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this transaction?"
+    );
+    if (!confirmed) return;
+  
+    setIsSubmitting(true);
+    try {
+      // We assume you have a DELETE /transactions/{id} route.
+      await api.delete(`/transactions/${transactionId}`);
+      alert("Transaction deleted successfully!");
+      reset();
+      onSubmitSuccess?.();
+    } catch (error) {
+      alert("Failed to delete transaction. Check console for details.");
+      console.error("Delete error:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   /**
    * renderDynamicFields:
    * Here is where we restore the complete JSX for each transaction type,
@@ -1049,6 +1070,26 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         {/* Now render all dynamic fields */}
         {renderDynamicFields()}
       </div>
+
+      {/*
+        For new transactions: Show a "Create" or "Save" button, etc.
+        If you already have code for those, keep them.
+
+        We'll show the Delete button only if transactionId is present (edit mode).
+      */}
+
+      {transactionId && (
+        <div style={{ marginTop: "20px", textAlign: "right" }}>
+          <button
+            type="button"
+            className="delete-button"
+            onClick={handleDeleteClick}
+            disabled={isSubmitting}
+          >
+            Delete Transaction
+          </button>
+        </div>
+      )}
     </form>
   );
 };

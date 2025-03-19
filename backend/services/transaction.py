@@ -236,15 +236,20 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
 
 def delete_transaction_record(transaction_id: int, db: Session):
     """
-    Delete a transaction if not locked. Also removes ledger entries,
-    lots, and disposals referencing it.
+    Delete a transaction if not locked. Removes ledger entries,
+    lots, disposals referencing it, then re-lots everything.
     """
     tx = get_transaction_by_id(db, transaction_id)
     if not tx or tx.is_locked:
         return False
 
+    # 1) Delete the transaction itself
     db.delete(tx)
     db.commit()
+
+    # 2) Re-lot *all* transactions from scratch
+    recalculate_all_transactions(db)
+
     return True
 
 # --------------------------------------------------------------------------------
@@ -498,21 +503,44 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     For a Sell or Withdrawal from a BTC account, dispose BTC in FIFO order.
     Creates partial-lot disposal records, each with a holding_period based on
     (tx.timestamp - lot.acquired_date).days
+
+    Additional Handling for Withdrawals:
+     - If purpose=Gift/Donation/Lost => proceeds=0 (forced)
+     - If purpose=Spent => we allow user-supplied 'proceeds_usd' (like a pseudo-sell),
+       then subtract BTC fee from net proceeds if fee is BTC.
+     - Otherwise, if 'proceeds_usd' is missing, default to 0.
     """
+
     from_acct = db.query(Account).filter(Account.id == tx.from_account_id).first()
     if not from_acct or from_acct.currency != "BTC":
-        return
+        return  # Only dispose if withdrawing BTC
 
     btc_outflow = float(tx.amount or 0)
     if btc_outflow <= 0:
         return
 
-    total_proceeds = float(tx_data.get("proceeds_usd", 0))
+    # 1) Handle proceeds_usd carefully (default to 0 if None)
+    raw_proceeds = tx_data.get("proceeds_usd")
+    if raw_proceeds is None:
+        raw_proceeds = "0"
+    try:
+        total_proceeds = float(raw_proceeds)
+    except ValueError:
+        # If someone passed something non-numeric, default to 0
+        total_proceeds = 0.0
+
     withdrawal_purpose = (tx.purpose or "").strip()
-    # If "Spent" => reduce net proceeds by BTC fee
+    
+    # 2) If Gift/Donation/Lost => forced 0 proceeds
+    if tx.type == "Withdrawal" and withdrawal_purpose in ("Gift", "Donation", "Lost"):
+        total_proceeds = 0.0
+
+    # 3) If "Spent" => reduce net proceeds by BTC fee if any
     if tx.type == "Withdrawal" and withdrawal_purpose == "Spent":
         fee_btc = float(tx.fee_amount or 0)
         fee_cur = (tx.fee_currency or "").upper()
+        # If there's a BTC fee and we have some total_proceeds (like a pseudo-sell),
+        # we recalculate net_proceeds after paying the fee in BTC.
         if fee_btc > 0 and fee_cur == "BTC" and btc_outflow > 0 and total_proceeds > 0:
             implied_price = total_proceeds / btc_outflow
             fee_in_usd = fee_btc * implied_price
@@ -521,7 +549,13 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
                 net_proceeds = 0.0
             total_proceeds = net_proceeds
 
-    lots = db.query(BitcoinLot).filter(BitcoinLot.remaining_btc > 0).order_by(BitcoinLot.acquired_date).all()
+    # 4) Continue with your existing FIFO disposal logic
+    lots = (
+        db.query(BitcoinLot)
+        .filter(BitcoinLot.remaining_btc > 0)
+        .order_by(BitcoinLot.acquired_date)
+        .all()
+    )
     remaining_outflow = btc_outflow
     total_outflow = btc_outflow
 
@@ -542,8 +576,9 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
             ratio = Decimal(can_use) / Decimal(total_outflow)
             partial_proceeds = (ratio * Decimal(total_proceeds)).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
 
+        # If Gift/Donation/Lost => we already forced total_proceeds=0.0,
+        # so partial_proceeds is 0 anyway, meaning disposal_gain => 0
         disposal_gain = partial_proceeds - disposal_basis
-        # Zero out gain if Gift/Donation/Lost
         if tx.type == "Withdrawal" and withdrawal_purpose in ("Gift", "Donation", "Lost"):
             disposal_gain = Decimal("0.0")
 
