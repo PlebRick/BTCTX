@@ -1,3 +1,5 @@
+/* src/styles/converter.css */
+
 /* Centers the converter horizontally */
 .sidebar-converter {
   display: flex;
@@ -39,9 +41,9 @@
 
 .toggle-btn {
   flex: 1;
-  margin: 0 0.2rem;      /* Increased from 0.1rem */
-  padding: 0.4rem;       /* Increased from 0.3rem */
-  font-size: 0.9rem;     /* Increased from 0.7rem */
+  margin: 0 0.1rem;      /* Reduced from 0.2rem to fit three buttons */
+  padding: 0.3rem;       /* Reduced from 0.4rem to fit smaller width */
+  font-size: 0.8rem;     /* Reduced from 0.9rem to fit text */
   border: 1px solid #444;
   border-radius: 4px;
   background: #333;
@@ -50,17 +52,29 @@
   transition: background 0.3s;
   text-align: center;
 }
+
+/* Remove margin for first and last buttons to avoid extra spacing */
+.toggle-btn:first-child {
+  margin-left: 0;
+}
+
+.toggle-btn:last-child {
+  margin-right: 0;
+}
+
 .toggle-btn.active {
   background-color: #4a4a4a;
   border-color: var(--color-accent);
   color: #fff;
 }
+
 .toggle-btn:hover {
   background: #4a4a4a;
 }
 
 .manual-price-row,
-.converter-row {
+.converter-row,
+.date-price-row {
   display: flex;
   flex-direction: column;
   margin-top: 0rem;
@@ -68,24 +82,79 @@
 }
 
 .manual-price-row label,
-.converter-row label {
+.converter-row label,
+.date-price-row label {
   margin-bottom: 0.3rem; /* Increased from 0.25rem */
   color: var(--color-text-dim);
   font-size: 0.9rem;     /* Increased from 0.75rem */
 }
 
 .manual-price-row input,
-.converter-row input {
+.converter-row input,
+.date-price-row input {
   width: 100%;
+  max-width: 300px;      /* Limit width for better appearance */
   padding: 0.4rem;       /* Increased from 0.3rem */
   font-size: 0.9rem;     /* Increased from 0.75rem */
   border: 1px solid #444;
   border-radius: 4px;
   background-color: #2a2a2a;
   color: #d4d4d4;
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
+
 .manual-price-row input:focus,
-.converter-row input:focus {
+.converter-row input:focus,
+.date-price-row input:focus {
   outline: none;
   border-color: var(--color-accent);
+  box-shadow: 0 0 5px rgba(217, 167, 95, 0.3); /* Subtle glow effect */
+}
+
+/* Specific styling for date-price-row */
+/* Outer container for date mode */
+.date-price-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;           /* Increased from 0.5rem for more space */
+  align-items: flex-start; /* Ensures left alignment of children */
+}
+
+/* Inner row for label and date input */
+.date-price-row .date-input-row {
+  display: flex;
+  justify-content: space-between; /* Label left, input right */
+  align-items: center;    /* Vertically center label and input */
+  width: 100%;            /* Full width to maximize spacing */
+}
+
+/* Label styling */
+.date-price-row label {
+  margin-bottom: 0;       /* No margin since it’s on the same row as input */
+  color: var(--color-text-dim);
+  font-size: 0.9rem;
+}
+
+/* Date input styling */
+.date-price-row input[type="date"] {
+  width: 100%;
+  max-width: 150px;       /* Compact size for date picker */
+  padding: 0.5rem;        /* Consistent padding */
+  background-color: #333; /* Preserved color */
+  border: 1px solid #555; /* Preserved border */
+  border-radius: 6px;     /* Preserved rounded corners */
+  color: #d4d4d4;
+}
+
+/* Style the date picker icon */
+.date-price-row input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);    /* Preserved lighter calendar icon */
+}
+
+/* Price text styling */
+.date-price-row .btc-price {
+  color: var(--color-text);
+  font-size: 0.9rem;
+  margin: 0;
+  text-align: left;       /* Explicitly left-aligned */
 }

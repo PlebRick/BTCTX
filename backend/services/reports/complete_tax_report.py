@@ -1,44 +1,101 @@
-from typing import Dict, Any
+from typing import Dict, Any, List
 from io import BytesIO
 
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer, PageBreak
+)
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfgen.canvas import Canvas
 
 def generate_comprehensive_tax_report(report_dict: Dict[str, Any]) -> bytes:
     """
-    Generates a 'Comprehensive Tax Report' that includes BOTH
-    high-level summaries (capital gains, income) AND detailed 
-    transaction data (like 8949 line items).
+    Comprehensive Tax Report with:
+      1) A blank title page (no page number).
+      2) Page numbers on subsequent pages, starting at "Page 1" for the second page.
+      3) Wider columns & wrapped text to avoid overlap.
+      4) Headings left-aligned, and minimal spacing as requested.
     """
-    # Prepare in-memory PDF buffer
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-
     styles = getSampleStyleSheet()
-    story = []
 
-    # --- Title & Metadata ---
+    # Custom heading style (left-aligned)
+    heading_style = ParagraphStyle(
+        name="Heading2Left",
+        parent=styles["Heading2"],
+        alignment=0,  # left align
+        spaceBefore=12,
+        spaceAfter=8,
+    )
+
+    # Normal style for body text
+    normal_style = styles["Normal"]
+    # A style for wrapping table cells so they don't overflow
+    wrapped_style = ParagraphStyle(
+        name="Wrapped",
+        parent=normal_style,
+        wordWrap='CJK',  # or 'RTL' or 'CJK'
+    )
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=0.75 * inch,
+        rightMargin=0.75 * inch,
+        topMargin=0.75 * inch,
+        bottomMargin=0.75 * inch
+    )
+
+    # ----------------------------------------------
+    # Page numbering callbacks
+    # ----------------------------------------------
+    def on_first_page(canvas: Canvas, doc):
+        """
+        Title page layout callback:
+        No page number here.
+        """
+        pass
+
+    def on_later_pages(canvas: Canvas, doc):
+        """
+        Subsequent pages layout callback:
+        Place "Page X" in the bottom-right corner,
+        counting from 1 on the *second* physical page.
+        """
+        page_num = doc.page - 1  # shift so the second sheet is labeled "Page 1"
+        canvas.setFont("Helvetica", 9)
+        canvas.drawRightString(7.9 * inch, 0.5 * inch, f"Page {page_num}")
+
+    # ----------------------------------------------
+    # Build the story
+    # ----------------------------------------------
+    story: List = []
+
+    # 1) Title Page (no page number)
     tax_year = report_dict.get("tax_year", "Unknown Year")
     report_date = report_dict.get("report_date", "Unknown Date")
-    period = report_dict.get("period", "")
+    period = report_dict.get("period", "N/A")
 
-    story.append(Paragraph(f"<b>BitcoinTX Comprehensive Tax Report</b>", styles["Title"]))
+    story.append(Paragraph("BitcoinTX Comprehensive Tax Report", styles["Title"]))
     meta_text = (
         f"<b>Tax Year:</b> {tax_year}<br/>"
         f"<b>Report Date:</b> {report_date}<br/>"
         f"<b>Period:</b> {period}"
     )
-    story.append(Paragraph(meta_text, styles["Normal"]))
+    story.append(Paragraph(meta_text, normal_style))
     story.append(Spacer(1, 12))
 
-    # ------------------------------------------------------
-    # (A) Capital Gains Summary (Short/Long/Total)
-    # ------------------------------------------------------
+    disclaimers = report_dict.get("disclaimers", "")
+    if disclaimers:
+        story.append(Paragraph(disclaimers, normal_style))
+    story.append(PageBreak())  # End title page, move on to normal pages
+
+    # 2) Capital Gains Summary
     cg_summary = report_dict.get("capital_gains_summary", {})
     if cg_summary:
-        story.append(Paragraph("<b>Capital Gains Summary</b>", styles["Heading2"]))
+        story.append(Paragraph("Capital Gains Summary", heading_style))
 
         short_term = cg_summary.get("short_term", {})
         long_term = cg_summary.get("long_term", {})
@@ -46,143 +103,205 @@ def generate_comprehensive_tax_report(report_dict: Dict[str, Any]) -> bytes:
 
         cg_data = [
             ["Type", "Proceeds", "Cost Basis", "Gain/Loss"],
-            ["Short-Term",
-             short_term.get("proceeds", 0),
-             short_term.get("basis", 0),
-             short_term.get("gain", 0)],
-            ["Long-Term",
-             long_term.get("proceeds", 0),
-             long_term.get("basis", 0),
-             long_term.get("gain", 0)],
-            ["Total",
-             total.get("proceeds", 0),
-             total.get("basis", 0),
-             total.get("gain", 0)],
+            [
+                "Short-Term",
+                f"{short_term.get('proceeds', 0):,.2f}",
+                f"{short_term.get('basis', 0):,.2f}",
+                f"{short_term.get('gain', 0):,.2f}",
+            ],
+            [
+                "Long-Term",
+                f"{long_term.get('proceeds', 0):,.2f}",
+                f"{long_term.get('basis', 0):,.2f}",
+                f"{long_term.get('gain', 0):,.2f}",
+            ],
+            [
+                "Total",
+                f"{total.get('proceeds', 0):,.2f}",
+                f"{total.get('basis', 0):,.2f}",
+                f"{total.get('gain', 0):,.2f}",
+            ],
         ]
-
-        table = Table(cg_data)
-        table.setStyle(TableStyle([
+        cg_table = Table(cg_data)
+        cg_table.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 1, colors.black),
             ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
             ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
         ]))
-        story.append(table)
+        story.append(cg_table)
         story.append(Spacer(1, 12))
 
-    # ------------------------------------------------------
-    # (B) Income Summary
-    # ------------------------------------------------------
+    # 3) Income Summary
     inc_summary = report_dict.get("income_summary", {})
     if inc_summary:
-        story.append(Paragraph("<b>Income Summary</b>", styles["Heading2"]))
-
+        story.append(Paragraph("Income Summary", heading_style))
         inc_data = [
             ["Mining", "Reward", "Other", "Total"],
             [
-                inc_summary.get("Mining", 0),
-                inc_summary.get("Reward", 0),
-                inc_summary.get("Other", 0),
-                inc_summary.get("Total", 0),
+                f"{inc_summary.get('Mining', 0):,.2f}",
+                f"{inc_summary.get('Reward', 0):,.2f}",
+                f"{inc_summary.get('Other', 0):,.2f}",
+                f"{inc_summary.get('Total', 0):,.2f}",
             ]
         ]
-        table = Table(inc_data)
-        table.setStyle(TableStyle([
+        inc_table = Table(inc_data)
+        inc_table.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 1, colors.black),
             ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
             ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
         ]))
-        story.append(table)
+        story.append(inc_table)
         story.append(Spacer(1, 12))
 
-    # ------------------------------------------------------
-    # (C) Detailed Capital Gains Transactions
-    # ------------------------------------------------------
+    # 4) Capital Gains Transactions (Detailed)
     cg_transactions = report_dict.get("capital_gains_transactions", [])
     if cg_transactions:
-        story.append(Paragraph("<b>Capital Gains Transactions</b>", styles["Heading2"]))
+        story.append(Paragraph("Capital Gains Transactions (Detailed)", heading_style))
 
-        tx_data = [["Date Sold", "Date Acquired", "Asset", "Amount", 
-                    "Cost Basis", "Proceeds", "Gain/Loss", "Holding"]]
+        # We'll define column widths
+        col_widths = [
+            1.6 * inch,  # Date Sold
+            1.6 * inch,  # Date Acquired
+            0.7 * inch,  # Asset
+            0.9 * inch,  # Amount
+            1.0 * inch,  # Cost Basis
+            1.0 * inch,  # Proceeds
+            1.0 * inch,  # Gain/Loss
+            0.7 * inch,  # Holding
+        ]
+
+        # Table header
+        tx_data = [[
+            "Date Sold", "Date Acquired", "Asset", "Amount",
+            "Cost Basis", "Proceeds", "Gain/Loss", "Holding"
+        ]]
+
         for tx in cg_transactions:
+            # Wrap date_sold + " (multiple lots)" in a Paragraph for word-wrap
+            date_sold_para = Paragraph(tx.get("date_sold", ""), wrapped_style)
+            date_acq_para  = Paragraph(tx.get("date_acquired", ""), wrapped_style)
+            asset = tx.get("asset", "BTC")
+            # Convert numeric columns to strings
+            amt_str = f"{tx.get('amount', 0):,.8f}"
+            cost_str = f"{tx.get('cost', 0):,.2f}"
+            proceeds_str = f"{tx.get('proceeds', 0):,.2f}"
+            gain_str = f"{tx.get('gain_loss', 0):,.2f}"
+            hold_str = tx.get("holding_period", "")
+
             tx_data.append([
-                tx.get("date_sold", ""),
-                tx.get("date_acquired", ""),
-                tx.get("asset", ""),
-                f"{tx.get('amount', 0):.8f}",
-                f"${tx.get('cost', 0):.2f}",
-                f"${tx.get('proceeds', 0):.2f}",
-                f"${tx.get('gain_loss', 0):.2f}",
-                tx.get("holding_period", "")
+                date_sold_para,
+                date_acq_para,
+                asset,
+                amt_str,
+                cost_str,
+                proceeds_str,
+                gain_str,
+                hold_str,
             ])
-        table = Table(tx_data)
-        table.setStyle(TableStyle([
+
+        cg_table = Table(tx_data, colWidths=col_widths, repeatRows=1)
+        cg_table.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 1, colors.black),
             ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("ALIGN", (0, 1), (-1, -1), "CENTER"),
+            ("ALIGN", (3, 1), (-2, -1), "RIGHT"),  # Right-align Amount, Cost, Proceeds
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),    # top-align wrapped cells
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ]))
-        story.append(table)
+        story.append(cg_table)
         story.append(Spacer(1, 12))
 
-    # ------------------------------------------------------
-    # (D) Detailed Income Transactions
-    # ------------------------------------------------------
+    # 5) Income Transactions (Detailed)
     inc_transactions = report_dict.get("income_transactions", [])
     if inc_transactions:
-        story.append(Paragraph("<b>Income Transactions</b>", styles["Heading2"]))
+        story.append(Paragraph("Income Transactions (Detailed)", heading_style))
 
-        inc_data = [["Date", "Asset", "Amount", "Value (USD)", "Type", "Description"]]
+        inc_col_widths = [
+            1.6 * inch,  # Date
+            0.7 * inch,  # Asset
+            0.9 * inch,  # Amount
+            1.0 * inch,  # Value(USD)
+            0.8 * inch,  # Type
+            2.0 * inch,  # Description
+        ]
+        inc_data = [[
+            "Date", "Asset", "Amount", "Value (USD)", "Type", "Description"
+        ]]
         for i_tx in inc_transactions:
+            date_p = Paragraph(i_tx.get("date", ""), wrapped_style)
+            asset_p = i_tx.get("asset", "BTC")
+            amt_str = f"{i_tx.get('amount', 0):,.8f}"
+            val_str = f"{i_tx.get('value_usd', 0):,.2f}"
+            type_str = i_tx.get("type", "")
+            desc_para = Paragraph(i_tx.get("description", ""), wrapped_style)
+
             inc_data.append([
-                i_tx.get("date", ""),
-                i_tx.get("asset", ""),
-                f"{i_tx.get('amount', 0):.8f}",
-                f"${i_tx.get('value_usd', 0):.2f}",
-                i_tx.get("type", ""),
-                i_tx.get("description", ""),
+                date_p,
+                asset_p,
+                amt_str,
+                val_str,
+                type_str,
+                desc_para,
             ])
-        table = Table(inc_data)
-        table.setStyle(TableStyle([
+        inc_table = Table(inc_data, colWidths=inc_col_widths, repeatRows=1)
+        inc_table.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 1, colors.black),
             ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("ALIGN", (0, 1), (-1, -1), "CENTER"),
+            ("ALIGN", (2, 1), (3, -1), "RIGHT"),  # Amount & Value right-aligned
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ]))
-        story.append(table)
-        story.append(Spacer(1, 12))
+        story.append(inc_table)
 
-    # ------------------------------------------------------
-    # (E) End-of-Year Balances
-    # ------------------------------------------------------
+        # Less space before next section
+        story.append(Spacer(1, 8))
+
+    # 6) End-of-Year Holdings
     eoy_balances = report_dict.get("end_of_year_balances", [])
     if eoy_balances:
-        story.append(Paragraph("<b>End of Year Holdings</b>", styles["Heading2"]))
+        story.append(Paragraph("End of Year Holdings", heading_style))
 
-        bal_data = [["Asset", "Quantity", "Cost Basis", "Market Value", "Description"]]
+        eoy_col_widths = [
+            0.9 * inch,  # Asset
+            0.9 * inch,  # Quantity
+            1.0 * inch,  # Cost Basis
+            1.0 * inch,  # Market Value
+            2.3 * inch,  # Description
+        ]
+        eoy_data = [[
+            "Asset", "Quantity", "Cost Basis (USD)", "Market Value (USD)", "Description"
+        ]]
         for bal in eoy_balances:
-            bal_data.append([
-                bal.get("asset", ""),
-                f"{bal.get('quantity', 0):.8f}",
-                f"${bal.get('cost', 0):.2f}",
-                f"${bal.get('value', 0):.2f}",
-                bal.get("description", "")
-            ])
-        table = Table(bal_data)
-        table.setStyle(TableStyle([
+            asset_p = bal.get("asset", "")
+            qty_str = f"{bal.get('quantity', 0):,.8f}"
+            cost_str = f"{bal.get('cost', 0):,.2f}"
+            val_str  = f"{bal.get('value', 0):,.2f}"
+            desc_p   = Paragraph(bal.get("description", ""), wrapped_style)
+
+            eoy_data.append([asset_p, qty_str, cost_str, val_str, desc_p])
+
+        eoy_table = Table(eoy_data, colWidths=eoy_col_widths, repeatRows=1)
+        eoy_table.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 1, colors.black),
             ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("ALIGN", (0, 1), (-1, -1), "CENTER"),
+            ("ALIGN", (1, 1), (3, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ]))
-        story.append(table)
+        story.append(eoy_table)
         story.append(Spacer(1, 12))
 
-    # Build the PDF
-    doc.build(story)
+    # ----------------------------------------------
+    # Finally, build the PDF with custom page callbacks
+    # ----------------------------------------------
+    doc.build(
+        story,
+        onFirstPage=on_first_page,
+        onLaterPages=on_later_pages
+    )
+
     pdf_bytes = buffer.getvalue()
     buffer.close()
-
     return pdf_bytes
