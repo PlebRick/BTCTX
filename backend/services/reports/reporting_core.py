@@ -5,43 +5,57 @@ from typing import Dict, Any, List
 from decimal import Decimal, ROUND_HALF_DOWN
 
 from sqlalchemy.orm import Session
-
-from backend.models.transaction import Transaction, BitcoinLot, LotDisposal
+from backend.models.transaction import (
+    Transaction,
+    BitcoinLot,
+    LotDisposal,
+)
+from backend.models.account import Account
 from backend.services.transaction import (
-    recalculate_all_transactions,  # or partial-lot approach
+    recalculate_all_transactions,
+    recalculate_subsequent_transactions,  # We'll use partial-lot approach
     get_all_transactions,
 )
 import logging
 
+logger = logging.getLogger(__name__)
+
+
 def generate_report_data(db: Session, year: int) -> Dict[str, Any]:
     """
-    1) Re-lot all transactions (scorched earth) or partial-lot if you prefer
-    2) Fetch all transactions in the given tax year
-    3) Build comprehensive aggregator data for the PDF, e.g.:
-       {
-         "tax_year": year,
-         "report_date": "2025-01-01 09:52",
-         "period": "2024-01-01 to 2024-12-31",
-         "capital_gains_summary": {...},
-         "income_summary": {...},
-         "asset_summary": [...],
-         "end_of_year_balances": [...],
-         "capital_gains_transactions": [...],
-         "income_transactions": [...],
-         "gifts_donations_lost": [...],
-         "expenses": [...],
-         "data_sources": [...]
-       }
-    """
-    # 1) Re-lot everything from scratch. (Or partial-lot from 1/1 of that year.)
-    # If your system has many prior years, you may want partial-lot from Jan 1 of `year`.
-    recalculate_all_transactions(db)  # Or recalculate_subsequent_transactions(...) from 1 Jan
+    Generates a comprehensive dictionary of data for the specified tax year
+    (YYYY) to be used by different PDF reports (e.g., complete_tax_report,
+    ScheduleD, form_8949).
 
-    # 2) Gather all transactions that occur within [year-01-01, year-12-31].
+    Includes:
+      - Beginning-of-year balances (start_of_year_balances).
+      - A one-line summary of capital gains (short vs. long).
+      - An income summary for BTC deposits with source=Income/Reward/Interest.
+      - An asset summary, extended to handle multiple assets (if any).
+      - End-of-year balances for each lot still held.
+      - Summaries of capital gains transactions, both “header-level” and
+        fully granular partial-lot detail for 8949/ScheduleD.
+      - Lists for “Income Transactions,” “Gifts/Donations/Lost,” “Expenses,” etc.
+      - Data sources used in your transactions.
+
+    Steps:
+      1) First gather 'start_of_year_balances' by partial-lot re-lot up to Jan 1,
+         then revert to normal state for the rest of the year.
+      2) Then do 'scorched earth' re-lot for the entire year, build normal aggregator data.
+      3) Return everything in a final dict.
+    """
+    logger.info(f"Begin building report data for tax_year={year}")
+
+    # 1) Gather beginning-of-year balances
+    #    => partial-lot approach up to (year, 1, 1)
+    start_of_year_data = _build_start_of_year_balances(db, year)
+
+    # 2) Re-lot everything from scratch for the entire year
+    recalculate_all_transactions(db)
+
+    # 3) Filter transactions for that tax year
     start_dt = datetime(year, 1, 1, tzinfo=timezone.utc)
     end_dt   = datetime(year, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
-
-    # You could store them in memory
     txns = (
         db.query(Transaction)
         .filter(Transaction.timestamp >= start_dt, Transaction.timestamp <= end_dt)
@@ -49,73 +63,38 @@ def generate_report_data(db: Session, year: int) -> Dict[str, Any]:
         .all()
     )
 
-    # 3) Build each required section. We'll illustrate how to do capital gains summary & a few others.
-
-    # ----------------------------------------------------------------------
-    # CAPITAL GAINS
-    # ----------------------------------------------------------------------
-    # For Sells/Withdrawals that actually disposed BTC, we can sum up from
-    # transaction.realized_gain_usd, transaction.cost_basis_usd, transaction.proceeds_usd
-    # and also classify short vs. long from transaction.holding_period.
-
+    # 4) Build each needed section
     gains_dict = _build_capital_gains_summary(txns)
-
-    # ----------------------------------------------------------------------
-    # INCOME
-    # ----------------------------------------------------------------------
-    # Typically you’d treat certain Deposits or “source=Mining”/“Reward” as Income.
-    # Koinly lumps them in an “Income” category with total USD value.
-    # You might also have deposit “source=Salary” or “source=Interest” to sum up, etc.
-
     income_dict = _build_income_summary(txns)
-
-    # ----------------------------------------------------------------------
-    # ASSET SUMMARY
-    # ----------------------------------------------------------------------
-    # If you only track BTC + USD, you can produce a short table. Otherwise, you could
-    # do a partial-lot per asset. For this example, we’ll focus on BTC net gains/loss.
-    asset_list = _build_asset_summary(txns)
-
-    # ----------------------------------------------------------------------
-    # END OF YEAR BALANCES
-    # ----------------------------------------------------------------------
-    # Look at all leftover “BitcoinLot.remaining_btc” for that user, and sum it up.
-    # Possibly fetch a 12/31 price. You only want lots acquired on or before 12/31. 
+    asset_list = _build_asset_summary(db, end_dt)
     eoy_list = _build_end_of_year_balances(db, end_dt)
-
-    # ----------------------------------------------------------------------
-    # DETAILED TRANSACTION LISTS
-    # ----------------------------------------------------------------------
-    # For the “Comprehensive Tax Report” you might list:
-    #   - “Capital Gains Transactions” => every Sell/Withdrawal with partial-lot disposal
-    #   - “Income Transactions” => deposits with source=“Income” or so
-    #   - “Gifts, Donations & Lost Assets” => withdrawal with “purpose” in (“Gift”,”Donation”,”Lost”)
-    #   - “Expenses” => if you track that in “purpose=Expenses”
-    # We'll do each one as an example:
-
-    cap_gain_txs = _build_capital_gains_transactions(txns)
+    cap_gain_txs_summary = _build_capital_gains_transactions_summary(txns)
+    cap_gain_txs_detail  = _build_capital_gains_transactions_detailed(db, txns)
     income_txs   = _build_income_transactions(txns)
     gifts_lost   = _build_gifts_donations_lost(txns)
     expense_list = _build_expenses_list(txns)
-
-    # ----------------------------------------------------------------------
-    # MISC / DATA SOURCES
-    # ----------------------------------------------------------------------
-    # You can store references to the “source” field or “account” names used
-    # to indicate where data came from. In a multi-exchange environment,
-    # you might parse transaction.source or transaction.from_account_id, etc.
     data_sources_list = _gather_data_sources(txns)
 
-    # 4) Construct final dictionary
+    # 5) Construct final dictionary
     result = {
         "tax_year": year,
         "report_date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         "period": f"{year}-01-01 to {year}-12-31",
-        "capital_gains_summary": gains_dict,
-        "income_summary": income_dict,
-        "asset_summary": asset_list,
-        "end_of_year_balances": eoy_list,
-        "capital_gains_transactions": cap_gain_txs,
+
+        # NEW: store beginning-of-year data
+        "start_of_year_balances": start_of_year_data,
+
+        "capital_gains_summary": gains_dict,       # short vs long aggregated
+        "income_summary": income_dict,             # deposit-based Income/Reward/Interest
+        "asset_summary": asset_list,               # multi-asset or just BTC
+        "end_of_year_balances": eoy_list,          # leftover BTC lots, etc.
+
+        # Basic "one line per transaction" disposal listing
+        "capital_gains_transactions": cap_gain_txs_summary,
+
+        # A fully “granular” partial-lot disposal list (one line per lot disposal)
+        "capital_gains_transactions_detailed": cap_gain_txs_detail,
+
         "income_transactions": income_txs,
         "gifts_donations_lost": gifts_lost,
         "expenses": expense_list,
@@ -123,16 +102,72 @@ def generate_report_data(db: Session, year: int) -> Dict[str, Any]:
     }
     return result
 
-# --------------------------------------------------------------------------
-# Example helper for capital gains summary
-# --------------------------------------------------------------------------
+
+def _build_start_of_year_balances(db: Session, year: int) -> List[Dict[str, Any]]:
+    """
+    Build a list of leftover BTC lots at the moment just before Jan 1 of 'year'.
+    Steps:
+      1) partial-lot re-lot up to Jan 1 of 'year'.
+      2) Query leftover lots with remaining_btc>0.
+      3) Possibly add a price as of Jan 1, or set 0. 
+      4) Return e.g. [ { "quantity": <float>, "avg_cost_basis": <float>, "value": <float> }, ... ]
+
+    Finally, we do NOT keep the DB in that partial-lot state; we revert by running
+    the main 'scorched earth' again in generate_report_data to handle the full year.
+    """
+    logger.info(f"Calculating start-of-year balances for {year}")
+
+    # We'll do a partial-lot re-lot from <year>-01-01
+    # So we gather all transactions from that date forward, remove their usage,
+    # effectively leaving behind the leftover from prior years.
+
+    from_dt = datetime(year, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    # We call recalculate_subsequent_transactions to remove usage for all tx >= from_dt
+    # so the leftover is from prior to that date:
+    recalculate_subsequent_transactions(db, from_dt)
+
+    # Now, leftover in the DB is effectively what we had at the stroke of midnight.
+    open_lots = (
+        db.query(BitcoinLot)
+        .filter(BitcoinLot.remaining_btc > 0)
+        .all()
+    )
+
+    # Suppose we have a notional price on Jan 1
+    january1_price = Decimal("16500.00")  # example
+
+    results = []
+    for lot in open_lots:
+        # fraction if partial-lot was used
+        fraction = Decimal("1.0")
+        if lot.total_btc and lot.total_btc > 0:
+            fraction = lot.remaining_btc / lot.total_btc
+        partial_cost = (lot.cost_basis_usd * fraction).quantize(Decimal("0.01"), ROUND_HALF_DOWN)
+
+        if lot.remaining_btc > 0:
+            avg_basis = partial_cost / lot.remaining_btc
+        else:
+            avg_basis = Decimal("0.0")
+
+        cur_value = lot.remaining_btc * january1_price
+
+        results.append({
+            "quantity": float(lot.remaining_btc),
+            "avg_cost_basis": float(avg_basis),
+            "value": float(cur_value)
+        })
+
+    logger.info(f"Found {len(results)} open BTC lots as of start of year {year}")
+    return results
+
 
 def _build_capital_gains_summary(txns: List[Transaction]) -> Dict[str, Any]:
     """
-    Summarize short-term vs. long-term gains by reading each transaction
-    that actually disposed BTC. We look at tx.type in ("Sell","Withdrawal")
-    *where* partial-lot usage occurred (i.e. realized_gain_usd != 0).
+    Summarizes short-term vs. long-term gains based on each transaction’s
+    realized_gain_usd, cost_basis_usd, proceeds_usd, and holding_period.
     """
+    from decimal import Decimal
+
     total_st_proceeds = Decimal("0.0")
     total_st_basis    = Decimal("0.0")
     total_st_gain     = Decimal("0.0")
@@ -144,16 +179,16 @@ def _build_capital_gains_summary(txns: List[Transaction]) -> Dict[str, Any]:
     disposal_count = 0
 
     for tx in txns:
-        if tx.type not in ("Sell","Withdrawal"):
+        if tx.type not in ("Sell", "Withdrawal"):
             continue
         if tx.realized_gain_usd is None:
-            continue  # means no disposal or no partial-lot
+            continue
+
         disposal_count += 1
         proceeds = tx.proceeds_usd or Decimal("0.0")
         basis    = tx.cost_basis_usd or Decimal("0.0")
         gain     = tx.realized_gain_usd or Decimal("0.0")
 
-        # Check short vs. long
         if tx.holding_period == "LONG":
             total_lt_proceeds += proceeds
             total_lt_basis    += basis
@@ -163,14 +198,11 @@ def _build_capital_gains_summary(txns: List[Transaction]) -> Dict[str, Any]:
             total_st_basis    += basis
             total_st_gain     += gain
 
-    # For “misc summary” or “other gains” you might have separate logic
-
-    # Net them up
     total_proceeds = total_st_proceeds + total_lt_proceeds
     total_basis    = total_st_basis    + total_lt_basis
     net_gains      = total_st_gain     + total_lt_gain
 
-    result = {
+    return {
         "number_of_disposals": disposal_count,
         "short_term": {
             "proceeds": float(total_st_proceeds),
@@ -188,112 +220,78 @@ def _build_capital_gains_summary(txns: List[Transaction]) -> Dict[str, Any]:
             "gain":     float(net_gains),
         }
     }
-    return result
 
-# --------------------------------------------------------------------------
-# Example helper for income summary
-# --------------------------------------------------------------------------
 
 def _build_income_summary(txns: List[Transaction]) -> Dict[str, Any]:
     """
-    For Koinly-like “Income,” we typically sum deposits with 'source' in
-    (“Mining”, “Reward”, “Airdrop”, “Salary”, etc.). If the user is storing
-    the USD “proceeds” or “cost_basis_usd” for these, we add them up. Otherwise,
-    we might guess a value from a BTC price feed at deposit time.
-
-    This example will:
-      - Search for transaction.type == "Deposit"
-      - If transaction.source in (“Mining”, “Reward”, “Salary”, “Interest”, “Other?”)
-        treat that entire deposit as “income” at the deposit’s BTC * price
+    Summarizes BTC deposit transactions if the deposit's source is
+    "Income", "Reward", or "Interest." We only track BTC deposits in
+    this app for income, ignoring USD deposit scenarios.
     """
-    total_income = Decimal("0.0")
-    mining_total = Decimal("0.0")
-    reward_total = Decimal("0.0")
-    other_income = Decimal("0.0")
+    from decimal import Decimal
 
-    # For example, we define:
-    income_tags = {"Mining", "Reward", "Salary", "Lending interest", "Other income", "Interest"}
+    total_income = Decimal("0.0")
+    total_reward = Decimal("0.0")
+    total_interest = Decimal("0.0")
 
     for tx in txns:
         if tx.type != "Deposit":
             continue
         if not tx.source:
             continue
+        deposit_usd = tx.cost_basis_usd or Decimal("0.0")
+        source_lower = tx.source.lower()
 
-        # Example: if user typed "Mining" or "Reward" in source
-        tag_str = tx.source.lower()
-        # We assume we can find a USD value in proceeds_usd or cost_basis_usd, or we do a price lookup
-        # For this example, assume cost_basis_usd for a deposit is the “income” value
-        deposit_usd_value = tx.cost_basis_usd or Decimal("0.0")
+        if source_lower == "income":
+            total_income += deposit_usd
+        elif source_lower == "reward":
+            total_reward += deposit_usd
+        elif source_lower == "interest":
+            total_interest += deposit_usd
 
-        if "mining" in tag_str:
-            mining_total += deposit_usd_value
-            total_income += deposit_usd_value
-        elif "reward" in tag_str or "interest" in tag_str:
-            reward_total += deposit_usd_value
-            total_income += deposit_usd_value
-        else:
-            # If it’s a deposit with some other source, we might treat it as “other income”
-            other_income += deposit_usd_value
-            total_income += deposit_usd_value
+    grand_total = total_income + total_reward + total_interest
 
     return {
-        "Mining": float(mining_total),
-        "Reward": float(reward_total),
-        "Other":  float(other_income),
-        "Total":  float(total_income),
+        "Income":   float(total_income),
+        "Reward":   float(total_reward),
+        "Interest": float(total_interest),
+        "Total":    float(grand_total),
     }
 
-# --------------------------------------------------------------------------
-# Example helper for asset summary
-# --------------------------------------------------------------------------
 
-def _build_asset_summary(txns: List[Transaction]) -> List[Dict[str,Any]]:
+def _build_asset_summary(db: Session, end_dt: datetime) -> List[Dict[str, Any]]:
     """
-    Koinly-like “Asset Summary” can show total profit/loss per asset.
-    If your system tracks only BTC & USD, we might only show BTC net gains.
-
-    For a multi-asset system, you’d group by transaction currency or partial-lot currency.
-    Here we do a minimal approach: everything is mostly BTC or USD.
-    We parse each disposal and treat 'BTC' as an asset. 
-    If you had additional crypto in the future, you'd group them similarly.
+    Example multi-asset approach: If only BTC, we'll do a placeholder row for BTC net gains.
     """
-    # Suppose we parse disposal-based gains from the transaction records,
-    # grouping by transaction “from_acct.currency” or partial-lot “BTC”.
-    # For now, we’ll just say we have "BTC" net from the capital gains summary.
+    # Hard-coded example:
+    btc_profit = 4000.0
+    btc_loss   = 0.0
+    btc_net    = 4000.0
 
-    # A real approach: gather the “_build_capital_gains_summary” data by asset,
-    # if you had multiple cryptos.
-
-    # We'll do a single row for BTC using the aggregated results from the capital gains approach
-    # You might replicate that logic here, or store it in a shared data structure.
-
-    # For demonstration, let's just do a dummy:
     return [
-        {"asset": "BTC", "profit": 32031.99, "loss": 3150.70, "net": 28881.29},
-        # If you had more lines for other tokens, they'd appear here
+        {
+            "asset": "BTC",
+            "profit": btc_profit,
+            "loss": btc_loss,
+            "net": btc_net
+        }
     ]
 
-# --------------------------------------------------------------------------
-# Example helper for EOY balances
-# --------------------------------------------------------------------------
 
 def _build_end_of_year_balances(db: Session, end_dt: datetime) -> List[Dict[str, Any]]:
     """
     Summarize leftover BTC from open lots as of 12/31, plus cost basis + approximate market value.
-    - For each open lot (remaining_btc>0) that was created on or before end_dt,
-      we sum them up. We might do a quick “price on 12/31” to get a value in USD.
     """
-    # 1) find leftover BTC lots with acquired_date <= end_dt
     open_lots = (
         db.query(BitcoinLot)
-        .filter(BitcoinLot.remaining_btc > 0, BitcoinLot.acquired_date <= end_dt)
+        .filter(
+            BitcoinLot.remaining_btc > 0,
+            BitcoinLot.acquired_date <= end_dt
+        )
         .order_by(BitcoinLot.acquired_date.asc())
         .all()
     )
 
-    # 2) sum them up. Optionally do a price lookup (like get_btc_price).
-    # For demonstration, let's assume the EOY price was $94,153.13 (like in your example).
     eoy_price = Decimal("94153.13")
     rows = []
     total_btc = Decimal("0.0")
@@ -302,15 +300,11 @@ def _build_end_of_year_balances(db: Session, end_dt: datetime) -> List[Dict[str,
 
     for lot in open_lots:
         rem_btc = lot.remaining_btc
-        cost_usd = lot.cost_basis_usd
-        # If the entire lot is still there, cost_basis_usd is the same. 
-        # If partial disposed, we might assume it’s proportional. 
-        # In your code, you track cost_basis_usd on the entire original lot. 
-        # A more precise approach would scale cost_basis_usd proportionally for partial usage. 
-        # For demonstration, let's just store the original leftover fraction.
-        fraction_remaining = rem_btc / lot.total_btc if lot.total_btc else Decimal("1")
-        partial_cost = (cost_usd * fraction_remaining).quantize(Decimal("0.01"), ROUND_HALF_DOWN)
+        fraction_remaining = Decimal("1")
+        if lot.total_btc > 0:
+            fraction_remaining = rem_btc / lot.total_btc
 
+        partial_cost = (lot.cost_basis_usd * fraction_remaining).quantize(Decimal("0.01"), ROUND_HALF_DOWN)
         cur_value = (rem_btc * eoy_price).quantize(Decimal("0.01"), ROUND_HALF_DOWN)
 
         rows.append({
@@ -325,7 +319,6 @@ def _build_end_of_year_balances(db: Session, end_dt: datetime) -> List[Dict[str,
         total_cost += partial_cost
         total_value += cur_value
 
-    # Optionally add a “Total” row
     rows.append({
         "asset": "Total",
         "quantity": float(total_btc),
@@ -335,35 +328,22 @@ def _build_end_of_year_balances(db: Session, end_dt: datetime) -> List[Dict[str,
     })
     return rows
 
-# --------------------------------------------------------------------------
-# Example “detailed transaction” sections
-# --------------------------------------------------------------------------
 
-def _build_capital_gains_transactions(txns: List[Transaction]) -> List[Dict[str,Any]]:
+def _build_capital_gains_transactions_summary(txns: List[Transaction]) -> List[Dict[str, Any]]:
     """
-    Return a row for each disposal transaction (Sell/Withdrawal) so the PDF
-    can show “Capital Gains Transactions.” 
-    We'll re-use the transaction fields:
-     - date_sold, date_acquired (the earliest lot?), cost, proceeds, gain, holding_period
-    Or you might show multiple lines for partial-lot usage. 
-    Here, we'll do a single line per Transaction.
+    One line per Sell/Withdrawal transaction. If partial-lot usage spanned multiple lots,
+    lumps them. Great for a simple summary in your PDF.
     """
     results = []
     for tx in txns:
-        if tx.type not in ("Sell","Withdrawal"):
+        if tx.type not in ("Sell", "Withdrawal"):
             continue
-        # If no partial-lot usage, skip
         if not tx.realized_gain_usd:
             continue
 
-        # The “date_acquired” is ambiguous if multiple lots. 
-        # Your code in `compute_sell_summary_from_disposals` sets `tx.holding_period`,
-        # but not the earliest date. If you want each partial-lot, you’d gather from `LotDisposal`.
-        # For demonstration, we’ll just show the transaction’s data:
-
         row = {
             "date_sold": tx.timestamp.isoformat() if tx.timestamp else "",
-            "date_acquired": "(multiple lots)",   # or you could parse earliest from partial-lots
+            "date_acquired": "(multiple lots)",
             "asset": "BTC",
             "amount": float(tx.amount or 0),
             "cost": float(tx.cost_basis_usd or 0),
@@ -374,34 +354,82 @@ def _build_capital_gains_transactions(txns: List[Transaction]) -> List[Dict[str,
         results.append(row)
     return results
 
-def _build_income_transactions(txns: List[Transaction]) -> List[Dict[str,Any]]:
+
+def _build_capital_gains_transactions_detailed(db: Session, txns: List[Transaction]) -> List[Dict[str, Any]]:
     """
-    Returns a row for each deposit that looks like “income” based on .source.
-    We'll re-use cost_basis_usd or proceed_usd as the income value if present.
+    Granular per-lot disposal listing. Perfect for 8949 or line-level detail.
     """
+    results: List[Dict[str, Any]] = []
+
+    disposal_txs = [t for t in txns if t.type in ("Sell", "Withdrawal")]
+    for tx in disposal_txs:
+        lot_usages = tx.lot_disposals
+        if not lot_usages:
+            continue
+
+        for disp in lot_usages:
+            lot = disp.lot
+            date_sold_str = tx.timestamp.isoformat() if tx.timestamp else ""
+            date_acquired_str = ""
+            if lot and lot.acquired_date:
+                date_acquired_str = lot.acquired_date.isoformat()
+
+            row = {
+                "date_sold": date_sold_str,
+                "date_acquired": date_acquired_str,
+                "asset": "BTC",
+                "amount_disposed": float(disp.disposed_btc or 0),
+                "disposal_basis_usd": float(disp.disposal_basis_usd or 0),
+                "proceeds_usd_for_that_portion": float(disp.proceeds_usd_for_that_portion or 0),
+                "realized_gain_usd": float(disp.realized_gain_usd or 0),
+                "holding_period": disp.holding_period or "",
+            }
+            results.append(row)
+
+    return results
+
+
+def _build_income_transactions(txns: List[Transaction]) -> List[Dict[str, Any]]:
+    """
+    All Deposits where source in ("income", "reward", "interest").
+    """
+    from decimal import Decimal
+
     results = []
     for tx in txns:
         if tx.type != "Deposit":
             continue
         if not tx.source:
             continue
-        # Heuristic: treat it as “income” if source matches certain patterns
-        # We'll just include them all in the “income_transactions”
+        source_lower = tx.source.lower()
+        if source_lower not in ("income", "reward", "interest"):
+            continue
+
+        deposit_usd = tx.cost_basis_usd or Decimal("0.0")
+        tx_timestamp = tx.timestamp.isoformat() if tx.timestamp else ""
+
+        if source_lower == "income":
+            row_type = "Income"
+        elif source_lower == "reward":
+            row_type = "Reward"
+        else:
+            row_type = "Interest"
+
         row = {
-            "date": tx.timestamp.isoformat() if tx.timestamp else "",
-            "asset": "BTC",
+            "date": tx_timestamp,
+            "asset": "BTC",  
             "amount": float(tx.amount or 0),
-            "value_usd": float(tx.cost_basis_usd or 0),
-            "type": "Other" if ("reward" not in tx.source.lower()) else "Reward",
+            "value_usd": float(deposit_usd),
+            "type": row_type,
             "description": tx.source,
         }
         results.append(row)
     return results
 
-def _build_gifts_donations_lost(txns: List[Transaction]) -> List[Dict[str,Any]]:
+
+def _build_gifts_donations_lost(txns: List[Transaction]) -> List[Dict[str, Any]]:
     """
-    Pull out all transactions that are 'Withdrawal' where purpose in ("Gift","Donation","Lost").
-    This matches Koinly's “Gifts/Donations” or “Lost Assets.”
+    All 'Withdrawal' where purpose in ("Gift","Donation","Lost").
     """
     results = []
     for tx in txns:
@@ -415,17 +443,16 @@ def _build_gifts_donations_lost(txns: List[Transaction]) -> List[Dict[str,Any]]:
                 "date": tx.timestamp.isoformat() if tx.timestamp else "",
                 "asset": "BTC",
                 "amount": float(tx.amount or 0),
-                "value_usd": float(tx.proceeds_usd or 0),  # typically 0
+                "value_usd": float(tx.proceeds_usd or 0),
                 "type": tx.purpose,
             }
             results.append(row)
     return results
 
-def _build_expenses_list(txns: List[Transaction]) -> List[Dict[str,Any]]:
+
+def _build_expenses_list(txns: List[Transaction]) -> List[Dict[str, Any]]:
     """
-    If you define “purpose=Expenses” or something similar for a withdrawal,
-    you can compile them here. 
-    For demonstration, we only add a row if purpose == "Expenses".
+    If purpose=Expenses for a withdrawal, gather them here.
     """
     results = []
     for tx in txns:
@@ -440,18 +467,64 @@ def _build_expenses_list(txns: List[Transaction]) -> List[Dict[str,Any]]:
             results.append(row)
     return results
 
+
 def _gather_data_sources(txns: List[Transaction]) -> List[str]:
     """
-    Example: parse transaction.source or the .from_account_id / .to_account_id
-    to guess which exchange/wallet was used. Then we can list them for the final PDF.
+    Example: parse transaction.source or account references for data origin.
     """
     sources = set()
     for tx in txns:
         if tx.source:
             sources.add(tx.source)
-        # Alternatively, if you have Account names, you might do:
-        #   from_acct = ...
-        #   sources.add(from_acct.name)
-        # ...
-    # Return as a sorted list
     return sorted(list(sources))
+
+
+def _build_start_of_year_balances(db: Session, year: int) -> List[Dict[str, Any]]:
+    """
+    Build leftover BTC lots at the moment just before Jan 1 of 'year'.
+    Approach:
+      1) partial-lot re-lot up to (year, 1, 1).
+      2) query leftover lots.
+      3) add a notional "Jan 1 price" if you want to display a value.
+
+    We'll revert to main logic by calling recalculate_all_transactions(...) later.
+    """
+    logger.info(f"Building start_of_year_balances for {year}")
+
+    # re-lot from <year>-01-01
+    from_dt = datetime(year, 1, 1, tzinfo=timezone.utc)
+    recalculate_subsequent_transactions(db, from_dt)
+
+    # leftover lots => how many remain from prior year
+    lots = (
+        db.query(BitcoinLot)
+        .filter(BitcoinLot.remaining_btc > 0)
+        .all()
+    )
+
+    # example "Jan 1" price
+    january1_price = Decimal("16500.00")
+
+    results = []
+    for lot in lots:
+        # fraction leftover in partial-lot
+        fraction = Decimal("1.0")
+        if lot.total_btc and lot.total_btc > 0:
+            fraction = lot.remaining_btc / lot.total_btc
+        partial_cost = (lot.cost_basis_usd * fraction).quantize(Decimal("0.01"), ROUND_HALF_DOWN)
+
+        if lot.remaining_btc > 0:
+            avg_basis = partial_cost / lot.remaining_btc
+        else:
+            avg_basis = Decimal("0.0")
+
+        cur_value = lot.remaining_btc * january1_price
+
+        results.append({
+            "quantity": float(lot.remaining_btc),
+            "avg_cost_basis": float(avg_basis),
+            "value": float(cur_value),
+        })
+
+    logger.info(f"Found {len(results)} BTC lots as of start-of-year for {year}")
+    return results

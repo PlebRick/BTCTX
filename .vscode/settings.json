@@ -11,6 +11,7 @@
         "dotenv",
         "ehthumbs",
         "fastapi",
+        "FONTSIZE",
         "htmlcov",
         "httpx",
         "itsdangerous",
