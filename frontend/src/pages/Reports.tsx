@@ -1,138 +1,167 @@
-// FILE: src/components/Reports.tsx
+// FILE: src/pages/Reports.tsx
 
 import React, { useState } from "react";
-import "../styles/reports.css"; // Import your CSS
+import "../styles/reports.css"; // Your custom CSS
 
 /**
- * If you prefer, you can move this to a config file or use environment
- * variables. For simplicity, we hardcode your FastAPI base URL here.
+ * Hardcoded base URL for your FastAPI backend.
+ * Adjust as needed or move to a config/environment variable.
  */
 const API_BASE = "http://localhost:8000";
 
-interface ReportOption {
-  title: string;
-  description: string;
-  endpoint: string;         // which backend route to call
-  needsYearInput?: boolean; // does this report require a taxYear?
-  fileExtension?: string;   // "pdf" or "csv"
-}
+/**
+ * Each report definition:
+ *  - key: internal identifier
+ *  - label: displayed to the user
+ *  - endpoint: your FastAPI route
+ *  - pdfOnly: indicates if the report can only produce PDF
+ */
+const REPORTS = [
+  {
+    key: "completeTax",
+    label: "Complete Tax Report",
+    endpoint: "/reports/complete_tax_report",
+    pdfOnly: true,
+  },
+  {
+    key: "irsReports",
+    label: "IRS Reports (Form 8949, Schedule D, etc.)",
+    endpoint: "/reports/irs_reports",
+    pdfOnly: true,
+  },
+  {
+    key: "transactionHistory",
+    label: "Transaction History",
+    endpoint: "/reports/transaction_history",
+    pdfOnly: false, // can do PDF or CSV
+  },
+];
 
 const Reports: React.FC = () => {
-  // We define your three reports.
-  // Each has an `endpoint` so we know which route to call.
-  // For "Transaction History," let's assume it's PDF by default,
-  // but if you prefer CSV, just set fileExtension="csv".
-  const reports: ReportOption[] = [
-    {
-      title: "Complete Tax Report",
-      description: "Generate a full tax summary.",
-      endpoint: "/reports/complete_tax_report",
-      needsYearInput: true,
-      fileExtension: "pdf",
-    },
-    {
-      title: "IRS Reports (Form 8949, Schedule D & 1)",
-      description: "Generate tax forms for IRS reporting.",
-      endpoint: "/reports/irs_reports",
-      needsYearInput: true,
-      fileExtension: "pdf",
-    },
-    {
-      title: "Transaction History",
-      description: "Full history of all recorded transactions.",
-      endpoint: "/reports/transaction_history",
-      needsYearInput: true,
-      fileExtension: "csv", // or "pdf" if you prefer
-    },
-  ];
+  // Track which report is selected
+  const [selectedReport, setSelectedReport] = useState<string>("completeTax");
 
-  // Local state for the user’s selected year
-  const [taxYear, setTaxYear] = useState("");
+  // Single Year Input
+  const [taxYear, setTaxYear] = useState<string>("");
 
-  // Unified handler for the three buttons
-  const handleGenerate = async (report: ReportOption) => {
-    // If this report needs a year, make sure one is entered
-    if (report.needsYearInput && !taxYear) {
-      alert("Please enter a tax year (e.g. 2024).");
+  // Format (PDF or CSV). We’ll only use it if the selected report supports CSV.
+  const [format, setFormat] = useState<string>("pdf");
+
+  /**
+   * Handler when the user clicks "Export"
+   */
+  const handleExport = async () => {
+    if (!taxYear) {
+      alert("Please enter a valid year (e.g. 2024).");
       return;
     }
 
+    const reportDef = REPORTS.find((r) => r.key === selectedReport);
+    if (!reportDef) {
+      alert("Invalid report selection.");
+      return;
+    }
+
+    // If this report is pdfOnly, ignore the user's 'format' setting and force "pdf"
+    const finalFormat = reportDef.pdfOnly ? "pdf" : format;
+
+    // Build query. For transactionHistory we do ?year=XXX&format=pdf/csv
+    // For the others, they only consume ?year=XXX, but passing &format=pdf is harmless.
+    const url = `${API_BASE}${reportDef.endpoint}?year=${taxYear}&format=${finalFormat}`;
+
     try {
-      // Build the final URL. Example: "http://localhost:8000/reports/complete_tax_report?year=2024"
-      const url = `${API_BASE}${report.endpoint}${
-        report.needsYearInput ? `?year=${taxYear}` : ""
-      }`;
-
-      const response = await fetch(url, {
-        method: "GET",
-        // If your server needs session cookies: credentials: "include",
-      });
-
+      const response = await fetch(url, { method: "GET" });
       if (!response.ok) {
         throw new Error(`Request failed with status ${response.status}`);
       }
 
-      // For both PDF and CSV, we can treat it as a Blob
+      // Blob for PDF or CSV
       const blob = await response.blob();
 
-      // Derive a filename from the report’s title + extension
-      const extension = report.fileExtension || "pdf";
-      const safeTitle = report.title.replace(/\s+/g, "");
-      const fileName = `${safeTitle}_${taxYear || "latest"}.${extension}`;
+      // Construct file name, e.g. "TransactionHistory_2024.pdf" or "...csv"
+      const safeLabel = reportDef.label.replace(/\s+/g, "");
+      const fileExt = finalFormat.toLowerCase();
+      const fileName = `${safeLabel}_${taxYear}.${fileExt}`;
 
-      // Create a temporary link to download
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
-
-      // Cleanup
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
+
     } catch (err) {
       if (err instanceof Error) {
-        console.error(`Error generating "${report.title}":`, err.message);
-        alert(`Failed to generate ${report.title}. See console for details.`);
+        console.error(`Error generating "${reportDef.label}":`, err.message);
+        alert(`Failed to generate ${reportDef.label}. See console for details.`);
       } else {
         console.error("Unknown error:", err);
       }
     }
   };
 
+  // Determine if the user should see the format dropdown or not
+  const reportDef = REPORTS.find((r) => r.key === selectedReport);
+  const showFormatDropdown = reportDef && !reportDef.pdfOnly;
+
   return (
     <div className="reports-container">
       <h2 className="reports-title">Reports</h2>
       <p className="reports-description">
-        Generate or view financial and tax reports.
+        Generate or view financial and tax reports. Select the desired report,
+        provide the year, then choose a format (where applicable) and click "Export."
       </p>
 
-      <div className="reports-section">
-        {reports.map((report, index) => (
-          <div key={index} className="report-option">
-            <div>
-              <span className="report-title">{report.title}</span>
-              <p className="report-subtitle">{report.description}</p>
-            </div>
-
-            {/* If this report needs a year, show an input */}
-            {report.needsYearInput && (
-              <input
-                type="text"
-                className="report-year-input"
-                placeholder="Enter Year (e.g. 2024)"
-                value={taxYear}
-                onChange={(e) => setTaxYear(e.target.value)}
-              />
-            )}
-
-            <button className="report-button" onClick={() => handleGenerate(report)}>
-              Generate
-            </button>
+      {/* Report Selection */}
+      <div className="report-selection">
+        {REPORTS.map((r) => (
+          <div key={r.key} className="report-radio">
+            <input
+              type="radio"
+              id={r.key}
+              name="report"
+              value={r.key}
+              checked={selectedReport === r.key}
+              onChange={() => setSelectedReport(r.key)}
+            />
+            <label htmlFor={r.key}>{r.label}</label>
           </div>
         ))}
       </div>
+
+      {/* Single Year Input */}
+      <div className="input-group">
+        <label>Tax Year:</label>
+        <input
+          type="text"
+          className="report-year-input"
+          placeholder="e.g. 2024"
+          value={taxYear}
+          onChange={(e) => setTaxYear(e.target.value)}
+        />
+      </div>
+
+      {/* Format Selector - only visible if the report supports CSV */}
+      {showFormatDropdown && (
+        <div className="input-group">
+          <label>Format:</label>
+          <select
+            value={format}
+            onChange={(e) => setFormat(e.target.value)}
+            className="report-format-select"
+          >
+            <option value="pdf">PDF</option>
+            <option value="csv">CSV</option>
+          </select>
+        </div>
+      )}
+
+      {/* Single Export Button */}
+      <button className="report-button" onClick={handleExport}>
+        Export
+      </button>
     </div>
   );
 };
