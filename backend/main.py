@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-main.py
+backend/main.py
 
 Sets up the FastAPI application for BitcoinTX, a double-entry Bitcoin portfolio tracker.
 
@@ -92,26 +92,26 @@ def startup_event():
     print("Database tables created or verified.")
 
 # ---------------------------------------------------------
-# Routers (Transaction, User, Account, Calculation, Bitcoin)
+# Routers (Transaction, User, Account, Calculation, Bitcoin, Reports, Debug)
 # ---------------------------------------------------------
-from backend.routers import transaction, user, account, calculation, bitcoin, debug
-app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
+# (Mandatory) Routers (Transaction, User, Account, Calculation, Bitcoin, Reports)
+from backend.routers import transaction, user, account, calculation, bitcoin, reports
+
+# Mandatory routers
 app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
 app.include_router(user.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
 app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"])
 app.include_router(bitcoin.router, prefix="/api", tags=["Bitcoin"])
+app.include_router(reports.reports_router, prefix="/api/reports", tags=["reports"])
 
-# ---------------------------------------------------------
-# Reports Router
-# ---------------------------------------------------------
-# If you placed the `reports_router` in backend/routers/reports.py
-# add it here:
+# (Optional) Debug Router
 try:
-    from backend.routers.reports import reports_router
-    app.include_router(reports_router, prefix="/reports", tags=["reports"])
+    from backend.routers import debug
+    app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
 except ImportError:
-    print("WARNING: Could not import 'reports_router'. Make sure 'backend/routers/reports.py' exists.")
+    print("WARNING: Could not import 'debug' router. If you need debug features, "
+          "ensure 'backend/routers/debug.py' exists.")
 
 # ---------------------------------------------------------
 # Session-Based Auth Helpers
