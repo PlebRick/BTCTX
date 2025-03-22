@@ -5,21 +5,21 @@ transaction_history.py
 
 Generates a Transaction History Report for a given year (including partial data if it's the current year).
 Exports either PDF or CSV, listing all Deposits, Withdrawals, Transfers, Buys, and Sells with relevant fields:
-    - Date
-    - Type
-    - FromAccount
-    - ToAccount
-    - Amount
-    - Fee
-    - FeeCurrency
-    - CostBasisUSD
-    - ProceedsUSD
-    - Purpose
+    - date
+    - type
+    - asset
+    - amount
+    - cost
+    - proceeds
+    - gain_loss
+    - description
 
-Industry Best Practices:
- - This report follows a double-entry accounting paradigm for Bitcoin and fiat transactions.
- - Aligns with FIFO cost basis tracking for IRS tax considerations.
- - Always verify final outputs with a qualified tax professional if using this data for official filings.
+We ensure:
+  - All valid types (Deposit, Withdrawal, Transfer, Buy, Sell)
+  - Strict date/time sort
+  - "Transfers" included
+  - Combined "Sell/Withdrawal" label for sells/withdrawals,
+    plus "Income"/"Reward"/"Interest" for deposit with matching source.
 """
 
 import datetime
@@ -58,15 +58,22 @@ def generate_transaction_history_report(
     2) Depending on 'format':
        - "pdf": calls _generate_pdf(...)
        - "csv": calls _generate_csv(...)
-    3) Returns the resulting bytes (PDF) or bytes-encoded CSV.
+    3) Returns the resulting bytes (PDF) or CSV bytes (utf-8).
 
-    :param db:        SQLAlchemy Session
-    :param year:      The year to filter by. If `year` is the current year, we limit up to today's date.
-    :param format:    "pdf" or "csv". Defaults to "pdf".
-    :return:          PDF or CSV data as bytes
+    The CSV columns are:
+       date,type,asset,amount,cost,proceeds,gain_loss,description
+
+    Some rules for 'type':
+     - If Deposit + source=Income => type=Income
+     - If Deposit + source=Interest => type=Interest
+     - If Deposit + source=Reward => type=Reward
+     - Else if Deposit => "Deposit"
+     - If Sell or Withdrawal => "Sell/Withdrawal"
+     - If Transfer => "Transfer"
+     - If Buy => "Buy"
     """
 
-    # Determine start/end times
+    # Determine date range
     start_of_year = datetime.datetime(year, 1, 1)
     now = datetime.datetime.now()
     if year == now.year:
@@ -76,8 +83,7 @@ def generate_transaction_history_report(
         # full year => up to Dec 31
         end_of_year = datetime.datetime(year, 12, 31, 23, 59, 59)
 
-    # Query relevant transactions
-    # We only include types in (Deposit, Withdrawal, Transfer, Buy, Sell).
+    # Fetch transactions of all valid types, strictly sorted by timestamp + id
     valid_types = ["Deposit", "Withdrawal", "Transfer", "Buy", "Sell"]
     txs = (
         db.query(Transaction)
@@ -90,35 +96,10 @@ def generate_transaction_history_report(
           .all()
     )
 
-    # Collect rows with all relevant columns:
-    #   Date, Type, FromAccount, ToAccount, Amount, Fee, FeeCurrency,
-    #   CostBasisUSD, ProceedsUSD, Purpose
+    # Build intermediate row data with custom logic
     results = []
     for tx in txs:
-        date_str = tx.timestamp.isoformat()
-        # Convert to a simpler YYYY-MM-DD if desired
-        # date_str = tx.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-
-        from_acct_name = _get_account_name(db, tx.from_account_id)
-        to_acct_name = _get_account_name(db, tx.to_account_id)
-
-        # Turn any None decimals into "0.0"
-        fee_amt = tx.fee_amount if tx.fee_amount else Decimal("0.0")
-        cost_basis = tx.cost_basis_usd if tx.cost_basis_usd else Decimal("0.0")
-        proceeds = tx.proceeds_usd if tx.proceeds_usd else Decimal("0.0")
-
-        row = {
-            "date": date_str,
-            "type": tx.type,
-            "from_account": from_acct_name,
-            "to_account": to_acct_name,
-            "amount": str(tx.amount or "0.0"),
-            "fee": str(fee_amt),
-            "fee_currency": tx.fee_currency or "",
-            "cost_basis_usd": str(cost_basis),
-            "proceeds_usd": str(proceeds),
-            "purpose": tx.purpose or "",
-        }
+        row = _build_csv_row(db, tx)
         results.append(row)
 
     # Dispatch to PDF or CSV
@@ -130,81 +111,204 @@ def generate_transaction_history_report(
         return pdf_bytes
 
 
-# --------------------------------------------------------------------------------
-# Internal Helpers
-# --------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Helper to map a single Transaction -> row dict
+# -----------------------------------------------------------------------------
+
+def _build_csv_row(db: Session, tx: Transaction) -> dict:
+    """
+    Replicates the logic from your front-end sample, producing columns:
+      date, type, from_account, to_account, asset, amount, cost, proceeds, gain_loss, description
+    """
+    # 1) Date/time
+    dt_str = tx.timestamp.isoformat()  # e.g. 2022-03-01T00:00:00+00:00
+
+    # 2) Type (merges some categories)
+    csv_type = _map_tx_type(tx)
+
+    # 3) Account names
+    from_acct = _get_account_name(db, tx.from_account_id)
+    to_acct = _get_account_name(db, tx.to_account_id)
+
+    # 4) Asset
+    csv_asset = "BTC"  # Adjust as needed if some transactions are USD
+
+    # 5) Amount
+    amt = tx.amount or Decimal("0")
+    amount_str = str(amt)
+
+    # 6) Cost
+    cost_str = "N/A"
+    if tx.cost_basis_usd is not None:
+        cost_str = str(tx.cost_basis_usd)
+
+    # 7) Proceeds
+    proceeds_str = "N/A"
+    if tx.proceeds_usd is not None:
+        proceeds_str = str(tx.proceeds_usd)
+
+    # 8) Gain/Loss
+    gain_str = "N/A"
+    if tx.realized_gain_usd is not None:
+        g = Decimal(tx.realized_gain_usd)
+        if g > 0:
+            gain_str = f"+{g}"
+        elif g < 0:
+            gain_str = f"{g}"  # includes the minus sign
+        else:
+            gain_str = "0.0"
+
+    # 9) Description
+    desc_str = _map_description(tx)
+
+    return {
+        "date": dt_str,
+        "type": csv_type,
+        "from_account": from_acct,
+        "to_account": to_acct,
+        "asset": csv_asset,
+        "amount": amount_str,
+        "cost": cost_str,
+        "proceeds": proceeds_str,
+        "gain_loss": gain_str,
+        "description": desc_str,
+    }
+
+
+def _map_tx_type(tx: Transaction) -> str:
+    """
+    Merges your front-end logic to produce the CSV 'type' column:
+
+    - If (Deposit && source=Income) => "Income"
+    - If (Deposit && source=Reward) => "Reward"
+    - If (Deposit && source=Interest) => "Interest"
+    - Else if Deposit => "Deposit"
+    - If Sell or Withdrawal => "Sell/Withdrawal"
+    - If Transfer => "Transfer"
+    - If Buy => "Buy"
+    """
+    t = tx.type
+    if t == "Deposit":
+        s = tx.source.lower() if tx.source else ""
+        if s == "income":
+            return "Income"
+        elif s == "reward":
+            return "Reward"
+        elif s == "interest":
+            return "Interest"
+        else:
+            return "Deposit"
+    elif t in ["Sell", "Withdrawal"]:
+        return "Sell/Withdrawal"
+    elif t == "Transfer":
+        return "Transfer"
+    elif t == "Buy":
+        return "Buy"
+    return t  # fallback
+
+
+def _map_description(tx: Transaction) -> str:
+    """
+    Your sample CSV last column is 'description'.
+    We'll fill it with front-end labels like 'CapitalGainsTransaction'
+    or 'Income' or etc. If that data isn't stored, you can combine
+    purpose or source.
+
+    For simplicity:
+    - If Sell/Withdrawal => "CapitalGainsTransaction" if realized_gain_usd != 0
+    - If Deposit => tx.source
+    - else => tx.purpose
+    """
+    if tx.type in ["Sell", "Withdrawal"]:
+        if tx.realized_gain_usd is not None and Decimal(tx.realized_gain_usd) != 0:
+            return "CapitalGainsTransaction"
+        return tx.purpose or ""
+    elif tx.type == "Deposit":
+        return tx.source or ""
+    # For Transfer/Buy or others, fallback to .purpose
+    return tx.purpose or ""
+
 
 def _get_account_name(db: Session, account_id: int) -> str:
     """
-    Retrieve the account name for a given account_id. Returns "" if not found or if ID is None/99.
+    Retrieve the account name for a given account_id.
+    Return "" if None. If account_id=99, treat as "External" (example).
+    Adjust as needed if your actual DB uses a different structure.
     """
-    if not account_id or account_id == 99:
-        return "External" if account_id == 99 else ""
+    if not account_id:
+        return ""
+    if account_id == 99:
+        return "External"
     acct = db.query(Account).filter(Account.id == account_id).first()
     return acct.name if acct else ""
 
 
+# --------------------------------------------------------------------------------
+# _generate_csv / _generate_pdf
+# --------------------------------------------------------------------------------
+
 def _generate_csv(rows: List[dict], year: int) -> str:
     """
-    Build CSV data from the list of row dicts. Return as a string.
+    Build CSV data from the row dicts.
+    Each row has columns:
+       date, type, from_account, to_account, asset, amount, cost, proceeds, gain_loss, description
     """
-    # CSV header
     headers = [
-        "Date",
-        "Type",
-        "FromAccount",
-        "ToAccount",
-        "Amount",
-        "Fee",
-        "FeeCurrency",
-        "CostBasisUSD",
-        "ProceedsUSD",
-        "Purpose",
+        "date",
+        "type",
+        "from_account",
+        "to_account",
+        "asset",
+        "amount",
+        "cost",
+        "proceeds",
+        "gain_loss",
+        "description",
     ]
     lines = [",".join(headers)]
 
-    for row in rows:
-        line = (
-            f"{row['date']},"
-            f"{row['type']},"
-            f"{row['from_account']},"
-            f"{row['to_account']},"
-            f"{row['amount']},"
-            f"{row['fee']},"
-            f"{row['fee_currency']},"
-            f"{row['cost_basis_usd']},"
-            f"{row['proceeds_usd']},"
-            f"\"{row['purpose'].replace('\"','\"\"')}\""  # handle commas or quotes in purpose
-        )
-        lines.append(line)
+    for r in rows:
+        line_elems = [
+            _escape_csv(r["date"]),
+            _escape_csv(r["type"]),
+            _escape_csv(r["from_account"]),
+            _escape_csv(r["to_account"]),
+            _escape_csv(r["asset"]),
+            _escape_csv(r["amount"]),
+            _escape_csv(r["cost"]),
+            _escape_csv(r["proceeds"]),
+            _escape_csv(r["gain_loss"]),
+            _escape_csv(r["description"]),
+        ]
+        lines.append(",".join(line_elems))
 
     csv_data = "\n".join(lines)
     logger.info(f"Generated Transaction History CSV for {year}, {len(rows)} rows.")
     return csv_data
 
 
+def _escape_csv(val: str) -> str:
+    """
+    Minimal CSV escaping: wrap in quotes if there's a comma or quote, double any quotes.
+    """
+    if not val:
+        return ""
+    need_quotes = ("," in val) or ('"' in val)
+    escaped = val.replace('"', '""')
+    if need_quotes:
+        return f"\"{escaped}\""
+    return escaped
+
+
 def _generate_pdf(rows: List[dict], year: int) -> bytes:
     """
-    Build a PDF with ReportLab from the list of row dicts.
-    Return the PDF as raw bytes in memory.
-
-    We create a simple table including:
-      - Date
-      - Type
-      - FromAccount
-      - ToAccount
-      - Amount
-      - Fee
-      - FeeCurrency
-      - CostBasisUSD
-      - ProceedsUSD
-      - Purpose
+    Build a PDF with ReportLab from the row dicts.
+    Columns: date, type, from_account, to_account, asset, amount, cost, proceeds, gain_loss, description
     """
 
     buffer = BytesIO()
     styles = getSampleStyleSheet()
 
-    # Custom styles
     heading_style = ParagraphStyle(
         name="Heading1Left",
         parent=styles["Heading1"],
@@ -231,7 +335,6 @@ def _generate_pdf(rows: List[dict], year: int) -> bytes:
     )
 
     def on_first_page(canvas: Canvas, doc_obj):
-        # Title or blank
         pass
 
     def on_later_pages(canvas: Canvas, doc_obj):
@@ -254,38 +357,48 @@ def _generate_pdf(rows: List[dict], year: int) -> bytes:
         logger.info(f"Generated empty Transaction History PDF for {year}.")
         return pdf_bytes
 
-    # Table Header
+    # Build table header
     data = [[
-        "Date",
-        "Type",
-        "From",
-        "To",
-        "Amount",
-        "Fee",
-        "FeeCur",
-        "CostBasis",
-        "Proceeds",
-        "Purpose",
+        "date",
+        "type",
+        "from_account",
+        "to_account",
+        "asset",
+        "amount",
+        "cost",
+        "proceeds",
+        "gain_loss",
+        "description",
     ]]
 
-    # Fill table rows
-    for row in rows:
+    # Add table rows
+    for r in rows:
         data.append([
-            Paragraph(row["date"], wrapped_style),
-            Paragraph(row["type"], wrapped_style),
-            Paragraph(row["from_account"], wrapped_style),
-            Paragraph(row["to_account"], wrapped_style),
-            Paragraph(row["amount"], wrapped_style),
-            Paragraph(row["fee"], wrapped_style),
-            Paragraph(row["fee_currency"], wrapped_style),
-            Paragraph(row["cost_basis_usd"], wrapped_style),
-            Paragraph(row["proceeds_usd"], wrapped_style),
-            Paragraph(row["purpose"], wrapped_style),
+            Paragraph(r["date"], wrapped_style),
+            Paragraph(r["type"], wrapped_style),
+            Paragraph(r["from_account"], wrapped_style),
+            Paragraph(r["to_account"], wrapped_style),
+            Paragraph(r["asset"], wrapped_style),
+            Paragraph(r["amount"], wrapped_style),
+            Paragraph(r["cost"], wrapped_style),
+            Paragraph(r["proceeds"], wrapped_style),
+            Paragraph(r["gain_loss"], wrapped_style),
+            Paragraph(r["description"], wrapped_style),
         ])
 
-    # Build the table with styling
-    col_widths = [1.2*inch, 0.8*inch, 1.0*inch, 1.0*inch, 0.8*inch,
-                  0.7*inch, 0.6*inch, 0.8*inch, 0.8*inch, 1.2*inch]
+    # Adjust column widths as needed
+    col_widths = [
+        1.3 * inch,  # date
+        1.0 * inch,  # type
+        1.1 * inch,  # from_account
+        1.1 * inch,  # to_account
+        0.6 * inch,  # asset
+        0.8 * inch,  # amount
+        0.8 * inch,  # cost
+        0.8 * inch,  # proceeds
+        0.9 * inch,  # gain_loss
+        1.2 * inch,  # description
+    ]
     table = Table(data, colWidths=col_widths)
     table.setStyle(TableStyle([
         ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
@@ -297,7 +410,6 @@ def _generate_pdf(rows: List[dict], year: int) -> bytes:
     story.append(table)
     story.append(Spacer(1, 0.3 * inch))
 
-    # Footer
     story.append(
         Paragraph(
             "All amounts are shown as recorded in BitcoinTX's ledger. "

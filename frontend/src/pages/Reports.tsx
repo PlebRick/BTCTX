@@ -1,167 +1,186 @@
-// FILE: src/pages/Reports.tsx
-
 import React, { useState } from "react";
-import "../styles/reports.css"; // Your custom CSS
+import { downloadPdfWithAxios } from "../api";
+import "../styles/reports.css"; // Our spinner CSS is also in here
 
-/**
- * Hardcoded base URL for your FastAPI backend.
- * Adjust as needed or move to a config/environment variable.
- */
+// Hardcoded base URL for your FastAPI server:
 const API_BASE = "http://localhost:8000";
 
-/**
- * Each report definition:
- *  - key: internal identifier
- *  - label: displayed to the user
- *  - endpoint: your FastAPI route
- *  - pdfOnly: indicates if the report can only produce PDF
- */
+// Example list of possible reports
 const REPORTS = [
   {
     key: "completeTax",
     label: "Complete Tax Report",
-    endpoint: "/reports/complete_tax_report",
+    endpoint: "/api/reports/complete_tax_report",
     pdfOnly: true,
   },
   {
     key: "irsReports",
     label: "IRS Reports (Form 8949, Schedule D, etc.)",
-    endpoint: "/reports/irs_reports",
+    endpoint: "/api/reports/irs_reports",
     pdfOnly: true,
   },
   {
     key: "transactionHistory",
     label: "Transaction History",
-    endpoint: "/reports/transaction_history",
-    pdfOnly: false, // can do PDF or CSV
+    endpoint: "/api/reports/transaction_history",
+    pdfOnly: false,
   },
 ];
 
 const Reports: React.FC = () => {
-  // Track which report is selected
+  // Default to Complete Tax (PDF)
   const [selectedReport, setSelectedReport] = useState<string>("completeTax");
-
-  // Single Year Input
   const [taxYear, setTaxYear] = useState<string>("");
-
-  // Format (PDF or CSV). We’ll only use it if the selected report supports CSV.
   const [format, setFormat] = useState<string>("pdf");
 
-  /**
-   * Handler when the user clicks "Export"
-   */
+  // Loading states for the spinner & progress
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [progress, setProgress] = useState<number>(0);
+
   const handleExport = async () => {
+    // Basic validation
     if (!taxYear) {
       alert("Please enter a valid year (e.g. 2024).");
       return;
     }
-
     const reportDef = REPORTS.find((r) => r.key === selectedReport);
     if (!reportDef) {
       alert("Invalid report selection.");
       return;
     }
 
-    // If this report is pdfOnly, ignore the user's 'format' setting and force "pdf"
-    const finalFormat = reportDef.pdfOnly ? "pdf" : format;
+    // If it's PDF-only but user selected CSV, override
+    let finalFormat = format;
+    if (reportDef.pdfOnly && format === "csv") {
+      finalFormat = "pdf";
+    }
 
-    // Build query. For transactionHistory we do ?year=XXX&format=pdf/csv
-    // For the others, they only consume ?year=XXX, but passing &format=pdf is harmless.
+    // Build final URL
     const url = `${API_BASE}${reportDef.endpoint}?year=${taxYear}&format=${finalFormat}`;
 
+    setIsLoading(true);
+    setProgress(0);
+
     try {
-      const response = await fetch(url, { method: "GET" });
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
-      }
+      // 1) Download as Blob with onProgress
+      const blob = await downloadPdfWithAxios(url, (percent) => {
+        setProgress(percent);
+      });
 
-      // Blob for PDF or CSV
-      const blob = await response.blob();
-
-      // Construct file name, e.g. "TransactionHistory_2024.pdf" or "...csv"
+      // 2) Build a filename
       const safeLabel = reportDef.label.replace(/\s+/g, "");
       const fileExt = finalFormat.toLowerCase();
       const fileName = `${safeLabel}_${taxYear}.${fileExt}`;
 
-      const blobUrl = window.URL.createObjectURL(blob);
+      // 3) Create a temporary link to force download
+      const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      URL.revokeObjectURL(blobUrl);
 
-    } catch (err) {
-      if (err instanceof Error) {
-        console.error(`Error generating "${reportDef.label}":`, err.message);
-        alert(`Failed to generate ${reportDef.label}. See console for details.`);
-      } else {
-        console.error("Unknown error:", err);
-      }
+    } catch (error) {
+      console.error("Error generating report:", error);
+      alert("Failed to generate the report. Check console for details.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Determine if the user should see the format dropdown or not
-  const reportDef = REPORTS.find((r) => r.key === selectedReport);
-  const showFormatDropdown = reportDef && !reportDef.pdfOnly;
+  // ------------------------------------------------------------
+  // We removed the user-selectable dropdown for format.
+  // Instead, we auto-set "csv" if Transaction History is chosen,
+  // otherwise "pdf".
+  // ------------------------------------------------------------
 
   return (
     <div className="reports-container">
       <h2 className="reports-title">Reports</h2>
       <p className="reports-description">
-        Generate or view financial and tax reports. Select the desired report,
-        provide the year, then choose a format (where applicable) and click "Export."
+        Generate or view financial and tax reports. ...
       </p>
 
-      {/* Report Selection */}
-      <div className="report-selection">
-        {REPORTS.map((r) => (
-          <div key={r.key} className="report-radio">
-            <input
-              type="radio"
-              id={r.key}
-              name="report"
-              value={r.key}
-              checked={selectedReport === r.key}
-              onChange={() => setSelectedReport(r.key)}
-            />
-            <label htmlFor={r.key}>{r.label}</label>
-          </div>
-        ))}
-      </div>
-
-      {/* Single Year Input */}
-      <div className="input-group">
-        <label>Tax Year:</label>
-        <input
-          type="text"
-          className="report-year-input"
-          placeholder="e.g. 2024"
-          value={taxYear}
-          onChange={(e) => setTaxYear(e.target.value)}
-        />
-      </div>
-
-      {/* Format Selector - only visible if the report supports CSV */}
-      {showFormatDropdown && (
+      <div className="reports-section">
         <div className="input-group">
-          <label>Format:</label>
-          <select
-            value={format}
-            onChange={(e) => setFormat(e.target.value)}
-            className="report-format-select"
-          >
-            <option value="pdf">PDF</option>
-            <option value="csv">CSV</option>
-          </select>
-        </div>
-      )}
+          <label>Tax Year:</label>
+          <input
+            type="text"
+            className="report-year-input"
+            placeholder="e.g. 2024"
+            value={taxYear}
+            onChange={(e) => setTaxYear(e.target.value)}
+          />
 
-      {/* Single Export Button */}
-      <button className="report-button" onClick={handleExport}>
-        Export
-      </button>
+          {/* 
+             Removed the <select> for Format. 
+             We now show a read-only field to reflect the auto-chosen format.
+          */}
+          <label>Format:</label>
+          <input
+            type="text"
+            className="report-format-input"
+            readOnly
+            value={format}
+          />
+
+          {/*
+          // Original <select> block for reference (commented out):
+          // <select
+          //   value={format}
+          //   onChange={(e) => setFormat(e.target.value)}
+          //   className="report-format-select"
+          // >
+          //   <option value="pdf">PDF</option>
+          //   <option value="csv">CSV</option>
+          // </select>
+          */}
+        </div>
+
+        {/* Radio buttons for which report */}
+        <div className="report-selection">
+          {REPORTS.map((r) => (
+            <div key={r.key} className="report-radio">
+              <input
+                type="radio"
+                id={r.key}
+                name="report"
+                value={r.key}
+                checked={selectedReport === r.key}
+                onChange={() => {
+                  setSelectedReport(r.key);
+                  // If transactionHistory => CSV, else PDF
+                  if (r.key === "transactionHistory") {
+                    setFormat("csv");
+                  } else {
+                    setFormat("pdf");
+                  }
+                }}
+              />
+              <label htmlFor={r.key}>{r.label}</label>
+            </div>
+          ))}
+        </div>
+
+        {/* Export Button */}
+        <div className="report-actions">
+          <button className="report-button" onClick={handleExport}>
+            Export
+          </button>
+        </div>
+
+        {/* Spinner + progress UI pinned to bottom-left of the card */}
+        {isLoading && (
+          <div className="downloading-overlay">
+            <span>
+              {progress > 0 ? `Downloading... ${progress}%` : "Downloading..."}
+            </span>
+            <div className="spinner" />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
