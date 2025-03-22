@@ -20,9 +20,11 @@ const REPORTS = [
     pdfOnly: true,
   },
   {
+    
+    // to "/api/reports/simple_transaction_history"
     key: "transactionHistory",
     label: "Transaction History",
-    endpoint: "/api/reports/transaction_history",
+    endpoint: "/api/reports/simple_transaction_history",
     pdfOnly: false,
   },
 ];

@@ -8,6 +8,9 @@ from backend.database import get_db
 from backend.services.reports.reporting_core import generate_report_data
 from backend.services.reports.complete_tax_report import generate_comprehensive_tax_report
 
+# NEW: Import the simpler transaction history generator
+from backend.services.reports import transaction_history
+
 reports_router = APIRouter()
 
 # ---------------------------------------------------------
@@ -59,74 +62,43 @@ def get_irs_reports(
 
 
 # ---------------------------------------------------------
-# 3) Transaction History (CSV or PDF, user-chosen)
+# 3) Simple Transaction History (CSV or PDF) - BYPASS advanced tax logic
 # ---------------------------------------------------------
-@reports_router.get("/transaction_history")
-def get_transaction_history(
+@reports_router.get("/simple_transaction_history")
+def get_simple_transaction_history(
     year: int,
     format: str = Query("csv", regex="^(csv|pdf)$"),
     user_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     """
-    Returns the full history of transactions for the given year,
-    in CSV or PDF format based on the `format` query param.
-      - `?format=csv` (default) => CSV
-      - `?format=pdf` => PDF
+    Returns a raw, comprehensive list of transactions for the given year (Deposit, Withdrawal,
+    Transfer, Buy, Sell), strictly sorted by date, WITHOUT pulling cost-basis from reporting_core
+    or calling external BTC price APIs. The result is guaranteed to include all transactions 
+    as they appear in the DB.
+
+    - `?year=YYYY` => filter by year
+    - `?format=csv` (default) => CSV
+    - `?format=pdf` => PDF
+
+    This uses transaction_history.generate_transaction_history_report(...), which fetches
+    the transactions directly from the DB and formats them (CSV/PDF) without any advanced 
+    cost-basis logic.
     """
-    report_dict = generate_report_data(db, year)
+    # Generate the report bytes from transaction_history.py
+    report_bytes = transaction_history.generate_transaction_history_report(db, year, format)
 
-    cg_txs = report_dict.get("capital_gains_transactions", [])
-    inc_txs = report_dict.get("income_transactions", [])
-
-    # -------------------------------------
-    # CASE A: CSV
-    # -------------------------------------
-    if format == "csv":
-        lines = ["date,type,asset,amount,cost,proceeds,gain_loss,description"]
-
-        for tx in cg_txs:
-            line = (
-                f"{tx.get('date_sold','')},"
-                f"Sell/Withdrawal,"
-                f"{tx.get('asset','')},"
-                f"{tx.get('amount','')},"
-                f"{tx.get('cost','')},"
-                f"{tx.get('proceeds','')},"
-                f"{tx.get('gain_loss','')},"
-                f"CapitalGainsTransaction"
-            )
-            lines.append(line)
-
-        for tx in inc_txs:
-            line = (
-                f"{tx.get('date','')},"
-                f"{tx.get('type','')},"
-                f"{tx.get('asset','')},"
-                f"{tx.get('amount','')},"
-                "N/A,"  # cost
-                "N/A,"  # proceeds
-                "N/A,"  # gain_loss
-                f"{tx.get('description','')}"
-            )
-            lines.append(line)
-
-        csv_data = "\n".join(lines)
-        return Response(
-            content=csv_data,
-            media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename=\"TransactionHistory_{year}.csv\"'}
-        )
-
-    # -------------------------------------
-    # CASE B: PDF
-    # -------------------------------------
+    # Return CSV or PDF depending on 'format'
+    if format.lower() == "csv":
+        content_type = "text/csv"
+        file_ext = "csv"
     else:
-        # If you have an actual transaction_history.py that generates a PDF, call it here.
-        # For demonstration, returning a placeholder PDF:
-        pdf_placeholder = b"(Placeholder) PDF of all transactions for the year."
-        return Response(
-            content=pdf_placeholder,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename=\"TransactionHistory_{year}.pdf\"'}
-        )
+        content_type = "application/pdf"
+        file_ext = "pdf"
+
+    file_name = f"SimpleTransactionHistory_{year}.{file_ext}"
+    return Response(
+        content=report_bytes,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'}
+    )
