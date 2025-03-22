@@ -1,154 +1,130 @@
-/* Root variables for easy color management */
 :root {
-  --bg-color: #131315;       /* Darker background to blend header */
-  --card-bg: #1c1c1e;        /* Unified background for all cards */
-  --text-color: #ffffff;     /* Main text color */
-  --highlight-color: #f2c45b; /* Gold highlight */
-  --accent-red: #ff453a;     /* For negative/down text */
-  --accent-green: #32d74b;   /* For positive/up text */
-  --fade-text: #a1a1a1;      /* Muted text */
+  --bg-color: #121212;
+  --card-bg: #1c1c1c;
+  --text-color: #ffffff;
+  --text-dim: #cfcfcf;
+  --highlight-color: #d9a75f;
+  --bitcoin-orange: #f7931a;
+  --accent-red: #ff453a;
+  --accent-green: #32d74b;
 }
 
-/* Overall dashboard container */
 .dashboard {
   background-color: var(--bg-color);
   color: var(--text-color);
-  padding: 1rem 2rem;
+  padding: 2rem;
   min-height: 100vh;
   font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
-/* Smooth transition for header fade effect */
-.header {
-  background: linear-gradient(to bottom, #000000 0%, var(--bg-color) 100%);
-  padding: 1rem 2rem;
-}
-
-/* Utility row styling for top and bottom sections */
+/* 
+  Two horizontal rows, each with 2 cards side by side.
+  The .card elements have flex:1 so they size evenly.
+*/
 .top-row,
 .bottom-row {
   display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
 }
 
 /* Cards */
 .card {
   background-color: var(--card-bg);
   padding: 1.5rem;
-  border-radius: 10px;
-  flex: 1;
+  border-radius: 12px;
+  flex: 1; /* ensures even distribution in each row */
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Headings within cards */
-/* Divider under each section header */
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Card Titles */
 .card h3 {
-  font-size: 1.2rem;
-  color: var(--text-color);
-  margin-bottom: 0.8rem;
-  border-bottom: 1px solid var(--fade-text); /* Subtle separator */
+  font-size: 1.25rem;
+  color: var(--highlight-color);
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 0.5rem;
+  font-weight: 600;
 }
 
-/* ✅ Standardize Font Styling for ALL Bottom Sections */
-.card p,
-.card ul,
-.card li {
-  margin: 0;
-  padding: 0;
-  font-size: 1rem;
-  line-height: 1.4;
-  font-weight: normal; /* Ensures all text has the same weight */
+/* Subheadings (Fees, etc.) */
+.card h4 {
+  font-size: 1.1rem;
   color: var(--text-color);
+  margin: 1rem 0 0.5rem;
+  font-weight: 500;
 }
 
-/* ✅ Ensure Lists Look the Same as Paragraphs */
-.account-balances-container ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.account-balances-container li {
-  margin-bottom: 0.4rem;
-  font-size: 1rem; /* Match paragraph text */
-  font-weight: normal; /* Ensures consistency */
-}
-
-/* ✅ Apply the Same Formatting to Realized Gains & Income */
-.realized-gains-container,
-.income-fees-container {
+/* Standard text within cards */
+.card p {
+  margin: 0 0 0.75rem;
   display: flex;
-  flex-direction: column;
-}
-
-/* ✅ Make Realized Gains & Income Match Account Balances */
-.realized-gains-container p,
-.income-fees-container p {
+  justify-content: space-between; /* label left, value right */
+  align-items: baseline;
   font-size: 1rem;
-  font-weight: normal;
-  margin-bottom: 0.4rem;
+  line-height: 1.5;
+  color: var(--text-color);
+  font-weight: 400;
 }
 
-/* Ensure Gains & Losses Use the Same Format */
-.realized-gains-container .text-block,
-.income-fees-container .text-block {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.4rem;
-  font-weight: normal; /* Ensure it's not bolder than Account Balances */
+.card p strong {
+  font-weight: 600;
+  color: var(--text-dim);
 }
 
-/* Special styling for gains/losses */
+/* Horizontal divider lines */
+.card hr {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0.75rem 0;
+}
+
+/* Gains/loss text colors */
 .text-gain {
   color: var(--accent-green);
 }
-
 .text-loss {
   color: var(--accent-red);
 }
 
-/* Portfolio Overview */
-.portfolio-overview h3 {
-  font-size: 1.2rem;
-  color: var(--highlight-color);
-  margin-bottom: 0.75rem;
-}
-
-/* Spacing for placeholders or chart areas */
-.portfolio-chart-placeholder,
-.btc-price-chart-placeholder {
-  background-color: #3a3a3c;
-  margin-top: 1rem;
-  border-radius: 6px;
-  flex: 1;
+/* Current Bitcoin Price card */
+.btc-price-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #ccc;
-  font-size: 0.95rem;
-  height: 200px; /* adjust as needed */
+  gap: 0.5rem;
+  margin-bottom: 1rem;
 }
 
-/* Top Row Specific: Give portfolio overview more space */
-.portfolio-overview {
-  flex: 1;
-}
-
-/* Right container for BTC price chart */
-.btc-price-container {
-  flex: 1;
+/* Large, centered price in Bitcoin Orange */
+.btc-price-large {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin-top: 4rem;
 }
 
-/* Bottom row sections (Balances, Gains, Income) */
-.account-balances-container,
-.realized-gains-container,
-.income-fees-container {
-  flex: 1;
-  padding: 1rem;
+.btc-price-value {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--bitcoin-orange);
+}
+
+/* Gift note on its own row */
+.gifts-note {
+  justify-content: flex-end; /* right align the note if you prefer */
+}
+
+/* For "Income & Fees" italic text (like BTC amounts or note) */
+.income-fees-container p em {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  font-style: italic;
 }

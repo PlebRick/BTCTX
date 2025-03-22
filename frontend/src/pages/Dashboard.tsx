@@ -1,4 +1,3 @@
-//frontend/src/pages/Dashboard.tsx
 import React, { useEffect, useState } from "react";
 import api from "../api"; // Centralized API client
 import "../styles/dashboard.css";
@@ -19,7 +18,7 @@ const Dashboard: React.FC = () => {
   const [exchangeBTCBalance, setExchangeBTCBalance] = useState<number>(0);
   const [walletBTCBalance, setWalletBTCBalance] = useState<number>(0);
   const [totalBTC, setTotalBTC] = useState<number>(0);
-  const [totalUSD, setTotalUSD] = useState<number>(0);
+  // Removed totalUSD since it’s unused
 
   // Cost basis & Gains
   const [averageBtcCostBasis, setAverageBtcCostBasis] = useState<number | null>(null);
@@ -34,7 +33,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     setIsPriceLoading(true);
     api
-      .get("/bitcoin/price") // => GET /api/bitcoin/price
+      .get("/bitcoin/price")
       .then((res) => {
         if (res.data && res.data.USD) {
           setCurrentBtcPrice(res.data.USD);
@@ -80,12 +79,12 @@ const Dashboard: React.FC = () => {
   // ------------------ 5) CALCULATE TOTALS ------------------
   useEffect(() => {
     if (!balances) return;
+
     let bank = 0;
     let exchUSD = 0;
     let exchBTC = 0;
     let wBTC = 0;
     let totalBtcTemp = 0;
-    let totalUsdTemp = 0;
 
     balances.forEach((acc) => {
       const numericBalance = parseDecimal(acc.balance);
@@ -107,11 +106,10 @@ const Dashboard: React.FC = () => {
       } else if (acc.name === "Exchange BTC" && acc.currency === "BTC") {
         exchBTC = numericBalance;
       }
-      // Tally totals
+
+      // Tally BTC total
       if (acc.currency === "BTC") {
         totalBtcTemp += numericBalance;
-      } else if (acc.currency === "USD") {
-        totalUsdTemp += numericBalance;
       }
     });
 
@@ -120,7 +118,6 @@ const Dashboard: React.FC = () => {
     setExchangeBTCBalance(exchBTC);
     setWalletBTCBalance(wBTC);
     setTotalBTC(totalBtcTemp);
-    setTotalUSD(totalUsdTemp);
   }, [balances]);
 
   // ------------------ 6) FETCH GAINS & LOSSES ------------------
@@ -155,211 +152,247 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // ------------------ 8) RENDER DASHBOARD ------------------
+  // ------------------ 8) UNREALIZED GAINS HELPER ------------------
+  const renderUnrealizedGains = () => {
+    if (isPriceLoading || currentBtcPrice === null || averageBtcCostBasis === null) {
+      return "Loading...";
+    }
+    const gains = (currentBtcPrice - averageBtcCostBasis) * totalBTC;
+    const isGain = gains >= 0;
+    const signSymbol = isGain ? "+" : "-";
+    const displayAmount = Math.abs(gains);
+    return (
+      <span className={isGain ? "text-gain" : "text-loss"}>
+        {signSymbol}
+        {formatUsd(displayAmount)}
+      </span>
+    );
+  };
+
+  // ------------------ 9) RENDER DASHBOARD ------------------
   return (
     <div className="dashboard">
-      {/* =================== Top Row =================== */}
+      {/* =================== TOP ROW: 2 CARDS =================== */}
       <div className="top-row">
-        {/* Portfolio Overview Card */}
+        {/* (1) Portfolio Overview */}
         <div className="card portfolio-overview">
           <h3>Portfolio Overview</h3>
 
-          {/* 1) BTC Balance */}
-          <p>BTC Balance: {formatBtc(totalBTC)}</p>
-
-          {/* 2) BTC Cost Basis (new line just below BTC Balance) */}
+          {/* Label on left, value on right (like Gains & Losses) */}
           <p>
-            BTC Cost Basis:{" "}
-            {averageBtcCostBasis !== null
-              ? formatUsd(averageBtcCostBasis)
-              : "Loading..."}
+            <strong>Bank (USD):</strong>
+            <span>{formatUsd(bankBalance)}</span>
+          </p>
+          <p>
+            <strong>Exchange (USD):</strong>
+            <span>{formatUsd(exchangeUSDBalance)}</span>
+          </p>
+          <p>
+            <strong>Exchange (BTC):</strong>
+            <span>{formatBtc(exchangeBTCBalance)}</span>
+          </p>
+          <p>
+            <strong>Wallet (BTC):</strong>
+            <span>{formatBtc(walletBTCBalance)}</span>
           </p>
 
-          {/* 3) USD Balance */}
-          <p>USD Balance: {formatUsd(totalUSD)}</p>
+          <hr />
 
-          {/* 4) Unrealized Gains/Losses */}
-          {isPriceLoading || currentBtcPrice === null || averageBtcCostBasis === null ? (
-            <p>Unrealized Gains/Losses: Loading...</p>
-          ) : (
-            <p>
-              Unrealized Gains/Losses:{" "}
-              {(() => {
-                const gains = (currentBtcPrice - averageBtcCostBasis) * totalBTC;
-                const isGain = gains >= 0;
-                const signSymbol = isGain ? "+" : "-";
-                const displayAmount = Math.abs(gains);
-                return (
-                  <span style={{ color: isGain ? "green" : "red" }}>
-                    {signSymbol}
-                    {formatUsd(displayAmount)}
-                  </span>
-                );
-              })()}
-            </p>
-          )}
-
-          {/* Placeholder for portfolio chart */}
-          <div className="portfolio-chart-placeholder">
-            <p>Portfolio Holdings Chart (Placeholder)</p>
-          </div>
+          <p>
+            <strong>Total BTC:</strong>
+            <span>{formatBtc(totalBTC)}</span>
+          </p>
+          <p>
+            <strong>BTC Cost Basis:</strong>
+            <span>
+              {averageBtcCostBasis !== null ? formatUsd(averageBtcCostBasis) : "Loading..."}
+            </span>
+          </p>
+          <p>
+            <strong>Unrealized Gains/Losses:</strong>
+            <span>{renderUnrealizedGains()}</span>
+          </p>
         </div>
 
-        {/* Bitcoin Price Card */}
+        {/* (2) Current Bitcoin Price */}
         <div className="card btc-price-container">
-          <h3>Bitcoin Price</h3>
-          <p>
-            Current BTC Price:{" "}
+          {/* Title row with logo on the left, heading on the right */}
+          <div className="btc-price-header">
+            <h3>Current Bitcoin Price</h3>
+          </div>
+
+          {/* The big orange price in the center */}
+          <div className="btc-price-large">
             {isPriceLoading ? (
-              "Loading..."
+              <span className="btc-price-value">Loading...</span>
             ) : currentBtcPrice !== null ? (
-              <strong>
+              <span className="btc-price-value">
                 $
                 {currentBtcPrice.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
-              </strong>
+              </span>
             ) : (
-              "Error fetching price"
+              <span className="btc-price-value">Error</span>
             )}
-          </p>
-          <div className="btc-price-chart-placeholder">
-            <p>Live BTC Price Chart (Placeholder)</p>
           </div>
         </div>
       </div>
 
-      {/* =================== Bottom Row =================== */}
+      {/* =================== BOTTOM ROW: 2 CARDS =================== */}
       <div className="bottom-row">
-        {/* Account Balances Card */}
-        <div className="card account-balances-container">
-          <h3>Account Balances</h3>
-          <ul>
-            <li>Bank (USD): {formatUsd(bankBalance)}</li>
-            <li>Exchange (USD): {formatUsd(exchangeUSDBalance)}</li>
-            <li>Exchange (BTC): {formatBtc(exchangeBTCBalance)}</li>
-            <li>Wallet (BTC): {formatBtc(walletBTCBalance)}</li>
-          </ul>
-        </div>
-
-        {/* Realized Gains/Losses Card */}
+        {/* (3) Realized Gains/Losses (FIFO) */}
         <div className="card realized-gains-container">
           <h3>Realized Gains/Losses (FIFO)</h3>
+
           <p>
-            <strong>Short‐Term Gains:</strong>{" "}
-            <span style={{ color: gainsAndLosses.short_term_gains > 0 ? "green" : "white" }}>
+            <strong>Short-Term Gains:</strong>
+            <span className={gainsAndLosses.short_term_gains > 0 ? "text-gain" : ""}>
               {formatUsd(gainsAndLosses.short_term_gains)}
             </span>
           </p>
           <p>
-            <strong>Short‐Term Losses:</strong>{" "}
-            <span style={{ color: gainsAndLosses.short_term_losses > 0 ? "red" : "white" }}>
+            <strong>Short-Term Losses:</strong>
+            <span className={gainsAndLosses.short_term_losses > 0 ? "text-loss" : ""}>
               {formatUsd(gainsAndLosses.short_term_losses)}
             </span>
           </p>
           <p>
-            <strong>Net Short‐Term:</strong>{" "}
+            <strong>Net Short-Term:</strong>
             <span
-              style={{
-                color:
-                  gainsAndLosses.short_term_net > 0
-                    ? "green"
-                    : gainsAndLosses.short_term_net < 0
-                    ? "red"
-                    : "white",
-              }}
+              className={
+                gainsAndLosses.short_term_net > 0
+                  ? "text-gain"
+                  : gainsAndLosses.short_term_net < 0
+                  ? "text-loss"
+                  : ""
+              }
             >
               {formatUsd(gainsAndLosses.short_term_net)}
             </span>
           </p>
+
           <hr />
+
           <p>
-            <strong>Long‐Term Gains:</strong>{" "}
-            <span style={{ color: gainsAndLosses.long_term_gains > 0 ? "green" : "white" }}>
+            <strong>Long-Term Gains:</strong>
+            <span className={gainsAndLosses.long_term_gains > 0 ? "text-gain" : ""}>
               {formatUsd(gainsAndLosses.long_term_gains)}
             </span>
           </p>
           <p>
-            <strong>Long‐Term Losses:</strong>{" "}
-            <span style={{ color: gainsAndLosses.long_term_losses > 0 ? "red" : "white" }}>
+            <strong>Long-Term Losses:</strong>
+            <span className={gainsAndLosses.long_term_losses > 0 ? "text-loss" : ""}>
               {formatUsd(gainsAndLosses.long_term_losses)}
             </span>
           </p>
           <p>
-            <strong>Net Long‐Term:</strong>{" "}
+            <strong>Net Long-Term:</strong>
             <span
-              style={{
-                color:
-                  gainsAndLosses.long_term_net > 0
-                    ? "green"
-                    : gainsAndLosses.long_term_net < 0
-                    ? "red"
-                    : "white",
-              }}
+              className={
+                gainsAndLosses.long_term_net > 0
+                  ? "text-gain"
+                  : gainsAndLosses.long_term_net < 0
+                  ? "text-loss"
+                  : ""
+              }
             >
               {formatUsd(gainsAndLosses.long_term_net)}
             </span>
           </p>
+
           <hr />
+
           <p>
-            <strong>Total Net Capital Gains:</strong>{" "}
+            <strong>Total Net Capital Gains:</strong>
             <span
-              style={{
-                color:
-                  gainsAndLosses.total_net_capital_gains > 0
-                    ? "green"
-                    : gainsAndLosses.total_net_capital_gains < 0
-                    ? "red"
-                    : "white",
-              }}
+              className={
+                gainsAndLosses.total_net_capital_gains > 0
+                  ? "text-gain"
+                  : gainsAndLosses.total_net_capital_gains < 0
+                  ? "text-loss"
+                  : ""
+              }
             >
               {formatUsd(gainsAndLosses.total_net_capital_gains)}
             </span>
           </p>
         </div>
 
-        {/* Income & Fees Card */}
+        {/* (4) Income & Fees */}
         <div className="card income-fees-container">
           <h3>Income & Fees</h3>
+
           <p>
-            Income (earned): {formatUsd(gainsAndLosses.income_earned)}{" "}
-            (<em>{formatBtc(gainsAndLosses.income_btc)}</em>)
-          </p>
-          <p>
-            Interest (earned): {formatUsd(gainsAndLosses.interest_earned)}{" "}
-            (<em>{formatBtc(gainsAndLosses.interest_btc)}</em>)
-          </p>
-          <p>
-            Rewards (earned): {formatUsd(gainsAndLosses.rewards_earned)}{" "}
-            (<em>{formatBtc(gainsAndLosses.rewards_btc)}</em>)
-          </p>
-          <p>
-            Gifts (received): {formatUsd(gainsAndLosses.gifts_received)}{" "}
-            (<em>{formatBtc(gainsAndLosses.gifts_btc)}</em>){" "}
-            <span style={{ fontStyle: "italic" }}>
-              (not added to income or gains)
+            <strong>Income (earned):</strong>
+            <span>
+              {formatUsd(gainsAndLosses.income_earned)} (
+              <em>{formatBtc(gainsAndLosses.income_btc)}</em>)
             </span>
           </p>
           <p>
-            Total Income (Income+Interest+Rewards):{" "}
-            {formatUsd(gainsAndLosses.total_income)}
+            <strong>Interest (earned):</strong>
+            <span>
+              {formatUsd(gainsAndLosses.interest_earned)} (
+              <em>{formatBtc(gainsAndLosses.interest_btc)}</em>)
+            </span>
           </p>
-          <br />
+          <p>
+            <strong>Rewards (earned):</strong>
+            <span>
+              {formatUsd(gainsAndLosses.rewards_earned)} (
+              <em>{formatBtc(gainsAndLosses.rewards_btc)}</em>)
+            </span>
+          </p>
+
+          {/* Gifts: label + value, then separate line for note */}
+          <p>
+            <strong>Gifts (received):</strong>
+            <span>
+              {formatUsd(gainsAndLosses.gifts_received)} (
+              <em>{formatBtc(gainsAndLosses.gifts_btc)}</em>)
+            </span>
+          </p>
+          <p className="gifts-note">
+            <em>(not added to income or gains)</em>
+          </p>
+
+          <p>
+            <strong>Total Income (I+Int+R):</strong>
+            <span>{formatUsd(gainsAndLosses.total_income)}</span>
+          </p>
+
+          <hr />
+
           <h4>Fees</h4>
-          <p>Fees (USD): {formatUsd(gainsAndLosses.fees.USD)}</p>
-          <p>Fees (BTC): {formatBtc(gainsAndLosses.fees.BTC)}</p>
+          <p>
+            <strong>Fees (USD):</strong>
+            <span>{formatUsd(gainsAndLosses.fees.USD)}</span>
+          </p>
+          <p>
+            <strong>Fees (BTC):</strong>
+            <span>{formatBtc(gainsAndLosses.fees.BTC)}</span>
+          </p>
           {isPriceLoading ? (
-            <p>Total Fees in USD: Loading...</p>
+            <p>
+              <strong>Total Fees in USD (approx):</strong>
+              <span>Loading...</span>
+            </p>
           ) : currentBtcPrice !== null ? (
             <p>
-              Total Fees in USD (approx):{" "}
-              {formatUsd(
-                gainsAndLosses.fees.USD + gainsAndLosses.fees.BTC * currentBtcPrice
-              )}
+              <strong>Total Fees in USD (approx):</strong>
+              <span>
+                {formatUsd(
+                  gainsAndLosses.fees.USD + gainsAndLosses.fees.BTC * currentBtcPrice
+                )}
+              </span>
             </p>
           ) : (
-            <p>Total Fees in USD: N/A</p>
+            <p>
+              <strong>Total Fees in USD:</strong>
+              <span>N/A</span>
+            </p>
           )}
         </div>
       </div>
