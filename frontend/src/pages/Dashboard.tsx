@@ -318,6 +318,20 @@ const Dashboard: React.FC = () => {
               {formatUsd(gainsAndLosses.total_net_capital_gains)}
             </span>
           </p>
+          <p>
+            <strong>Year to Date Gains:</strong>
+            <span
+              className={
+                gainsAndLosses.year_to_date_capital_gains > 0
+                  ? "text-gain"
+                  : gainsAndLosses.year_to_date_capital_gains < 0
+                  ? "text-loss"
+                  : ""
+              }
+            >
+              {formatUsd(gainsAndLosses.year_to_date_capital_gains)}
+            </span>
+          </p>
         </div>
 
         {/* (4) Income & Fees */}
@@ -346,7 +360,13 @@ const Dashboard: React.FC = () => {
             </span>
           </p>
 
-          {/* Gifts: label + value, then separate line for note */}
+          <hr />
+
+          <p>
+            <strong>Total Income:</strong>
+            <span>{formatUsd(gainsAndLosses.total_income)}</span>
+          </p>
+
           <p>
             <strong>Gifts (received):</strong>
             <span>
@@ -356,11 +376,6 @@ const Dashboard: React.FC = () => {
           </p>
           <p className="gifts-note">
             <em>(not added to income or gains)</em>
-          </p>
-
-          <p>
-            <strong>Total Income (I+Int+R):</strong>
-            <span>{formatUsd(gainsAndLosses.total_income)}</span>
           </p>
 
           <hr />
@@ -374,6 +389,7 @@ const Dashboard: React.FC = () => {
             <strong>Fees (BTC):</strong>
             <span>{formatBtc(gainsAndLosses.fees.BTC)}</span>
           </p>
+
           {isPriceLoading ? (
             <p>
               <strong>Total Fees in USD (approx):</strong>

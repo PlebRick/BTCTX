@@ -1,9 +1,4 @@
-/**
- * frontend/src/types/global.d.ts
- *
- * Ambient type declarations for the entire frontend.
- * Make sure this file is included in tsconfig.json ("include") so TypeScript picks it up.
- */
+/* FILE: frontend/src/types/global.d.ts */
 
 declare global {
   // --------------------------------------------------------------
@@ -57,6 +52,9 @@ declare global {
     interest_btc?: string | number;
     rewards_btc?: string | number;
     gifts_btc?: string | number;
+
+    // -- ADDED: Year to Date Gains
+    year_to_date_capital_gains?: string | number; // <-- ADDED
   }
 
   interface GainsAndLosses {
@@ -95,6 +93,9 @@ declare global {
     interest_btc: number;
     rewards_btc: number;
     gifts_btc: number;
+
+    // -- ADDED: Year to Date Gains
+    year_to_date_capital_gains: number; // <-- ADDED
   }
 
   // --------------------------------------------------------------

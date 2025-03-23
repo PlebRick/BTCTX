@@ -17,32 +17,39 @@
   font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
-/* 
-  Two horizontal rows, each with 2 cards side by side.
-  The .card elements have flex:1 so they size evenly.
-*/
+.dashboard {
+  /* Keep your existing background, text color, etc. */
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  /* Keep the same padding so there's consistent spacing from header/sidebar */
+  padding: 2rem;
+  min-height: 100vh;
+  font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Each row of cards can wrap if the screen is too narrow */
 .top-row,
 .bottom-row {
   display: flex;
+  flex-wrap: wrap;         /* allows wrapping on smaller screens */
   gap: 1.5rem;
   margin-bottom: 1.5rem;
+  justify-content: flex-start;  /* left‐justify the cards */
 }
 
-/* Cards */
+/* Cards:
+   - bigger min/max widths, so they start out larger & remain responsive. */
 .card {
+  flex: 1 1 auto;        /* grow & shrink as needed */
+  min-width: 360px;      /* bigger minimum than before */
+  max-width: 650px;      /* bigger maximum than before */
   background-color: var(--card-bg);
   padding: 1.5rem;
   border-radius: 12px;
-  flex: 1; /* ensures even distribution in each row */
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
 
 /* Card Titles */

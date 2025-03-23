@@ -169,10 +169,12 @@ export function parseGainsAndLosses(raw: GainsAndLossesRaw): GainsAndLosses {
     total_net_capital_gains: parseDecimal(raw.total_net_capital_gains),
 
     // ------------------ New BTC fields for Income/Interest/Rewards/Gifts ------------------
-    // These were just introduced in the aggregator. We parse them similarly.
     income_btc: parseDecimal(raw.income_btc),
     interest_btc: parseDecimal(raw.interest_btc),
     rewards_btc: parseDecimal(raw.rewards_btc),
     gifts_btc: parseDecimal(raw.gifts_btc),
+
+    // ------------------ New YTD Gains field ------------------
+    year_to_date_capital_gains: parseDecimal(raw.year_to_date_capital_gains),
   };
 }
