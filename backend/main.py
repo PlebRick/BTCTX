@@ -32,12 +32,14 @@ load_dotenv()
 # ---------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")  # Fallback if not set
 
-# Default CORS origins if none specified (e.g., dev environment)
+# Default CORS origins if none specified (dev environment)
 default_origins = (
     "http://127.0.0.1:3000,"
     "http://localhost:3000,"
     "http://127.0.0.1:5173,"
-    "http://localhost:5173"
+    "http://localhost:5173,"
+    "http://127.0.0.1:8000,"
+    "http://localhost:8000"
 )
 raw_origins = os.getenv("CORS_ALLOW_ORIGINS", default_origins)
 ALLOWED_ORIGINS = [origin.strip() for origin in raw_origins.split(",")]
