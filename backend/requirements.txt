@@ -34,8 +34,7 @@ python-dateutil==2.8.2
 pandas==2.0.3
 
 # For PDF form filling (e.g., official 8949 or Schedule D)
-PyPDF2==3.0.1
-
+pypdf==5.4.0  # or latest stable version
 # For programmatic PDF creation from Python
 reportlab==3.6.12
 
