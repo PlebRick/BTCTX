@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from typing import Optional, Dict, List
 from io import BytesIO
 from pypdf import PdfReader, PdfWriter
-from pypdf.generic import BooleanObject, NameObject
 
+# Database & internal imports
 from backend.database import get_db
 from backend.services.reports.reporting_core import generate_report_data
 from backend.services.reports.complete_tax_report import generate_comprehensive_tax_report
@@ -17,15 +17,11 @@ from backend.services.reports.form_8949 import (
     Form8949Row,
 )
 
-# -------------------------------------------------------------------------
-# pdftk-based filler & optional final flatten
-# -------------------------------------------------------------------------
+# Import pdftk-based utilities (remove ghostscript references)
 from backend.services.reports.pdftk_filler import fill_pdf_with_pdftk
 from backend.services.reports.pdf_utils import flatten_pdf_with_pdftk
-# -------------------------------------------------------------------------
 
 reports_router = APIRouter()
-
 
 @reports_router.get("/complete_tax_report")
 def get_complete_tax_report(
@@ -36,9 +32,7 @@ def get_complete_tax_report(
     """
     Generates a comprehensive tax report (PDF) that includes
     realized gains, income, fees, and balances.
-
-    Uses reportlab-based generation from scratch (complete_tax_report.py).
-    We leave it unchanged, as it's working well for custom PDF generation.
+    Uses ReportLab and doesn't need pdftk.
     """
     report_dict = generate_report_data(db, year)
     pdf_bytes = generate_comprehensive_tax_report(report_dict)
@@ -53,47 +47,37 @@ def get_complete_tax_report(
 @reports_router.get("/irs_reports")
 def get_irs_reports(
     year: int,
-    flatten: bool = Query(False, description="Set to True to flatten the final PDF via pdftk"),
-    user_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     """
-    Generates a combined PDF for:
-      - Form 8949 (short- and long-term pages, chunked 14 rows each)
-      - Schedule D (totals only)
-
-    Uses pdftk to fill these potentially XFA-based IRS forms. Then merges
-    partial PDFs in memory with pypdf. If ?flatten=true, optionally does
-    a final flatten pass with pdftk.
-
-    Return: Merged PDF as bytes, in 'application/pdf'.
+    Generates a combined PDF for Form 8949 and Schedule D,
+    always flattened with pdftk for XFA-based IRS forms.
     """
-    # 1) Build the row data (short & long term) plus schedule_d summary
+    # 1) Gather the data rows for Form 8949 + schedule totals
     report_data = build_form_8949_and_schedule_d(year, db)
     short_rows = [Form8949Row(**r) for r in report_data["short_term"]]
     long_rows = [Form8949Row(**r) for r in report_data["long_term"]]
 
     path_8949 = "backend/assets/irs_templates/Form_8949_Fillable_2024.pdf"
     path_sched_d = "backend/assets/irs_templates/Schedule_D_Fillable_2024.pdf"
-
     partial_pdfs: List[bytes] = []
 
-    # 2) Short-term Form 8949, 14 rows per page
+    # 2) Fill short-term chunks (Form 8949)
+    #    14 rows per page
     for i in range(0, len(short_rows), 14):
-        chunk = short_rows[i:i + 14]
+        chunk = short_rows[i : i + 14]
         field_data = map_8949_rows_to_field_data(chunk, page=1)
-        # Flattened partial PDF via pdftk
         pdf_bytes = fill_pdf_with_pdftk(path_8949, field_data, drop_xfa=True)
         partial_pdfs.append(pdf_bytes)
 
-    # 3) Long-term Form 8949, 14 rows per page
+    # 3) Fill long-term chunks (Form 8949)
     for i in range(0, len(long_rows), 14):
-        chunk = long_rows[i:i + 14]
+        chunk = long_rows[i : i + 14]
         field_data = map_8949_rows_to_field_data(chunk, page=2)
         pdf_bytes = fill_pdf_with_pdftk(path_8949, field_data, drop_xfa=True)
         partial_pdfs.append(pdf_bytes)
 
-    # 4) Schedule D totals
+    # 4) Fill Schedule D totals
     schedule_d_fields = {
         # Short-term (line 1b)
         "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]": str(report_data["schedule_d"]["short_term"]["proceeds"]),
@@ -110,21 +94,16 @@ def get_irs_reports(
     filled_sd_bytes = fill_pdf_with_pdftk(path_sched_d, schedule_d_fields, drop_xfa=True)
     partial_pdfs.append(filled_sd_bytes)
 
-    # 5) Merge all partial PDFs (already flattened) in memory with pypdf
-    final_pdf = _merge_all_pdfs(partial_pdfs)
+    # 5) Merge partial PDFs in memory with pypdf
+    merged_pdf = _merge_all_pdfs(partial_pdfs)
 
-    # 6) Optional final flatten
-    if flatten:
-        final_pdf = flatten_pdf_with_pdftk(final_pdf)
-        debug_path = "/tmp/IRSReport_flattened_test.pdf"
-        with open(debug_path, "wb") as f:
-            f.write(final_pdf)
-        print(f"[DEBUG] Flattened PDF (pdftk) written to {debug_path}")
+    # 6) ALWAYS flatten at the end with pdftk
+    final_pdf = flatten_pdf_with_pdftk(merged_pdf)
 
     return Response(
         content=final_pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="IRSReports_{year}.pdf"'}
+        headers={"Content-Disposition": f'attachment; filename=\"IRSReports_{year}.pdf\"'}
     )
 
 
@@ -137,10 +116,8 @@ def get_simple_transaction_history(
 ):
     """
     Exports a raw list of transactions (CSV or PDF).
-    Bypasses FIFO and gain/loss logic.
-
-    This route remains unchanged. 'transaction_history.py' uses
-    ReportLab for PDF or CSV output.
+    Bypasses FIFO and gain/loss logic. This uses a custom
+    ReportLab or CSV approach that doesn't need pdftk.
     """
     report_bytes = transaction_history.generate_transaction_history_report(db, year, format)
 
@@ -155,39 +132,9 @@ def get_simple_transaction_history(
     )
 
 
-# -----------------------------------------------------------------------------
-# (DEPRECATED) Old fill_pdf_form with pypdf. Not used for IRS XFA forms.
-# -----------------------------------------------------------------------------
-def fill_pdf_form(template_path: str, field_data: Dict[str, str]) -> bytes:
-    """
-    (DEPRECATED) Fills a PDF form using pypdf if it supports AcroForm fields.
-    If you have an XFA-based form, pypdf can’t fill it reliably.
-    Keeping this for any non-IRS forms or as a fallback.
-    """
-    reader = PdfReader(template_path)
-    writer = PdfWriter()
-
-    for page in reader.pages:
-        writer.add_page(page)
-
-    root_dict = reader.trailer.get("/Root", {})
-    if "/AcroForm" in root_dict:
-        acroform = root_dict["/AcroForm"]
-        writer._root_object.update({NameObject("/AcroForm"): acroform})
-        writer._root_object["/AcroForm"].update({NameObject("/NeedAppearances"): BooleanObject(True)})
-        writer.update_page_form_field_values(writer.pages[0], field_data)
-
-    output_buf = BytesIO()
-    writer.write(output_buf)
-    return output_buf.getvalue()
-
-
 def _merge_all_pdfs(pdf_list: List[bytes]) -> bytes:
     """
     Merges multiple PDFs (in-memory bytes) into a single PDF with pypdf.
-
-    Because each chunk is flattened by pdftk, we can safely merge them.
-    The final PDF is returned as bytes for immediate response to the user.
     """
     writer = PdfWriter()
     for pdf_data in pdf_list:
