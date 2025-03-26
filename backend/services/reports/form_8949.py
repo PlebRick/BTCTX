@@ -62,8 +62,8 @@ class Form8949Row:
         }
 
     @staticmethod
-    def _round(amount: Decimal) -> Decimal:
-        return amount.quantize(CURRENCY_PLACES, rounding=ROUND_HALF_UP)
+    def _round(amount) -> Decimal:
+        return Decimal(amount).quantize(CURRENCY_PLACES, rounding=ROUND_HALF_UP)
 
 
 def build_form_8949_and_schedule_d(

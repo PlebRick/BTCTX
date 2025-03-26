@@ -92,7 +92,14 @@ def fill_pdf_with_pdftk(template_path: str, field_data: dict, drop_xfa: bool = T
         # 1) Possibly remove XFA
         if drop_xfa:
             no_xfa_path = os.path.join(tmpdir, "no_xfa.pdf")
-            cmd_drop = ["pdftk", template_path, "drop_xfa", "output", no_xfa_path]
+            # IMPORTANT: place "drop_xfa" *after* "output no_xfa_path"
+            cmd_drop = [
+                "pdftk",
+                template_path,
+                "output",
+                no_xfa_path,
+                "drop_xfa"
+            ]
             subprocess.run(cmd_drop, check=True)
             final_template = no_xfa_path
 
@@ -117,9 +124,12 @@ def fill_pdf_with_pdftk(template_path: str, field_data: dict, drop_xfa: bool = T
         # 3) Fill form & flatten
         filled_path = os.path.join(tmpdir, "filled_form.pdf")
         cmd_fill = [
-            "pdftk", final_template,
-            "fill_form", fdf_path,
-            "output", filled_path,
+            "pdftk",
+            final_template,
+            "fill_form",
+            fdf_path,
+            "output",
+            filled_path,
             "flatten"
         ]
         subprocess.run(cmd_fill, check=True)
