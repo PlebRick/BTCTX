@@ -7,7 +7,9 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+# Dynamically add project root to sys.path
+ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.append(str(ROOT_DIR))
 
 from backend.database import SessionLocal
 from backend.services.transaction import create_transaction_record
