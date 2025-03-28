@@ -1,7 +1,7 @@
 """
 backend/models/transaction.py
 
-Refactored to incorporate the full double-entry design with separate models:
+Full double-entry design with separate models:
 1) Transaction (header record)
 2) LedgerEntry (individual debit/credit lines)
 3) BitcoinLot (tracking BTC acquired for FIFO)
@@ -74,7 +74,7 @@ class Transaction(Base):
     # Primary key
     id = Column(Integer, primary_key=True, index=True)
 
-    # Example transaction type: "Deposit", "Withdrawal", "Buy", "Sell", etc.
+    # Transaction type: "Deposit", "Withdrawal", "Buy", "Sell", and "Transfer"
     # If you prefer an Enum, you can adapt or store as string.
     type = Column(String, nullable=False, doc="Transaction type: e.g. 'Deposit', 'Buy', 'Sell'")
 
@@ -162,6 +162,18 @@ class Transaction(Base):
         String,
         nullable=True,
         doc="E.g. 'SHORT' or 'LONG' for partial disposal. Optional usage."
+    )
+  
+    # NEW FIELD: fmv_usd
+    fmv_usd = Column(
+        Numeric(18, 2),
+        nullable=True,
+        doc=(
+            "Fair Market Value for non-sale disposals (Gift, Donation, Lost). "
+            "If user withdrew BTC but did not receive actual proceeds, we store "
+            "an informational FMV here (e.g. $450). Meanwhile, proceeds_usd=0. "
+            "For normal sales or 'Spent', fmv_usd might remain null or 0."
+        )
     )
 
     # For deposit/withdrawal scenarios
@@ -267,7 +279,6 @@ class LedgerEntry(Base):
             f"<LedgerEntry(id={self.id}, tx={self.transaction_id}, acct={self.account_id}, "
             f"amount={self.amount}, currency={self.currency}, entry_type={self.entry_type})>"
         )
-
 
 class BitcoinLot(Base):
     """
