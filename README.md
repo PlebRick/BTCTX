@@ -5,9 +5,15 @@
 
 It tracks your BTC and USD balances using **double-entry accounting** and helps you calculate FIFO-based capital gains, cost basis, and income for IRS reporting. It includes a full-featured dashboard, a manual transaction entry form, and exportable reports like Form 8949 and Schedule D.
 
+<img width="1388" alt="image" src="https://github.com/user-attachments/assets/3adf19f4-28e1-462d-8318-ccb35f6ca576" />
+
+<img width="1490" alt="image" src="https://github.com/user-attachments/assets/597e6709-2638-433e-9a54-2e7c70d082da" />
+
+<img width="955" alt="image" src="https://github.com/user-attachments/assets/8316fa63-4af9-4f2d-af03-bb3e7cbc5633" />
+
 ---
 
-## 🧠 Project Goals
+## Project Goals
 
 - ✅ Track every Bitcoin transaction manually (no exchange sync)
 - ✅ Use **FIFO** for cost basis tracking
@@ -17,19 +23,19 @@ It tracks your BTC and USD balances using **double-entry accounting** and helps 
 
 ---
 
-## 🌐 Live Tech Stack
+## Live Tech Stack
 
-| Layer        | Tech                                  |
-| ------------ | ------------------------------------- |
-| Frontend     | React + TypeScript + Tailwind + Vite  |
-| Backend      | FastAPI + SQLAlchemy + SQLite         |
-| Dev Tools    | Conda + VSCode DevContainer + Docker  |
-| Report Tools | pandas, WeasyPrint, PyPDF2, Jinja2    |
-| Bitcoin API  | Kraken (primary), CoinGecko, CoinDesk |
+| Layer        | Tech                                      |
+| ------------ | ----------------------------------------- |
+| Frontend     | React + TypeScript + Vite                 |
+| Backend      | FastAPI + SQLAlchemy + SQLite             |
+| Dev Tools    | Conda + VSCode DevContainer + Docker      |
+| Report Tools | pandas, pdftk, WeasyPrint, PyPDF2, Jinja2 |
+| Bitcoin API  | Kraken (primary), CoinGecko, CoinDesk     |
 
 ---
 
-## ✨ Features
+## Features
 
 - 📈 **Dashboard**: BTC holdings, USD balance, realized/unrealized gains
 - 🧾 **Transaction Form**: Deposits, Withdrawals, Transfers, Buys, Sells
