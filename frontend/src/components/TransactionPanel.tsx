@@ -75,7 +75,8 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
           />
         </div>
 
-        <div className="panel-footer">
+        <div className="panel-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "1rem" }}>
+          {/* Save button on the left */}
           <button
             className="save-button"
             type="submit"
@@ -83,13 +84,31 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
             disabled={isUpdating}
           >
             {isUpdating
-              ? "Updating..."
+              ? "Saving..."
               : transactionId
               ? "Update Transaction"
               : "Save Transaction"}
           </button>
+        
+          {/* Delete button only if editing */}
+          {transactionId && (
+            <button
+              type="button"
+              className="delete-button danger"
+              onClick={() => {
+                const confirmed = window.confirm("Are you sure you want to delete this transaction?");
+                if (confirmed) {
+                  // We’ll call the form’s delete handler
+                  const deleteBtn = document.querySelector<HTMLButtonElement>("#trigger-form-delete");
+                  deleteBtn?.click();
+                }
+              }}
+              disabled={isUpdating}
+            >
+              Delete
+            </button>
+          )}
         </div>
-      </div>
 
       {showDiscardModal && (
         <div className="discard-modal">
