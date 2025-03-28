@@ -83,6 +83,7 @@ function mapTransactionToFormData(tx: ITransaction): TransactionFormData {
     // You can set defaults for everything else:
     costBasisUSD: tx.cost_basis_usd ?? 0,
     proceeds_usd: tx.proceeds_usd ?? 0,
+    fmv_usd: tx.fmv_usd ?? 0,
   };
 
   // Helper to convert account_id => "Bank", "Wallet", "Exchange", etc.
@@ -193,6 +194,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       fee: 0,
       costBasisUSD: 0,
       proceeds_usd: 0,
+      fmv_usd: 0,
     },
   });
 
@@ -212,12 +214,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   const amountBtcVal = watch("amountBTC") || 0;
   const purposeVal = watch("purpose");
   const proceedsUsdVal = watch("proceeds_usd") || 0;
-
-  useEffect(() => {
-  console.log("currencyVal:", currencyVal);
-  console.log("amountUsdVal:", amountUsdVal);
-  console.log("amountBtcVal:", amountBtcVal);
-}, [currencyVal, amountUsdVal, amountBtcVal]);
+  const fmvUsdVal = watch("fmv_usd") || 0;
 
   /**
    * Load existing transaction if we have a transactionId
@@ -342,7 +339,52 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       fee: 0,
       costBasisUSD: 0,
       proceeds_usd: 0,
+      fmv_usd: 0,
     });
+  };
+
+  /**
+   * handleRefreshFmv:
+   * Called when user clicks "Refresh" button for FMV. 
+   * We fetch from historical if date < today, else from live price.
+   */
+  const handleRefreshFmv = async () => {
+    try {
+      const formVals = getValues();
+      const isoTimestamp = localDatetimeToIso(formVals.timestamp);
+      const txDate = new Date(isoTimestamp);
+
+      // If transaction date is older than "now" => fetch historical
+      const now = new Date();
+      const isBackdated = txDate < now;
+
+      // 1) Get a BTC price from your API
+      let priceResponse;
+      if (isBackdated) {
+        const dateStr = txDate.toISOString().split("T")[0]; // e.g. "2025-03-28"
+        priceResponse = await axios.get(
+          `http://localhost:8000/api/bitcoin/price/history?date=${dateStr}`
+        );
+      } else {
+        priceResponse = await axios.get("http://localhost:8000/api/bitcoin/price");
+      }
+
+      const data = priceResponse.data;
+      const btcPrice = data?.USD ? parseDecimal(data.USD) : 0;
+      if (!btcPrice || btcPrice <= 0) {
+        throw new Error("Invalid price data from API");
+      }
+
+      // 2) Calculate FMV = (amount of BTC) * (btcPrice)
+      const amountBtc = parseDecimal(formVals.amount || 0);
+      const newFmv = amountBtc * btcPrice;
+
+      // 3) Set the form's fmv_usd to newFmv
+      setValue("fmv_usd", Number(newFmv.toFixed(2))); 
+    } catch (err) {
+      console.error("FMV refresh error:", err);
+      alert("Failed to refresh FMV. Check console for details.");
+    }
   };
 
   /**
@@ -374,6 +416,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       let purpose: string | undefined;
       let cost_basis_usd = 0;
       let proceeds_usd: number | undefined;
+      let fmv_usd: number | undefined;
 
       switch (data.type) {
         case "Deposit":
@@ -393,6 +436,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           feeCurrency = data.currency === "BTC" ? "BTC" : "USD";
           purpose = data.purpose && data.purpose !== "N/A" ? data.purpose : "N/A";
           proceeds_usd = parseDecimal(data.proceeds_usd);
+          fmv_usd = parseDecimal(data.fmv_usd);
           break;
 
         case "Transfer":
@@ -424,6 +468,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         fee_currency: feeCurrency,
         cost_basis_usd,
         proceeds_usd,
+        fmv_usd,
         source,
         purpose,
       };
@@ -632,11 +677,18 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         const account = watch("account");
         const currency = watch("currency");
         const feeLabel = currency === "BTC" ? "Fee (BTC)" : "Fee (USD)";
-
-        // Only show purpose if BTC withdrawal from Wallet/Exchange
-        const showPurpose =
+        const showPurpose = // Only show purpose if BTC withdrawal from Wallet/Exchange
           account === "Wallet" ||
           (account === "Exchange" && currency === "BTC");
+
+        // For BTC only, we show proceeds + possible FMV
+        const showBtcFields = currency === "BTC";
+
+        // We'll check if user selected Gift/Donation/Lost
+        const isSpecialPurpose =
+          purposeVal === "Gift" ||
+          purposeVal === "Donation" ||
+          purposeVal === "Lost";
 
         return (
           <>
@@ -727,24 +779,53 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               />
             </div>
 
-            {/* Proceeds if BTC */}
-            {currency === "BTC" && (
-              <div className="form-group">
-                <label>Proceeds (USD):</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  defaultValue={0}
-                  {...register("proceeds_usd", { valueAsNumber: true })}
-                />
-                {/* Optional warning if user selects Spent with proceeds=0 */}
-                {purposeVal === "Spent" && proceedsUsdVal === 0 && (
-                  <div style={{ color: "red", marginTop: "5px" }}>
-                    <strong>Warning:</strong> You selected “Spent” but “Proceeds (USD)” is 0.
+            {/* For BTC withdrawals: proceeds + FMV */}
+            {showBtcFields && (
+              <>
+                {/* Proceeds */}
+                <div className="form-group">
+                  <label>Proceeds (USD):</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    {...register("proceeds_usd", { valueAsNumber: true })}
+                    // If Gift/Donation/Lost => read-only => always 0
+                    readOnly={isSpecialPurpose}
+                  />
+                  {purposeVal === "Spent" && proceedsUsdVal === 0 && (
+                    <div style={{ color: "red", marginTop: "5px" }}>
+                      <strong>Warning:</strong> You selected “Spent” but “Proceeds (USD)” is 0.
+                    </div>
+                  )}
+                </div>
+
+                {/* FMV for Gift/Donation/Lost */}
+                {isSpecialPurpose && (
+                  <div className="form-group">
+                    <label>FMV (USD):</label>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-control"
+                        {...register("fmv_usd", { valueAsNumber: true })}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRefreshFmv}
+                        className="refresh-button"
+                        style={{ minWidth: "100px" }}
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                    <small style={{ color: "#888", display: "block", marginTop: 4 }}>
+                      Estimated fair market value at the time of gift/donation/lost.
+                    </small>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </>
         );
@@ -1018,80 +1099,69 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   };
 
   // ------------------------------------------------------------------------
-  // Actual render
-  // ------------------------------------------------------------------------
-  return (
-    <form
-      id={id || "transaction-form"}
-      className="transaction-form"
-      onSubmit={handleSubmit(onSubmit)}
-    >
-      {/* Optional spinner if isSubmitting */}
-      {isSubmitting && (
-        <div style={{ textAlign: "center", marginBottom: "20px" }}>
-          <div className="spinner"></div>
-          <p>Processing transaction...</p>
-        </div>
-      )}
+// Actual render
+// ------------------------------------------------------------------------
+return (
+  <form
+    id={id || "transaction-form"}
+    className="transaction-form"
+    onSubmit={handleSubmit(onSubmit)}
+  >
+    {/* Optional spinner if isSubmitting */}
+    {isSubmitting && (
+      <div style={{ textAlign: "center", marginBottom: "20px" }}>
+        <div className="spinner"></div>
+        <p>Processing transaction...</p>
+      </div>
+    )}
 
-      <div className="form-fields-grid">
-        {/* Transaction Type */}
-        <div className="form-group">
-          <label>Transaction Type:</label>
-          <select
-            className="form-control"
-            value={currentType}
-            onChange={onTransactionTypeChange}
-            required
-            disabled={!!transactionId} // if editing, lock the type
-          >
-            <option value="">Select Transaction Type</option>
-            <option value="Deposit">Deposit</option>
-            <option value="Withdrawal">Withdrawal</option>
-            <option value="Transfer">Transfer</option>
-            <option value="Buy">Buy</option>
-            <option value="Sell">Sell</option>
-          </select>
-        </div>
-
-        {/* Date & Time */}
-        <div className="form-group">
-          <label>Date & Time:</label>
-          <input
-            type="datetime-local"
-            className="form-control"
-            {...register("timestamp", { required: "Date & Time is required" })}
-          />
-          {errors.timestamp && (
-            <span className="error-text">{errors.timestamp.message}</span>
-          )}
-        </div>
-
-        {/* Now render all dynamic fields */}
-        {renderDynamicFields()}
+    <div className="form-fields-grid">
+      {/* Transaction Type */}
+      <div className="form-group">
+        <label>Transaction Type:</label>
+        <select
+          className="form-control"
+          value={currentType}
+          onChange={onTransactionTypeChange}
+          required
+          disabled={!!transactionId} // if editing, lock the type
+        >
+          <option value="">Select Transaction Type</option>
+          <option value="Deposit">Deposit</option>
+          <option value="Withdrawal">Withdrawal</option>
+          <option value="Transfer">Transfer</option>
+          <option value="Buy">Buy</option>
+          <option value="Sell">Sell</option>
+        </select>
       </div>
 
-      {/*
-        For new transactions: Show a "Create" or "Save" button, etc.
-        If you already have code for those, keep them.
+      {/* Date & Time */}
+      <div className="form-group">
+        <label>Date & Time:</label>
+        <input
+          type="datetime-local"
+          className="form-control"
+          {...register("timestamp", { required: "Date & Time is required" })}
+        />
+        {errors.timestamp && (
+          <span className="error-text">{errors.timestamp.message}</span>
+        )}
+      </div>
 
-        We'll show the Delete button only if transactionId is present (edit mode).
-      */}
+      {/* Dynamic transaction-type-specific fields */}
+      {renderDynamicFields()}
+    </div>
 
-      {transactionId && (
-        <div style={{ marginTop: "20px", textAlign: "right" }}>
-          <button
-            type="button"
-            className="delete-button"
-            onClick={handleDeleteClick}
-            disabled={isSubmitting}
-          >
-            Delete Transaction
-          </button>
-        </div>
-      )}
-    </form>
-  );
-};
+    {/* Hidden delete trigger for TransactionPanel */}
+    {transactionId && (
+      <button
+        id="trigger-form-delete"
+        type="button"
+        style={{ display: "none" }}
+        onClick={handleDeleteClick}
+      />
+    )}
+  </form>
+);
 
 export default TransactionForm;
