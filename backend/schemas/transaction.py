@@ -1,7 +1,7 @@
 """
 backend/schemas/transaction.py
 
-Refactored for the full double-entry approach, compatible with Pydantic v2.
+Full double-entry approach, compatible with Pydantic v2.
 We've removed ConstrainedDecimal (deprecated in Pydantic 2.0).
 Instead, we store decimal fields directly as Decimal, optionally
 adding custom validators or field constraints as needed.
@@ -22,7 +22,7 @@ FIFO acquisitions/disposals are in BitcoinLot and LotDisposal schemas.
 
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -110,6 +110,13 @@ class TransactionBase(BaseModel):
     proceeds_usd: Optional[Decimal] = Field(
         default=None,
         description="Total USD proceeds for tax reporting (e.g., Sell price)."
+
+    )
+    
+    fmv_usd: Optional[Decimal] = Field(
+        default=None,
+        description="Fair market value for non-sale disposals (Gift, Donation, Lost)."
+    
     )
     realized_gain_usd: Optional[Decimal] = Field(
         default=None,
@@ -142,7 +149,7 @@ class TransactionBase(BaseModel):
             return validate_btc_decimal(v)
         return v
 
-    @field_validator("cost_basis_usd", "proceeds_usd", "realized_gain_usd")
+    @field_validator("cost_basis_usd", "proceeds_usd", "realized_gain_usd", "fmv_usd")
     def validate_usd_fields(cls, v: Decimal | None) -> Decimal | None:
         if v is not None:
             return validate_usd_decimal(v)
