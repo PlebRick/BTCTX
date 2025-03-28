@@ -7,7 +7,7 @@ It tracks your BTC and USD balances using **double-entry accounting** and helps 
 
 ---
 
-## 🧠 Project Goals
+## Project Goals
 
 - ✅ Track every Bitcoin transaction manually (no exchange sync)
 - ✅ Use **FIFO** for cost basis tracking
@@ -17,19 +17,19 @@ It tracks your BTC and USD balances using **double-entry accounting** and helps 
 
 ---
 
-## 🌐 Live Tech Stack
+## Live Tech Stack
 
 | Layer        | Tech                                  |
 | ------------ | ------------------------------------- |
-| Frontend     | React + TypeScript + Tailwind + Vite  |
+| Frontend     | React + TypeScript + Vite  |
 | Backend      | FastAPI + SQLAlchemy + SQLite         |
 | Dev Tools    | Conda + VSCode DevContainer + Docker  |
-| Report Tools | pandas, WeasyPrint, PyPDF2, Jinja2    |
+| Report Tools | pandas, pdftk, WeasyPrint, PyPDF2, Jinja2  |
 | Bitcoin API  | Kraken (primary), CoinGecko, CoinDesk |
 
 ---
 
-## ✨ Features
+## Features
 
 - 📈 **Dashboard**: BTC holdings, USD balance, realized/unrealized gains
 - 🧾 **Transaction Form**: Deposits, Withdrawals, Transfers, Buys, Sells
