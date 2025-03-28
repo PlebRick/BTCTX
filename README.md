@@ -7,6 +7,12 @@ It tracks your BTC and USD balances using **double-entry accounting** and helps 
 
 <img width="1388" alt="image" src="https://github.com/user-attachments/assets/3adf19f4-28e1-462d-8318-ccb35f6ca576" />
 
+<img width="1490" alt="image" src="https://github.com/user-attachments/assets/597e6709-2638-433e-9a54-2e7c70d082da" />
+
+<img width="955" alt="image" src="https://github.com/user-attachments/assets/8316fa63-4af9-4f2d-af03-bb3e7cbc5633" />
+
+
+
 
 ---
 
