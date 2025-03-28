@@ -4,35 +4,43 @@ import io
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Dict, Literal, Optional
+from sqlalchemy.orm import Session
 
 from pypdf import PdfReader, PdfWriter
-from pypdf.generic import BooleanObject, NameObject
-from sqlalchemy.orm import Session
+from io import BytesIO
 
 from backend.models import LotDisposal
 from backend.models.transaction import Transaction
+from backend.services.reports.pdftk_filler import fill_pdf_with_pdftk
+from backend.services.reports.pdf_utils import flatten_pdf_with_pdftk
+from pypdf import PdfReader, PdfWriter
 
+
+##############################################################################
+# 1) FORM 8949 ROW DEFINITION
+##############################################################################
 CURRENCY_PLACES = Decimal("0.01")
-
 
 class Form8949Row:
     """
-    Represents a single row on IRS Form 8949.
-    Includes date acquired, date sold, proceeds, cost basis, gain/loss,
-    holding period, and box code (A–F).
-
-    Monetary values are stored as Decimal and rounded using HALF_UP
-    to meet IRS requirements.
+    Represents a single row on IRS Form 8949 (one line).
+    (a) Description of property
+    (b) Date acquired
+    (c) Date sold
+    (d) proceeds
+    (e) cost
+    (f) code (if any) or basis status
+    (g) adjustment
+    (h) gain/loss
     """
-
     def __init__(
         self,
-        description: str,
-        date_acquired: str,
-        date_sold: str,
-        proceeds: Decimal,
-        cost: Decimal,
-        gain_loss: Decimal,
+        description: str,           # col (a)
+        date_acquired: str,         # col (b)
+        date_sold: str,             # col (c)
+        proceeds: Decimal,          # col (d)
+        cost: Decimal,              # col (e)
+        gain_loss: Decimal,         # col (h)
         holding_period: Literal["SHORT", "LONG"],
         box: Literal["A", "B", "C", "D", "E", "F"]
     ):
@@ -44,12 +52,11 @@ class Form8949Row:
         self.gain_loss = Decimal(gain_loss)
         self.holding_period = holding_period
         self.box = box
+        # For columns (f) and (g) (code & adjustment), we might not store them if your code
+        # doesn’t require adjustments. If you do, you can expand below.
 
     def to_dict(self) -> Dict:
-        """
-        Convert the row into a dictionary, rounding numeric fields.
-        Used to map to PDF or CSV exports.
-        """
+        """Convert to a dictionary with final, rounded decimal amounts."""
         return {
             "description": self.description,
             "date_acquired": self.date_acquired,
@@ -66,94 +73,106 @@ class Form8949Row:
         return Decimal(amount).quantize(CURRENCY_PLACES, rounding=ROUND_HALF_UP)
 
 
+##############################################################################
+# 2) BUILDING 8949 DATA FROM DB
+##############################################################################
 def build_form_8949_and_schedule_d(
     year: int,
     db: Session,
     basis_reported_flags: Optional[Dict[int, bool]] = None
 ) -> Dict:
     """
-    Collects all LotDisposal records for the specified tax year (based on transaction.timestamp),
-    separates them into short- and long-term groups, and returns Form 8949 rows + Schedule D summary.
+    Gathers all LotDisposals for the given tax year, separates short vs. long,
+    and returns a dict for your get_irs_reports route:
 
-    The returned dict typically looks like:
     {
-      "short_term": [...],  # each item is a row dict
-      "long_term": [...],
+      "short_term": [...row dicts...],
+      "long_term":  [...row dicts...],
       "schedule_d": {
-        "short_term": { "proceeds": ..., "cost": ..., "gain_loss": ... },
-        "long_term":  { "proceeds": ..., "cost": ..., "gain_loss": ... }
+         "short_term": {"proceeds":..., "cost":..., "gain_loss":...},
+         "long_term":  {"proceeds":..., "cost":..., "gain_loss":...}
       }
     }
     """
     start_date = datetime(year, 1, 1, tzinfo=timezone.utc)
     end_date = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
 
-    # Query all relevant disposals for that tax year
     disposals = (
         db.query(LotDisposal)
-        .join(LotDisposal.transaction)
-        .join(LotDisposal.lot)
-        .filter(
-            Transaction.timestamp >= start_date,
-            Transaction.timestamp < end_date
-        )
-        .all()
+          .join(LotDisposal.transaction)
+          .filter(Transaction.timestamp >= start_date, Transaction.timestamp < end_date)
+          .all()
     )
 
     rows_short: List[Form8949Row] = []
     rows_long: List[Form8949Row] = []
 
     for disp in disposals:
-        if not disp.lot or not disp.lot.acquired_date:
-            raise ValueError(
-                f"LotDisposal ID={disp.id} is missing an associated BitcoinLot or acquired_date."
-            )
+        # If you do basis_reported_flags => A or C (short), D or F (long)
+        is_basis_reported = False
+        if basis_reported_flags and disp.id in basis_reported_flags:
+            is_basis_reported = basis_reported_flags[disp.id]
 
-        # 'basis_reported' determines if we use box A/C or D/F
-        is_basis_reported = basis_reported_flags.get(disp.id, False) if basis_reported_flags else False
+        # Decide box letter
         box = _determine_box(disp.holding_period, is_basis_reported)
 
-        acquired_str = disp.lot.acquired_date.date().isoformat()
-        sold_date = disp.transaction.timestamp.date().isoformat()
+        # Format date_acquired
+        if disp.lot and disp.lot.acquired_date:
+            acquired_str = disp.lot.acquired_date.strftime("%m/%d/%Y")
+        else:
+            acquired_str = ""
 
+        # date_sold
+        sold_str = ""
+        if disp.transaction and disp.transaction.timestamp:
+            sold_str = disp.transaction.timestamp.strftime("%m/%d/%Y")
+
+        # parse amounts
         proceeds_dec = Decimal(disp.proceeds_usd_for_that_portion or 0)
         cost_dec = Decimal(disp.disposal_basis_usd or 0)
         gain_dec = Decimal(disp.realized_gain_usd or 0)
+        hp_str = (disp.holding_period or "SHORT").upper()
 
         row = Form8949Row(
-            description=f"{disp.disposed_btc} BTC (acquired {acquired_str})",
+            description=f"{disp.disposed_btc} BTC",
             date_acquired=acquired_str,
-            date_sold=sold_date,
+            date_sold=sold_str,
             proceeds=proceeds_dec,
             cost=cost_dec,
             gain_loss=gain_dec,
-            holding_period=disp.holding_period,
+            holding_period=hp_str,
             box=box
         )
 
-        # Split into short-term vs long-term
-        if (disp.holding_period or "").upper() == "SHORT":
-            rows_short.append(row)
-        else:
+        if hp_str == "LONG":
             rows_long.append(row)
+        else:
+            rows_short.append(row)
 
-    # Build aggregated totals for Schedule D
+    # Summaries for schedule D lines
     schedule_d = _build_schedule_d_data(rows_short, rows_long)
 
     return {
         "short_term": [r.to_dict() for r in rows_short],
-        "long_term": [r.to_dict() for r in rows_long],
+        "long_term":  [r.to_dict() for r in rows_long],
         "schedule_d": schedule_d
     }
 
 
-def _build_schedule_d_data(
-    short_rows: List[Form8949Row],
-    long_rows: List[Form8949Row]
-) -> Dict[str, Dict[str, Decimal]]:
+def _determine_box(holding_period: str, basis_reported: bool) -> Literal["A", "B", "C", "D", "E", "F"]:
     """
-    Computes Schedule D totals for short- and long-term dispositions.
-    Summarizes proceeds, cost, and gain/loss.
+    short => A (if basis reported) or C (if not)
+    long => D (if basis reported) or F (if not)
+    """
+    hp = holding_period.upper()
+    if hp == "LONG":
+        return "D" if basis_reported else "F"
+    return "A" if basis_reported else "C"
+
+
+def _build_schedule_d_data(short_rows: List[Form8949Row], long_rows: List[Form8949Row]) -> Dict[str, Dict[str, Decimal]]:
+    """
+    Summarize short vs. long for schedule D lines 1b & 8b.
     """
     st_proceeds = sum(r.proceeds for r in short_rows)
     st_cost = sum(r.cost for r in short_rows)
@@ -163,7 +182,6 @@ def _build_schedule_d_data(
     lt_cost = sum(r.cost for r in long_rows)
     lt_gain = sum(r.gain_loss for r in long_rows)
 
-    # Round using the same method as Form8949Row
     return {
         "short_term": {
             "proceeds": Form8949Row._round(st_proceeds),
@@ -178,137 +196,121 @@ def _build_schedule_d_data(
     }
 
 
-def _determine_box(holding_period: str, basis_reported: bool) -> Literal["A", "B", "C", "D", "E", "F"]:
-    """
-    Decides which box on Form 8949 to use:
-      SHORT => A (basis reported) or C (not reported)
-      LONG  => D (basis reported) or F (not reported)
-    """
-    hp = (holding_period or "").upper()
-    if hp == "SHORT":
-        return "A" if basis_reported else "C"
-    else:
-        return "D" if basis_reported else "F"
-
-
-# -----------------------------------------------------------------------------
-# (DEPRECATED) pypdf-based fill method for strictly AcroForm PDFs
-# -----------------------------------------------------------------------------
-def fill_pdf_form(template_path: str, field_data: Dict[str, str]) -> bytes:
-    """
-    (DEPRECATED) Fills an AcroForm PDF using pypdf. 
-    This won't handle XFA forms (typical IRS forms). 
-    Retaining for potential fallback if we ever see a pure AcroForm.
-    """
-    reader = PdfReader(template_path)
-    writer = PdfWriter()
-
-    # Copy all pages to the new writer
-    for page in reader.pages:
-        writer.add_page(page)
-
-    # If there's an AcroForm, set NeedAppearances and fill page 0
-    root_obj = reader.trailer.get("/Root", {})
-    if "/AcroForm" in root_obj:
-        acroform = root_obj["/AcroForm"]
-        writer._root_object.update({NameObject("/AcroForm"): acroform})
-        writer._root_object["/AcroForm"].update({
-            NameObject("/NeedAppearances"): BooleanObject(True)
-        })
-        # Fill fields on page 0
-        writer.update_page_form_field_values(writer.pages[0], field_data)
-
-    output_buf = io.BytesIO()
-    writer.write(output_buf)
-    return output_buf.getvalue()
-
-
+##############################################################################
+# 3) FIELD-MAPPING HELPERS
+##############################################################################
 def map_8949_rows_to_field_data(rows: List[Form8949Row], page: int = 1) -> Dict[str, str]:
     """
-    Creates a dictionary of {pdfFieldName: value} for up to 14 Form8949Row 
-    objects on a single 8949 page. If more than 14 rows, you'll need additional pages.
-
-    Usage:
-      1) For short-term rows (<=14), call map_8949_rows_to_field_data(rows, page=1).
-      2) For next 14, page=2 => "f2_..." field names, etc.
-      3) Fill the PDF with fill_pdf_with_pdftk(...) or fill_pdf_form(...).
+    Fills up to 14 lines on a single Form 8949 page, matching official field naming
+    like:
+      Row1 => f1_3..f1_10,
+      Row2 => f1_11..f1_18, etc.
+    If page=2 => you might use "f2_3..f2_10" etc.
     """
     if len(rows) > 14:
-        raise ValueError("Cannot fit more than 14 rows on one Form 8949 page")
+        raise ValueError("Cannot fit more than 14 rows on one page")
 
-    page_prefix = f"Page{page}[0]"  # e.g., "Page1[0]" or "Page2[0]"
-    field_prefix = f"f{page}_"      # e.g., "f1_" or "f2_"
-    field_data = {}
+    # if your PDF uses Page1 => f1_..., Page2 => f2_...
+    # let's build that prefix:
+    # e.g. page=1 => "f1_", page=2 => "f2_"
+    prefix_num = 1 if page == 1 else 2
+    prefix = f"f{prefix_num}_"
 
-    # The standard columns A–H, skipping columns F and G
-    columns = [
-        "description",      # Column A
-        "date_acquired",    # Column B
-        "date_sold",        # Column C
-        "proceeds",         # Column D
-        "cost",             # Column E
-        "",                 # Column F (unused)
-        "",                 # Column G (unused)
-        "gain_loss"         # Column H
-    ]
+    # Also, the PDF structure might require something like:
+    # "topmostSubform[0].Page1[0].Table_Line1[0].Row1[0].f1_3[0]"
+    # We'll combine them in a final string below.
 
-    for i, row in enumerate(rows, start=1):
-        row_dict = row.to_dict()
-        row_subform = f"Row{i}[0]"
+    # For row i => the base field index is (3 + (i-1)*8).
+    # col (a) => offset 0 => f1_(base_index + 0)
+    # col (b) => offset 1
+    # ...
+    # col (h) => offset 7
+    # So the "field number" = base_index + offset.
+    #
+    # Then we append "[0]" at the end.
+
+    field_data: Dict[str, str] = {}
+
+    for i, row_obj in enumerate(rows, start=1):
+        # row1 => base=3, row2 => base=11, row3 => base=19, etc.
         base_index = 3 + (i - 1) * 8
 
-        for col_idx, key in enumerate(columns):
-            if key:
-                field_num = base_index + col_idx
-                pdf_field = (
-                    f"topmostSubform[0].{page_prefix}.Table_Line1[0].{row_subform}."
-                    f"{field_prefix}{field_num}[0]"
-                )
-                field_data[pdf_field] = str(row_dict[key])
+        # We'll handle columns (a)–(h). If you want columns (f) & (g) for code/adj,
+        # you'd expand the logic. For now let's do:
+        #   col (a)=description => offset=0
+        #   col (b)=date_acq => offset=1
+        #   col (c)=date_sold => offset=2
+        #   col (d)=proceeds => offset=3
+        #   col (e)=cost => offset=4
+        #   col (f)=??? -> skip or store row_obj.box
+        #   col (g)=??? -> skip if no adjustments
+        #   col (h)=gain_loss => offset=7
 
-        # Optional debug print
-        print(f"[DEBUG] 8949 Page={page}, Row={i} => fields:")
-        for k, v in field_data.items():
-            print(f"  {k} = {v}")
+        # field => topmostSubform[0].Page{prefix_num}[0].Table_Line1[0].Row{i}[0].f1_{field_num}[0]
+        # let's define a helper function
+        def field_name(row_i: int, field_no: int) -> str:
+            return (
+                f"topmostSubform[0].Page{prefix_num}[0].Table_Line1[0].Row{row_i}[0].{prefix}{field_no}[0]"
+            )
+
+        # col (a) => offset=0 => field # = base_index+0
+        col_a = field_name(i, base_index + 0)
+        field_data[col_a] = row_obj.description
+
+        # col (b) => offset=1 => date_acquired
+        col_b = field_name(i, base_index + 1)
+        field_data[col_b] = row_obj.date_acquired
+
+        # col (c) => offset=2 => date_sold
+        col_c = field_name(i, base_index + 2)
+        field_data[col_c] = row_obj.date_sold
+
+        # col (d) => offset=3 => proceeds
+        col_d = field_name(i, base_index + 3)
+        field_data[col_d] = str(row_obj.proceeds)
+
+        # col (e) => offset=4 => cost
+        col_e = field_name(i, base_index + 4)
+        field_data[col_e] = str(row_obj.cost)
+
+        # col (f) => offset=5 => code => you might store row_obj.box here if you want
+        # or if your PDF does it differently, skip. We'll store box for demonstration:
+        col_f = field_name(i, base_index + 5)
+        field_data[col_f] = row_obj.box  # e.g. "A/C" or "D/F"
+
+        # col (g) => offset=6 => adjustment => skip if you don't have it
+        col_g = field_name(i, base_index + 6)
+        field_data[col_g] = ""  # or row_obj.adjustment if you track it
+
+        # col (h) => offset=7 => gain_loss
+        col_h = field_name(i, base_index + 7)
+        field_data[col_h] = str(row_obj.gain_loss)
 
     return field_data
 
 
 def map_schedule_d_fields(schedule_d: Dict[str, Dict[str, Decimal]]) -> Dict[str, str]:
     """
-    Maps short-term (line 1b) and long-term (line 8b) totals onto the 
-    known Schedule D fields:
-      - Row1b => f1_07[0], f1_08[0], f1_09[0], f1_10[0]
-      - Row8b => f1_27[0], f1_28[0], f1_29[0], f1_30[0]
+    Adapts short_term (line 1b) & long_term (line 8b) totals from 'schedule_d'
+    to your fillable PDF field naming:
 
-    If you have codes in the 'Adjustment' column, place them in f1_09[0] or f1_29[0].
+      topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0] => short proceeds
+      ...
+      topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0] => long proceeds
     """
-    short_proceeds = schedule_d["short_term"]["proceeds"]
-    short_cost = schedule_d["short_term"]["cost"]
-    short_gain = schedule_d["short_term"]["gain_loss"]
-
-    long_proceeds = schedule_d["long_term"]["proceeds"]
-    long_cost = schedule_d["long_term"]["cost"]
-    long_gain = schedule_d["long_term"]["gain_loss"]
+    short_data = schedule_d["short_term"]
+    long_data  = schedule_d["long_term"]
 
     return {
-        # Short-term: line 1b
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]": str(short_proceeds),
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_08[0]": str(short_cost),
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_09[0]": "",
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]": str(short_gain),
+        # short => line 1b fields
+        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]": str(short_data["proceeds"]),
+        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_08[0]": str(short_data["cost"]),
+        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_09[0]": "",  # adjustments
+        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]": str(short_data["gain_loss"]),
 
-        # Long-term: line 8b
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]": str(long_proceeds),
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]": str(long_cost),
+        # long => line 8b
+        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]": str(long_data["proceeds"]),
+        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]": str(long_data["cost"]),
         "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]": "",
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]": str(long_gain),
+        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]": str(long_data["gain_loss"]),
     }
-
-
-# -----------------------------------------------------------------------------
-# Best Practice:
-# For XFA-based IRS forms, use fill_pdf_with_pdftk(...) from pdftk_filler.py,
-# which can drop_xfa and flatten. Then if you have multiple partial PDFs
-# (14 rows per page, etc.), merge them in memory with pypdf or using pdftk.
-# -----------------------------------------------------------------------------

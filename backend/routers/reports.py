@@ -51,9 +51,10 @@ def get_irs_reports(
 ):
     """
     Generates a combined PDF for Form 8949 and Schedule D,
-    always flattened with pdftk for XFA-based IRS forms.
+    using pdftk to remove XFA and flatten at each step.
+    Then merges all partial PDFs into a final flattened file.
     """
-    # 1) Gather the data rows for Form 8949 + schedule totals
+    # 1) Gather rows for Form 8949 + schedule totals
     report_data = build_form_8949_and_schedule_d(year, db)
     short_rows = [Form8949Row(**r) for r in report_data["short_term"]]
     long_rows = [Form8949Row(**r) for r in report_data["long_term"]]
@@ -62,19 +63,19 @@ def get_irs_reports(
     path_sched_d = "backend/assets/irs_templates/Schedule_D_Fillable_2024.pdf"
     partial_pdfs: List[bytes] = []
 
-    # 2) Fill short-term chunks (Form 8949)
-    #    14 rows per page
+    # 2) Fill short-term chunks (max 14 rows per page)
     for i in range(0, len(short_rows), 14):
         chunk = short_rows[i : i + 14]
         field_data = map_8949_rows_to_field_data(chunk, page=1)
-        pdf_bytes = fill_pdf_with_pdftk(path_8949, field_data, drop_xfa=True)
+        # Now simply call fill_pdf_with_pdftk(...) without drop_xfa
+        pdf_bytes = fill_pdf_with_pdftk(path_8949, field_data)
         partial_pdfs.append(pdf_bytes)
 
-    # 3) Fill long-term chunks (Form 8949)
+    # 3) Fill long-term chunks (max 14 rows per page)
     for i in range(0, len(long_rows), 14):
         chunk = long_rows[i : i + 14]
         field_data = map_8949_rows_to_field_data(chunk, page=2)
-        pdf_bytes = fill_pdf_with_pdftk(path_8949, field_data, drop_xfa=True)
+        pdf_bytes = fill_pdf_with_pdftk(path_8949, field_data)
         partial_pdfs.append(pdf_bytes)
 
     # 4) Fill Schedule D totals
@@ -91,13 +92,14 @@ def get_irs_reports(
         "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]": "",
         "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]": str(report_data["schedule_d"]["long_term"]["gain_loss"]),
     }
-    filled_sd_bytes = fill_pdf_with_pdftk(path_sched_d, schedule_d_fields, drop_xfa=True)
+    # Also call fill_pdf_with_pdftk(...) for Schedule D
+    filled_sd_bytes = fill_pdf_with_pdftk(path_sched_d, schedule_d_fields)
     partial_pdfs.append(filled_sd_bytes)
 
     # 5) Merge partial PDFs in memory with pypdf
     merged_pdf = _merge_all_pdfs(partial_pdfs)
 
-    # 6) ALWAYS flatten at the end with pdftk
+    # 6) Flatten the final merged PDF
     final_pdf = flatten_pdf_with_pdftk(merged_pdf)
 
     return Response(
