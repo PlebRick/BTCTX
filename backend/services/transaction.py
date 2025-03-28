@@ -96,6 +96,7 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
         purpose=tx_data.get("purpose"),
         cost_basis_usd=tx_data.get("cost_basis_usd"),
         proceeds_usd=tx_data.get("proceeds_usd"),
+        fmv_usd=tx_data.get("fmv_usd"),
         is_locked=tx_data.get("is_locked", False),
         created_at=now_utc,
         updated_at=now_utc
@@ -186,6 +187,8 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
         tx.cost_basis_usd = tx_data["cost_basis_usd"]
     if "proceeds_usd" in tx_data:
         tx.proceeds_usd = tx_data["proceeds_usd"]
+    if "fmv_usd" in tx_data:
+        tx.fmv_usd = tx_data["fmv_usd"]
 
     tx.updated_at = datetime.now(timezone.utc)
 
