@@ -205,16 +205,16 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   // Watch various fields
   const accountVal = watch("account");
-  const currencyVal = watch("currency");
+  //const currencyVal = watch("currency");
   const fromAccountVal = watch("fromAccount");
   const fromCurrencyVal = watch("fromCurrency");
   const amountFromVal = watch("amountFrom") || 0;
   const amountToVal = watch("amountTo") || 0;
-  const amountUsdVal = watch("amountUSD") || 0;
-  const amountBtcVal = watch("amountBTC") || 0;
+  //const amountUsdVal = watch("amountUSD") || 0;
+  //const amountBtcVal = watch("amountBTC") || 0;
   const purposeVal = watch("purpose");
   const proceedsUsdVal = watch("proceeds_usd") || 0;
-  const fmvUsdVal = watch("fmv_usd") || 0;
+  //const fmvUsdVal = watch("fmv_usd") || 0;
 
   /**
    * Load existing transaction if we have a transactionId
@@ -1154,14 +1154,15 @@ return (
 
     {/* Hidden delete trigger for TransactionPanel */}
     {transactionId && (
-      <button
-        id="trigger-form-delete"
-        type="button"
-        style={{ display: "none" }}
-        onClick={handleDeleteClick}
-      />
-    )}
-  </form>
-);
+        <button
+          id="trigger-form-delete"
+          type="button"
+          style={{ display: "none" }}
+          onClick={handleDeleteClick}
+        />
+      )}
+    </form>
+  );
+};  // <-- IMPORTANT: Close the arrow function properly
 
 export default TransactionForm;

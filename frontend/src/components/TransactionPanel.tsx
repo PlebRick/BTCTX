@@ -58,7 +58,7 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
   if (!isOpen) return null;
 
   return (
-    <>
+    <React.Fragment>
       <div className="transaction-panel-overlay" onClick={handleOverlayClick} />
       <div className="transaction-panel">
         <div className="panel-header">
@@ -124,8 +124,9 @@ const TransactionPanel: React.FC<TransactionPanelProps> = ({
           </div>
         </div>
       )}
-    </>
+      </div>
+    </React.Fragment>
   );
-};
+};  
 
 export default TransactionPanel;

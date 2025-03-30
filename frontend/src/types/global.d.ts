@@ -127,6 +127,7 @@ declare global {
     fee_amount?: string | number;
     cost_basis_usd?: string | number;
     proceeds_usd?: string | number;
+    fmv_usd?: string | number;
     realized_gain_usd?: string | number;
     timestamp: string;
     is_locked: boolean;
@@ -151,6 +152,7 @@ declare global {
     fee_amount: number;
     cost_basis_usd: number;
     proceeds_usd: number;
+    fmv_usd?: number;
     realized_gain_usd: number;
     timestamp: string;   // ISO8601
     is_locked: boolean;
@@ -183,6 +185,7 @@ declare global {
     fee_currency: Currency;
     cost_basis_usd: number;
     proceeds_usd?: number; // optional for certain types
+    fmv_usd?: number;
     source?: string;
     purpose?: string;
     is_locked: boolean;   // only on creation
@@ -227,6 +230,7 @@ declare global {
     fee?: number;
     costBasisUSD?: number;
     proceeds_usd?: number;
+    fmv_usd?: number;
 
     // Transfer
     fromAccount?: AccountType;
