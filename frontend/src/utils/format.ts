@@ -105,6 +105,7 @@ export function parseTransaction(rawTx: ITransactionRaw): ITransaction {
     fee_amount: parseDecimal(rawTx.fee_amount),
     cost_basis_usd: parseDecimal(rawTx.cost_basis_usd),
     proceeds_usd: parseDecimal(rawTx.proceeds_usd),
+    fmv_usd: parseDecimal(rawTx.fmv_usd),
     realized_gain_usd: parseDecimal(rawTx.realized_gain_usd),
 
     // Optional fields normalized

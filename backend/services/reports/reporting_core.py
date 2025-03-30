@@ -602,7 +602,8 @@ def _build_gifts_donations_lost(txns: List[Transaction]) -> List[Dict[str, Any]]
                 "date": tx.timestamp.isoformat() if tx.timestamp else "",
                 "asset": "BTC",
                 "amount": float(tx.amount or 0),
-                "value_usd": float(tx.proceeds_usd or 0),
+                "proceeds_usd": float(tx.proceeds_usd or 0),
+                "fmv_usd": float(tx.fmv_usd or 0),
                 "type": tx.purpose,
             }
             results.append(row)
