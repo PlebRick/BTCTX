@@ -434,31 +434,46 @@ def generate_comprehensive_tax_report(report_dict: Dict[str, Any]) -> bytes:
         story.append(Paragraph(f"{tax_year} Gifts, Donations & Lost Assets", heading_style))
         story.append(Spacer(1, 0.1 * inch))
 
-        data = [["Date", "Asset", "Amount", "Value (USD)", "Type"]]
+        # We now have two separate USD columns: "Proceeds" and "FMV".
+        data = [
+            ["Date", "Asset", "Amount", "Proceeds (USD)", "FMV (USD)", "Type"]
+        ]
+
         for item in gifts_lost:
+            # For example, if item["asset"] == "BTC" and it includes
+            # "amount", "proceeds_usd", and "fmv_usd"
             if item.get("asset") == "BTC":
                 d_str = iso_to_mmddyyyy(item.get("date", ""))
                 amt_str = fmt_btc(item.get("amount", 0.0))
-                val_str = fmt_usd(item.get("value_usd", 0.0))
-                row_type = item.get("type", "")
+
+                # This is your old "value_usd" replaced with proceeds:
+                proceeds_val = item.get("proceeds_usd", 0.0)
+                proceeds_str = fmt_usd(proceeds_val)
+
+                # The new FMV field:
+                fmv_val = item.get("fmv_usd", 0.0)
+                fmv_str = fmt_usd(fmv_val)
+
+                row_type = item.get("type", "")  # e.g. "Gift", "Donation", or "Lost"
 
                 data.append([
                     wrap_text(d_str),
                     wrap_text("BTC"),
                     Paragraph(amt_str, right_aligned_style),
-                    Paragraph(val_str, right_aligned_style),
+                    Paragraph(proceeds_str, right_aligned_style),
+                    Paragraph(fmv_str, right_aligned_style),
                     wrap_text(row_type),
                 ])
 
-        table = Table(data, colWidths=[1.0 * inch, 0.8 * inch, 0.9 * inch, 0.9 * inch, 1.3 * inch])
-        table.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-            ("ALIGN", (2, 0), (3, -1), "RIGHT"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ]))
-        story.append(table)
-        story.append(Spacer(1, 0.5 * inch))
+    table = Table(data, colWidths=[1.0 * inch, 0.8 * inch, 0.9 * inch, 0.9 * inch, 0.9 * inch, 1.3 * inch])
+    table.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ("ALIGN", (2, 0), (4, -1), "RIGHT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 0.5 * inch))
 
     # =====================================================
     # 8) Expenses
