@@ -1,8 +1,8 @@
-//frontend/src/App.tsx
-import React, { useEffect, useState } from "react";
-import "./styles/app.css"; // Ensures global + layout CSS is loaded
-import { Routes, Route, Navigate } from "react-router-dom";
-import axios from "axios";
+// FILE: frontend/src/App.tsx
+
+import React, { useEffect, useState, useCallback } from "react";
+import "./styles/app.css";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 
 import AppLayout from "./components/AppLayout";
 import Dashboard from "./pages/Dashboard";
@@ -14,54 +14,127 @@ import TransactionForm from "./components/TransactionForm";
 import LoginPage from "./pages/Login";
 import RegisterPage from "./pages/Register";
 
+import api from "./api"; // Central Axios-based API client, sending cookies by default
+
+// Loading spinner for a better UX vs. plain text
+const LoadingSpinner: React.FC = () => (
+  <div className="flex justify-center items-center mt-8">
+    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+  </div>
+);
+
 /**
- * PrivateRoute component:
- * 1. Checks if the user is authenticated by calling a protected endpoint.
- * 2. While loading, shows a "Checking auth..." message.
- * 3. If not authenticated, redirects to /login.
- * 4. Otherwise, renders the children (protected component).
+ * PrivateRoute
+ * -----------
+ * - Checks user session by calling /api/protected (session-based auth).
+ * - Shows a loading spinner while waiting.
+ * - Redirects to /login if unauthorized.
  */
 const PrivateRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check session status by hitting a protected route
-    axios
-      .get("/api/protected", { withCredentials: true })
+    let isMounted = true;
+
+    api
+      .get("/protected", { withCredentials: true })
       .then(() => {
-        setIsAuthenticated(true);
-        setLoading(false);
+        if (isMounted) {
+          setIsAuthenticated(true);
+          setLoading(false);
+        }
       })
-      .catch(() => {
-        setIsAuthenticated(false);
-        setLoading(false);
+      .catch((err) => {
+        if (isMounted) {
+          setIsAuthenticated(false);
+          setLoading(false);
+        }
+        console.error("Authentication check failed:", err);
+        // Production: send to monitoring (Sentry, etc.)
       });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   if (loading) {
-    return <div style={{ textAlign: "center", marginTop: "2rem" }}>Checking auth...</div>;
+    return <LoadingSpinner />;
   }
 
   if (!isAuthenticated) {
-    // Not logged in => redirect to /login
     return <Navigate to="/login" replace />;
   }
 
-  // Authenticated => render the intended page
   return children;
 };
 
+/**
+ * App
+ * ---
+ * - On "/" or "/login", checks if any user exists to enforce single-user system:
+ *   => If none, redirect to /register.
+ * - Provides protected routes for Dashboard, Transactions, etc.
+ * - Falls back to /dashboard if route not found.
+ *
+ * Production Best Practices (IRS Pub. 1075 context):
+ * - Use secure cookies and https_only sessions (set in your backend).
+ * - Possibly log auth events for compliance and auditing.
+ * - Wrap repeated calls to /users/exists with memoization to reduce overhead.
+ */
 const App: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Tracks whether we've confirmed user existence
+  const [checkedUserExists, setCheckedUserExists] = useState(false);
+  // Prevent repeated calls if the user navigates quickly
+  const [isChecking, setIsChecking] = useState(false);
+
+  // Memoized function to check if a user exists
+  const checkUserExists = useCallback(() => {
+    if (isChecking) return;
+    setIsChecking(true);
+
+    api
+      .get("/users/exists", { withCredentials: true })
+      .then((res) => {
+        setCheckedUserExists(true);
+        if (!res.data.exists) {
+          // If no user is found, we must register
+          navigate("/register");
+        }
+      })
+      .catch((err) => {
+        console.error("Error checking user existence:", err);
+        // Production: send to monitoring
+        setCheckedUserExists(true);
+      })
+      .finally(() => setIsChecking(false));
+  }, [isChecking, navigate]);
+
+  useEffect(() => {
+    // Only check user existence on certain paths
+    if (["/", "/login"].includes(location.pathname)) {
+      checkUserExists();
+    } else {
+      // In other routes, we can consider user existence 'checked'
+      setCheckedUserExists(true);
+    }
+  }, [location.pathname, checkUserExists]);
+
+  // Show spinner if we haven't confirmed user existence on relevant paths
+  if (!checkedUserExists && ["/", "/login"].includes(location.pathname)) {
+    return <LoadingSpinner />;
+  }
+
   return (
     <Routes>
-      {/*
-        Redirect root URL ("/") to /dashboard by default.
-        But if user isn't logged in, PrivateRoute will bounce them to /login.
-      */}
+      {/* Default route redirects to /dashboard if user tries to go to '/' */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-      {/* PROTECTED ROUTES: wrapped in PrivateRoute */}
+      {/* PROTECTED ROUTES */}
       <Route
         path="/dashboard"
         element={
@@ -111,11 +184,11 @@ const App: React.FC = () => {
         }
       />
 
-      {/* PUBLIC ROUTES: Login & Register */}
+      {/* PUBLIC ROUTES */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
-      {/* Fallback catch-all: back to /dashboard (which is also protected) */}
+      {/* Fallback: go to dashboard for any unknown path */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

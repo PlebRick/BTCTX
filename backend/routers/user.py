@@ -1,26 +1,13 @@
-"""
-backend/routers/user.py
-
-Handles user-related endpoints (registration, listing users, etc.).
-Enforces a single-user limit: if any user already exists, no new registration is allowed.
-
-Key points:
- - @router.post("/register"): final route is POST /api/users/register (due to prefix in main.py)
- - @router.get("/"): final route is GET /api/users
- - @router.patch("/users/{user_id}"): final route is PATCH /api/users/users/{user_id}
- - @router.delete("/users/{user_id}"): final route is DELETE /api/users/users/{user_id}
-
-If you prefer /api/users/{user_id} for PATCH/DELETE, remove "users/" in those decorators.
-"""
+# FILE: backend/routers/user.py
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
-# Pydantic schemas for user creation/read/update
+# Pydantic schemas for user creation, reading, and updating
 from backend.schemas.user import UserCreate, UserRead, UserUpdate
 
-# Service functions that interact with the DB
+# Service functions that interact with the database
 from backend.services.user import (
     get_all_users,
     get_user_by_username,
@@ -32,14 +19,13 @@ from backend.services.user import (
 # Database session provider
 from backend.database import SessionLocal
 
-# Create a FastAPI router instance
+# Create a FastAPI router instance with the "users" tag for API documentation
 router = APIRouter(tags=["users"])
 
 def get_db():
     """
-    Provide a DB session for user endpoints.
-    Typically you might use 'get_db' from database.py,
-    but here we define it inline for completeness.
+    Provide a database session for user endpoints.
+    Yields a SessionLocal instance and ensures it is closed after use.
     """
     db = SessionLocal()
     try:
@@ -50,16 +36,18 @@ def get_db():
 @router.post("/register", response_model=UserRead)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
     """
-    Single-user registration endpoint: POST /api/users/register
+    Register a new user: POST /api/users/register
 
-    1) If any user already exists, block new registration (single-user system).
-    2) If the requested username is already taken, return 400 (edge case).
-    3) Hash the provided password (handled in create_user) and create the user.
+    Enforces a single-user system:
+    1. If any user exists, blocks registration (400 error).
+    2. Checks if the username is taken (redundant in single-user system but kept for flexibility).
+    3. Creates the user with a hashed password via create_user and returns the UserRead schema.
 
-    Returns a UserRead schema (excluding the password hash).
+    Best Practices:
+    - Password complexity: Ensure UserCreate schema or create_user enforces IRS Publication 1075 requirements.
+    - Secure storage: Verify create_user uses strong hashing (e.g., bcrypt).
     """
-
-    # 1) Check if *any* user exists (single-user limit).
+    # Check if any user exists (single-user limit)
     existing_users = get_all_users(db)
     if existing_users:
         raise HTTPException(
@@ -67,9 +55,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
             detail="Only one user allowed. A user already exists."
         )
 
-    # 2) Check if this exact username is taken (paranoia check).
-    #    Technically, if there's "any" user, we already blocked above.
-    #    But let's keep it for clarity or if you ever allow multiple users in the future.
+    # Check if this username is taken (redundant but retained for clarity)
     existing_user = get_user_by_username(user.username, db)
     if existing_user:
         raise HTTPException(
@@ -77,7 +63,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
             detail="Username already registered"
         )
 
-    # 3) Create the user record.
+    # Create the user record
     new_user = create_user(user, db)
     if not new_user:
         raise HTTPException(
@@ -91,33 +77,40 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 def get_users(db: Session = Depends(get_db)):
     """
     Retrieve all registered users: GET /api/users
-    Mainly for debugging or to confirm the single-user environment.
+
+    - In a single-user system, returns at most one user.
+    - Useful for debugging or verifying user existence.
     """
     return get_all_users(db)
 
-@router.patch("/users/{user_id}", response_model=UserRead)
+@router.patch("/{user_id}", response_model=UserRead)
 def patch_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db)):
     """
-    Partially update a user's fields (username or password) using UserUpdate.
-    If the user isn't found, returns 404.
-    On success, returns the updated user record (UserRead).
+    Partially update a user's fields: PATCH /api/users/{user_id}
 
-    Final route: PATCH /api/users/users/{user_id}
-      (Remove 'users/' if you want PATCH /api/users/{user_id}).
+    - Updates username or password based on the UserUpdate schema.
+    - Returns the updated user (UserRead schema).
+    - Raises a 404 error if the user is not found.
+
+    Best Practices:
+    - Audit logging: Implement logging in update_user_service for compliance audits.
     """
     updated_user = update_user_service(user_id, user_data, db)
     if not updated_user:
         raise HTTPException(status_code=404, detail="User not found.")
     return updated_user
 
-@router.delete("/users/{user_id}", status_code=204)
+@router.delete("/{user_id}", status_code=204)
 def delete_user(user_id: int, db: Session = Depends(get_db)):
     """
-    Delete an existing user by ID.
-    Final route: DELETE /api/users/users/{user_id}
-      (Remove 'users/' if you want /api/users/{user_id}).
+    Delete a user by ID: DELETE /api/users/{user_id}
 
-    Returns 204 No Content on successful deletion, or 404 if not found.
+    - Deletes the user if found.
+    - Returns 204 No Content on success.
+    - Raises a 404 error if the user is not found or cannot be deleted.
+
+    Best Practices:
+    - Audit logging: Implement logging in delete_user_service for compliance audits.
     """
     success = delete_user_service(user_id, db)
     if not success:

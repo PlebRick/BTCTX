@@ -104,7 +104,7 @@ app.include_router(transaction.router, prefix="/api/transactions", tags=["transa
 app.include_router(user.router, prefix="/api/users", tags=["users"])
 app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
 app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"])
-app.include_router(bitcoin.router, prefix="/api", tags=["Bitcoin"])
+app.include_router(bitcoin.router, prefix="/api/bitcoin", tags=["Bitcoin"])
 app.include_router(reports.reports_router, prefix="/api/reports", tags=["reports"])
 
 # (Optional) Debug Router

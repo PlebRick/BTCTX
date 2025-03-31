@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from ..services import bitcoin  # Adjust the import path if needed
 
 router = APIRouter(
-    prefix="/bitcoin",
     tags=["Bitcoin"]
 )
 
