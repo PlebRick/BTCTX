@@ -148,6 +148,11 @@ class Transaction(Base):
         nullable=True,
         doc="Summarized cost basis for the entire transaction (if relevant)."
     )
+    gross_proceeds_usd = Column(
+        Numeric(18, 2),
+        nullable=True,
+        doc="User-entered gross proceeds for a Sell or Withdrawal, before fees."
+    )
     proceeds_usd = Column(
         Numeric(18, 2),
         nullable=True,

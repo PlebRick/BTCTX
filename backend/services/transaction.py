@@ -1,5 +1,3 @@
-# FILE: backend/services/transaction.py
-
 """
 backend/services/transaction.py
 
@@ -96,6 +94,8 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
         purpose=tx_data.get("purpose"),
         cost_basis_usd=tx_data.get("cost_basis_usd"),
         proceeds_usd=tx_data.get("proceeds_usd"),
+        # NEW OR MODIFIED FOR GROSS_PROCEEDS_USD: if front end sends it
+        gross_proceeds_usd=tx_data.get("gross_proceeds_usd"),
         fmv_usd=tx_data.get("fmv_usd"),
         is_locked=tx_data.get("is_locked", False),
         created_at=now_utc,
@@ -189,6 +189,9 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
         tx.proceeds_usd = tx_data["proceeds_usd"]
     if "fmv_usd" in tx_data:
         tx.fmv_usd = tx_data["fmv_usd"]
+    # NEW OR MODIFIED FOR GROSS_PROCEEDS_USD: partial update of gross
+    if "gross_proceeds_usd" in tx_data:
+        tx.gross_proceeds_usd = tx_data["gross_proceeds_usd"]
 
     tx.updated_at = datetime.now(timezone.utc)
 
@@ -289,6 +292,12 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
     """
     Convert single-entry data => multi-line ledger.
     Handles cross-currency Buy/Sell logic, Transfer fees, etc.
+
+    CHANGES FOR GROSS_PROCEEDS_USD:
+    For Sells, we now read 'gross_proceeds_usd' and subtract fees
+    to produce a net 'proceeds_usd' value. That net is stored in
+    the DB (used by partial-lot disposal and aggregator). Meanwhile,
+    the original user-typed gross remains in 'gross_proceeds_usd'.
     """
     from_acct_id = tx_data.get("from_account_id")
     to_acct_id = tx_data.get("to_account_id")
@@ -351,7 +360,7 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
         and from_acct and from_acct.currency == "BTC"
         and to_acct and to_acct.currency == "USD"
     ):
-        # Subtract BTC
+        # Subtract BTC out of from_acct
         if amount > 0:
             db.add(LedgerEntry(
                 transaction_id=tx.id,
@@ -361,17 +370,38 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
                 entry_type="MAIN_OUT"
             ))
 
-        # Subtract fee if fee_currency = USD
-        net_usd_in = proceeds_usd
-        if fee_currency == "USD":
-            net_usd_in = proceeds_usd - fee_amount
-            if net_usd_in < 0:
-                net_usd_in = Decimal("0")
+        # NEW OR MODIFIED FOR GROSS_PROCEEDS_USD:
+        # Check if user typed 'gross_proceeds_usd'; if present, derive net from that.
+        gross_raw = tx_data.get("gross_proceeds_usd") or "0"
+        gross_usd = Decimal(gross_raw)
 
-        # Overwrite with new net proceeds in the tx_data
-        tx_data["proceeds_usd"] = str(net_usd_in)
+        if gross_usd > 0:
+            # If fee is in USD, net = (gross - fee)
+            if fee_currency == "USD":
+                net_usd_in = gross_usd - fee_amount
+                if net_usd_in < 0:
+                    net_usd_in = Decimal("0")
+            else:
+                # If fee is BTC, we do not reduce the gross USD
+                net_usd_in = gross_usd
 
-        # Credit to_acct with net_usd_in
+            # Overwrite proceeds_usd so aggregator & partial-lot disposal see net
+            tx_data["proceeds_usd"] = str(net_usd_in)
+            tx.proceeds_usd = net_usd_in
+            # Also store the user's typed gross in DB
+            tx.gross_proceeds_usd = gross_usd
+        else:
+            # If user did NOT provide 'gross_proceeds_usd',
+            # fallback to old logic using 'proceeds_usd'
+            net_usd_in = proceeds_usd
+            if fee_currency == "USD":
+                net_usd_in = proceeds_usd - fee_amount
+                if net_usd_in < 0:
+                    net_usd_in = Decimal("0")
+            tx_data["proceeds_usd"] = str(net_usd_in)
+            tx.proceeds_usd = net_usd_in
+
+        # Credit net to the to_acct
         if net_usd_in > 0:
             db.add(LedgerEntry(
                 transaction_id=tx.id,
@@ -380,7 +410,7 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
                 currency="USD",
                 entry_type="MAIN_IN"
             ))
-        # Fee line to "USD Fees"
+        # Fee line if fee is USD
         if fee_amount > 0 and fee_currency == "USD":
             fee_acct = db.query(Account).filter_by(name="USD Fees").first()
             if fee_acct:
@@ -391,6 +421,7 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
                     currency="USD",
                     entry_type="FEE"
                 ))
+
         db.flush()
         return
 
@@ -811,6 +842,8 @@ def recalculate_all_transactions(db: Session):
             "timestamp": rec_tx.timestamp,
             "source": rec_tx.source,
             "purpose": rec_tx.purpose,
+            "gross_proceeds_usd": rec_tx.gross_proceeds_usd,
+            "fmv_usd": rec_tx.fmv_usd,
         }
         build_ledger_entries_for_transaction(rec_tx, sub_tx_data, db)
         _maybe_verify_balance_for_internal(rec_tx, db)
@@ -859,6 +892,9 @@ def recalculate_subsequent_transactions(db: Session, from_timestamp: datetime):
             "timestamp": rec_tx.timestamp,
             "source": rec_tx.source,
             "purpose": rec_tx.purpose,
+            # If present, re-inject gross_proceeds_usd
+            "gross_proceeds_usd": rec_tx.gross_proceeds_usd,
+            "fmv_usd": rec_tx.fmv_usd,
         }
         build_ledger_entries_for_transaction(rec_tx, sub_tx_data, db)
         _maybe_verify_balance_for_internal(rec_tx, db)

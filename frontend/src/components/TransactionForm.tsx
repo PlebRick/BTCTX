@@ -1,4 +1,4 @@
-//frontend/src/components/TransactionForm.tsx
+// FILE: frontend/src/components/TransactionForm.tsx
 import React, { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import axios from "axios";
@@ -73,6 +73,9 @@ function mapDoubleEntryAccounts(data: TransactionFormData): IAccountMapping {
  * mapTransactionToFormData:
  * Converts an ITransaction (fetched from backend) into TransactionFormData
  * so we can populate the form fields in edit mode.
+ *
+ * // NEW: GROSS PROCEEDS FOR SELL
+ * We read tx.gross_proceeds_usd (if present) into 'grossProceedsUSD' for the user to see.
  */
 function mapTransactionToFormData(tx: ITransaction): TransactionFormData {
   // Common fields
@@ -80,10 +83,12 @@ function mapTransactionToFormData(tx: ITransaction): TransactionFormData {
     type: tx.type,
     timestamp: new Date(tx.timestamp).toISOString().slice(0, 16), // for datetime-local
     fee: tx.fee_amount ?? 0,
-    // You can set defaults for everything else:
     costBasisUSD: tx.cost_basis_usd ?? 0,
     proceeds_usd: tx.proceeds_usd ?? 0,
     fmv_usd: tx.fmv_usd ?? 0,
+
+    // NEW: GROSS PROCEEDS FOR SELL
+    grossProceedsUSD: tx.gross_proceeds_usd ?? 0,
   };
 
   // Helper to convert account_id => "Bank", "Wallet", "Exchange", etc.
@@ -142,9 +147,10 @@ function mapTransactionToFormData(tx: ITransaction): TransactionFormData {
         toCurrency,
         amountFrom: tx.amount,
         // If it was BTC with a fee, "amountTo" is (amount - fee).
-        amountTo: tx.type === "Transfer" && fromCurrency === "BTC"
-          ? tx.amount - (tx.fee_amount ?? 0)
-          : tx.amount,
+        amountTo:
+          tx.type === "Transfer" && fromCurrency === "BTC"
+            ? tx.amount - (tx.fee_amount ?? 0)
+            : tx.amount,
       };
     }
     case "Buy":
@@ -159,7 +165,10 @@ function mapTransactionToFormData(tx: ITransaction): TransactionFormData {
         ...baseData,
         account: "Exchange",
         amountBTC: tx.amount,
-        amountUSD: tx.proceeds_usd ?? 0,
+
+        // OLD: form used "amountUSD" for net proceeds
+        // NEW: we treat "amountUSD" as "grossProceedsUSD" for user input
+        grossProceedsUSD: tx.gross_proceeds_usd ?? tx.proceeds_usd ?? 0,
       };
     default:
       // Return the base for safety
@@ -195,6 +204,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       costBasisUSD: 0,
       proceeds_usd: 0,
       fmv_usd: 0,
+
+      // NEW: Initialize "grossProceedsUSD"
+      grossProceedsUSD: 0,
     },
   });
 
@@ -205,16 +217,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   // Watch various fields
   const accountVal = watch("account");
-  //const currencyVal = watch("currency");
   const fromAccountVal = watch("fromAccount");
   const fromCurrencyVal = watch("fromCurrency");
   const amountFromVal = watch("amountFrom") || 0;
   const amountToVal = watch("amountTo") || 0;
-  //const amountUsdVal = watch("amountUSD") || 0;
-  //const amountBtcVal = watch("amountBTC") || 0;
   const purposeVal = watch("purpose");
   const proceedsUsdVal = watch("proceeds_usd") || 0;
-  //const fmvUsdVal = watch("fmv_usd") || 0;
 
   /**
    * Load existing transaction if we have a transactionId
@@ -240,6 +248,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         fee: 0,
         costBasisUSD: 0,
         proceeds_usd: 0,
+        fmv_usd: 0,
+        grossProceedsUSD: 0,
       });
       setCurrentType("");
     }
@@ -319,20 +329,16 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   /**
    * onTransactionTypeChange:
-   * When user picks a new type from the dropdown, reset form fields.
-   * (Disabled in edit mode, so only for creating new.)
+   * When user picks a new type from the dropdown, reset some form fields.
    */
   const onTransactionTypeChange = (
     e: React.ChangeEvent<HTMLSelectElement>
   ) => {
     const newType = e.target.value as TransactionType;
     setCurrentType(newType);
-  
-    // Get the current values from the form
+
+    // Preserve existing, but reset certain fields
     const currentValues = getValues();
-  
-    // Partially reset: preserve existing values (including timestamp),
-    // but override type, fee, costBasisUSD, proceeds_usd, etc.
     reset({
       ...currentValues,
       type: newType,
@@ -340,13 +346,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       costBasisUSD: 0,
       proceeds_usd: 0,
       fmv_usd: 0,
+      grossProceedsUSD: 0,
     });
   };
 
   /**
    * handleRefreshFmv:
    * Called when user clicks "Refresh" button for FMV. 
-   * We fetch from historical if date < today, else from live price.
    */
   const handleRefreshFmv = async () => {
     try {
@@ -354,11 +360,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       const isoTimestamp = localDatetimeToIso(formVals.timestamp);
       const txDate = new Date(isoTimestamp);
 
-      // If transaction date is older than "now" => fetch historical
       const now = new Date();
       const isBackdated = txDate < now;
 
-      // 1) Get a BTC price from your API
       let priceResponse;
       if (isBackdated) {
         const dateStr = txDate.toISOString().split("T")[0]; // e.g. "2025-03-28"
@@ -375,12 +379,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         throw new Error("Invalid price data from API");
       }
 
-      // 2) Calculate FMV = (amount of BTC) * (btcPrice)
       const amountBtc = parseDecimal(formVals.amount || 0);
       const newFmv = amountBtc * btcPrice;
 
-      // 3) Set the form's fmv_usd to newFmv
-      setValue("fmv_usd", Number(newFmv.toFixed(2))); 
+      setValue("fmv_usd", Number(newFmv.toFixed(2)));
     } catch (err) {
       console.error("FMV refresh error:", err);
       alert("Failed to refresh FMV. Check console for details.");
@@ -390,11 +392,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   /**
    * onSubmit:
    * Either create a new transaction or update the existing one.
+   *
+   * // NEW: GROSS PROCEEDS FOR SELL
+   *  If type=Sell => we now pass "gross_proceeds_usd" as well, which the backend
+   *  will use to compute net (proceeds_usd).
    */
   const onSubmit: SubmitHandler<TransactionFormData> = async (data) => {
     setIsSubmitting(true);
     try {
-      // 1) if BTC withdrawal & proceeds_usd not set, default to 0
+      // 1) If BTC withdrawal & user didn't provide proceeds, default to 0
       if (
         data.type === "Withdrawal" &&
         data.currency === "BTC" &&
@@ -406,10 +412,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       // 2) from/to IDs
       const { from_account_id, to_account_id } = mapDoubleEntryAccounts(data);
 
-      // 3) datetime => ISO
+      // 3) Convert datetime => ISO
       const isoTimestamp = localDatetimeToIso(data.timestamp);
 
-      // 4) figure out amount, costBasis, etc.
+      // 4) Prepare fields for the payload
       let amount = 0;
       let feeCurrency: Currency = "USD";
       let source: string | undefined;
@@ -417,6 +423,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       let cost_basis_usd = 0;
       let proceeds_usd: number | undefined;
       let fmv_usd: number | undefined;
+      let gross_proceeds_usd: number | undefined; // <-- new
 
       switch (data.type) {
         case "Deposit":
@@ -451,9 +458,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           break;
 
         case "Sell":
+          // NEW: we interpret "amountBTC" as the BTC being sold
           amount = parseDecimal(data.amountBTC);
           feeCurrency = "USD";
-          proceeds_usd = parseDecimal(data.amountUSD);
+
+          // Instead of storing net proceeds in "proceeds_usd," we store user input as "gross_proceeds_usd"
+          gross_proceeds_usd = parseDecimal(data.grossProceedsUSD);
           break;
       }
 
@@ -467,18 +477,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         fee_amount: parseDecimal(data.fee),
         fee_currency: feeCurrency,
         cost_basis_usd,
-        proceeds_usd,
+        proceeds_usd,   // might be undefined if Sell
+        gross_proceeds_usd, // <-- new field for Sell
         fmv_usd,
         source,
         purpose,
       };
 
       if (transactionId) {
-        // --- Editing existing transaction ---
+        // --- EDITING existing transaction ---
         await api.put(`/transactions/${transactionId}`, payload);
         alert("Transaction updated successfully!");
       } else {
-        // --- Creating new transaction ---
+        // --- CREATING new transaction ---
         const createPayload: ICreateTransactionPayload = {
           ...payload,
           is_locked: false,
@@ -536,10 +547,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       "Are you sure you want to delete this transaction?"
     );
     if (!confirmed) return;
-  
+
     setIsSubmitting(true);
     try {
-      // We assume you have a DELETE /transactions/{id} route.
       await api.delete(`/transactions/${transactionId}`);
       alert("Transaction deleted successfully!");
       reset();
@@ -554,13 +564,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
   /**
    * renderDynamicFields:
-   * Here is where we restore the complete JSX for each transaction type,
-   * just like in your “before” file. That’s what was missing!
+   * Renders form controls for each transaction type.
+   * // NEW: For "Sell" we show "Gross Proceeds (USD)" instead of "Amount USD"
    */
   const renderDynamicFields = () => {
     switch (currentType) {
       case "Deposit": {
-        // watchers you need inside deposit:
         const account = watch("account");
         const currency = watch("currency");
 
@@ -677,14 +686,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         const account = watch("account");
         const currency = watch("currency");
         const feeLabel = currency === "BTC" ? "Fee (BTC)" : "Fee (USD)";
-        const showPurpose = // Only show purpose if BTC withdrawal from Wallet/Exchange
+        const showPurpose =
           account === "Wallet" ||
           (account === "Exchange" && currency === "BTC");
 
         // For BTC only, we show proceeds + possible FMV
         const showBtcFields = currency === "BTC";
 
-        // We'll check if user selected Gift/Donation/Lost
         const isSpecialPurpose =
           purposeVal === "Gift" ||
           purposeVal === "Donation" ||
@@ -790,7 +798,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                     step="0.01"
                     className="form-control"
                     {...register("proceeds_usd", { valueAsNumber: true })}
-                    // If Gift/Donation/Lost => read-only => always 0
                     readOnly={isSpecialPurpose}
                   />
                   {purposeVal === "Spent" && proceedsUsdVal === 0 && (
@@ -1062,21 +1069,24 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               )}
             </div>
 
-            {/* Amount USD */}
+            {/* NEW: GROSS PROCEEDS (USD) */}
             <div className="form-group">
-              <label>Amount USD:</label>
+              <label>Gross Proceeds (USD):</label>
               <input
                 type="number"
                 step="0.01"
                 className="form-control"
-                {...register("amountUSD", {
+                {...register("grossProceedsUSD", {
                   required: true,
                   valueAsNumber: true,
                 })}
               />
-              {errors.amountUSD && (
-                <span className="error-text">Amount USD is required</span>
+              {errors.grossProceedsUSD && (
+                <span className="error-text">Gross proceeds is required</span>
               )}
+              <small style={{ color: "#888", display: "block", marginTop: 4 }}>
+                The backend will subtract fees to calculate net proceeds.
+              </small>
             </div>
 
             {/* Fee (USD) */}
@@ -1099,61 +1109,61 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   };
 
   // ------------------------------------------------------------------------
-// Actual render
-// ------------------------------------------------------------------------
-return (
-  <form
-    id={id || "transaction-form"}
-    className="transaction-form"
-    onSubmit={handleSubmit(onSubmit)}
-  >
-    {/* Optional spinner if isSubmitting */}
-    {isSubmitting && (
-      <div style={{ textAlign: "center", marginBottom: "20px" }}>
-        <div className="spinner"></div>
-        <p>Processing transaction...</p>
+  // Actual render
+  // ------------------------------------------------------------------------
+  return (
+    <form
+      id={id || "transaction-form"}
+      className="transaction-form"
+      onSubmit={handleSubmit(onSubmit)}
+    >
+      {/* Optional spinner if isSubmitting */}
+      {isSubmitting && (
+        <div style={{ textAlign: "center", marginBottom: "20px" }}>
+          <div className="spinner"></div>
+          <p>Processing transaction...</p>
+        </div>
+      )}
+
+      <div className="form-fields-grid">
+        {/* Transaction Type */}
+        <div className="form-group">
+          <label>Transaction Type:</label>
+          <select
+            className="form-control"
+            value={currentType}
+            onChange={onTransactionTypeChange}
+            required
+            disabled={!!transactionId} // if editing, lock the type
+          >
+            <option value="">Select Transaction Type</option>
+            <option value="Deposit">Deposit</option>
+            <option value="Withdrawal">Withdrawal</option>
+            <option value="Transfer">Transfer</option>
+            <option value="Buy">Buy</option>
+            <option value="Sell">Sell</option>
+          </select>
+        </div>
+
+        {/* Date & Time */}
+        <div className="form-group">
+          <label>Date & Time:</label>
+          <input
+            type="datetime-local"
+            className="form-control"
+            {...register("timestamp", { required: "Date & Time is required" })}
+          />
+          {errors.timestamp && (
+            <span className="error-text">{errors.timestamp.message}</span>
+          )}
+        </div>
+
+        {/* Dynamic transaction-type-specific fields */}
+        {renderDynamicFields()}
       </div>
-    )}
 
-    <div className="form-fields-grid">
-      {/* Transaction Type */}
-      <div className="form-group">
-        <label>Transaction Type:</label>
-        <select
-          className="form-control"
-          value={currentType}
-          onChange={onTransactionTypeChange}
-          required
-          disabled={!!transactionId} // if editing, lock the type
-        >
-          <option value="">Select Transaction Type</option>
-          <option value="Deposit">Deposit</option>
-          <option value="Withdrawal">Withdrawal</option>
-          <option value="Transfer">Transfer</option>
-          <option value="Buy">Buy</option>
-          <option value="Sell">Sell</option>
-        </select>
-      </div>
-
-      {/* Date & Time */}
-      <div className="form-group">
-        <label>Date & Time:</label>
-        <input
-          type="datetime-local"
-          className="form-control"
-          {...register("timestamp", { required: "Date & Time is required" })}
-        />
-        {errors.timestamp && (
-          <span className="error-text">{errors.timestamp.message}</span>
-        )}
-      </div>
-
-      {/* Dynamic transaction-type-specific fields */}
-      {renderDynamicFields()}
-    </div>
-
-    {/* Hidden delete trigger for TransactionPanel */}
-    {transactionId && (
+      {/* Hidden delete trigger for TransactionPanel */}
+      {transactionId && (
         <button
           id="trigger-form-delete"
           type="button"
@@ -1163,6 +1173,6 @@ return (
       )}
     </form>
   );
-};  // <-- IMPORTANT: Close the arrow function properly
+};
 
 export default TransactionForm;

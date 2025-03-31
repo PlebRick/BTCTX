@@ -3,16 +3,19 @@ import requests
 # Define the API URL (adjust for your local setup)
 API_URL = "http://127.0.0.1:8000/api/transactions/"
 
-# Sample transaction data
+# Refactored sample transaction data (Deposit from external to bank)
 transaction_data = {
-    "account_id": 1,
     "type": "Deposit",
-    "amount_usd": 1000.00,
-    "amount_btc": 0.0,
     "timestamp": "2025-02-04T12:30:00",
+    "from_account_id": 99,       # External source
+    "to_account_id": 1,         # Bank
+    "amount": 1000.00,          # total amount deposited
+    "fee_amount": 0.50,         # fee in USD
+    "fee_currency": "USD",
+    "cost_basis_usd": 0,        # for USD deposits, usually 0 (no BTC involved)
     "source": "Income",
     "purpose": None,
-    "fee": {"currency": "USD", "amount": 0.50}
+    "is_locked": False
 }
 
 # Send POST request to the API

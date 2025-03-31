@@ -107,12 +107,17 @@ class TransactionBase(BaseModel):
         default=None,
         description="Total USD cost basis for tax reporting (e.g., Buy price)."
     )
+
     proceeds_usd: Optional[Decimal] = Field(
         default=None,
         description="Total USD proceeds for tax reporting (e.g., Sell price)."
 
     )
-    
+    gross_proceeds_usd: Optional[Decimal] = Field(
+        default=None,
+        description="Exact user input for sale/withdrawal proceeds, before fees."
+    )
+
     fmv_usd: Optional[Decimal] = Field(
         default=None,
         description="Fair market value for non-sale disposals (Gift, Donation, Lost)."
@@ -154,6 +159,12 @@ class TransactionBase(BaseModel):
         if v is not None:
             return validate_usd_decimal(v)
         return v
+    
+    @field_validator("gross_proceeds_usd")
+    def validate_gross_proceeds_usd(cls, v: Decimal | None) -> Decimal | None:
+        if v is not None:
+            return validate_usd_decimal(v)  # your existing 2-decimal check
+        return v
 
 class TransactionCreate(TransactionBase):
     """
@@ -181,6 +192,8 @@ class TransactionUpdate(BaseModel):
 
     cost_basis_usd: Optional[Decimal] = None
     proceeds_usd: Optional[Decimal] = None
+    gross_proceeds_usd: Optional[Decimal] = None
+    fmv_usd: Optional[Decimal] = None
     realized_gain_usd: Optional[Decimal] = None
     holding_period: Optional[str] = None
 
@@ -211,8 +224,14 @@ class TransactionUpdate(BaseModel):
             return validate_btc_decimal(v)
         return v
 
-    @field_validator("cost_basis_usd", "proceeds_usd", "realized_gain_usd")
+    @field_validator("cost_basis_usd", "proceeds_usd", "realized_gain_usd", "fmv_usd",)
     def validate_usd_fields(cls, v: Decimal | None) -> Decimal | None:
+        if v is not None:
+            return validate_usd_decimal(v)
+        return v
+    
+    @field_validator("gross_proceeds_usd")
+    def validate_gross_proceeds_usd(cls, v: Decimal | None) -> Decimal | None:
         if v is not None:
             return validate_usd_decimal(v)
         return v

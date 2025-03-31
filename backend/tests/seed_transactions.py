@@ -1,5 +1,3 @@
-# backend/tests/seed_transactions.py
-
 #!/usr/bin/env python3
 """
 Seed Transactions Script
@@ -40,10 +38,18 @@ def load_transactions():
     return tx_list
 
 def normalize_decimal_fields(tx: dict) -> dict:
-    """Ensures Decimal precision for typical numeric fields."""
+    """
+    Ensures Decimal precision for typical numeric fields.
+    Updated to include 'gross_proceeds_usd' for the new schema.
+    """
     decimal_fields = [
-        "amount", "fee_amount", "cost_basis_usd",
-        "proceeds_usd", "realized_gain_usd", "fmv_usd"
+        "amount",
+        "fee_amount",
+        "cost_basis_usd",
+        "proceeds_usd",
+        "realized_gain_usd",
+        "fmv_usd",
+        "gross_proceeds_usd"  # <-- ADDED for the refactored system
     ]
     for field in decimal_fields:
         raw = tx.get(field)

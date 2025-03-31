@@ -138,6 +138,9 @@ declare global {
     fee_currency?: string;
     created_at?: string;
     updated_at?: string;
+
+    // NEW: For Sell transactions, store gross proceeds typed by the user
+    gross_proceeds_usd?: string | number; // <-- ADDED
   }
 
   /**
@@ -163,6 +166,9 @@ declare global {
     fee_currency?: string;
     created_at?: string;
     updated_at?: string;
+
+    // NEW: For Sell transactions, store gross proceeds typed by the user
+    gross_proceeds_usd?: number; // <-- ADDED
   }
 
   type SortMode = "TIMESTAMP_DESC" | "CREATION_DESC";
@@ -189,6 +195,9 @@ declare global {
     source?: string;
     purpose?: string;
     is_locked: boolean;   // only on creation
+
+    // NEW: For Sell transactions
+    gross_proceeds_usd?: number; // <-- ADDED
   }
 
   /**
@@ -243,6 +252,9 @@ declare global {
     // Buy / Sell
     amountUSD?: number;
     amountBTC?: number;
+
+    // NEW: For Sell transactions, the user’s typed gross proceeds
+    grossProceedsUSD?: number; // <-- ADDED
   }
 
   // Optional global props for TransactionForm if you want them globally
