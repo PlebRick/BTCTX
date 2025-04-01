@@ -1,6 +1,6 @@
 # FILE: backend/routers/user.py
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -101,18 +101,19 @@ def patch_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db
     return updated_user
 
 @router.delete("/{user_id}", status_code=204)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(user_id: int, request: Request, db: Session = Depends(get_db)):
     """
     Delete a user by ID: DELETE /api/users/{user_id}
 
     - Deletes the user if found.
+    - Clears the session afterward.
     - Returns 204 No Content on success.
     - Raises a 404 error if the user is not found or cannot be deleted.
-
-    Best Practices:
-    - Audit logging: Implement logging in delete_user_service for compliance audits.
     """
     success = delete_user_service(user_id, db)
     if not success:
         raise HTTPException(status_code=404, detail="User not found or cannot be deleted.")
+
+    # ✅ Clear the session after successful deletion
+    request.session.clear()
     return

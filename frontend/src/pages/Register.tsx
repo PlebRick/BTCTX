@@ -1,90 +1,89 @@
+// FILE: frontend/src/pages/Register.tsx
+
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useNavigate, Link } from 'react-router-dom';
+import '../styles/login.css'; // Reuse the same login styles
 
-/**
- * A simple registration page for a single-user system.
- * 
- * Key points:
- *  - We call POST /api/users/register (which your FastAPI backend defines).
- *  - We include withCredentials: true to allow session cookies.
- *  - On success, we can either auto-login or redirect the user to a login page.
- */
 const RegisterPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
 
-  // Handle the form submission:
-  // Prevent default submission, call the correct endpoint, handle success/errors.
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
-      // IMPORTANT: Use /api/users/register here.
       const response = await axios.post(
         '/api/users/register',
         { username, password },
-        { withCredentials: true } // Required if your backend uses session cookies.
-      );
-
-      console.log('Register response:', response.data);
-
-      // ------------------------------------------------------
-      // Option A: Auto-login the newly created user
-      // ------------------------------------------------------
-      // If you want to automatically log them in after successful registration:
-      /*
-      const loginResponse = await axios.post(
-        '/api/login',
-        { username, password },
         { withCredentials: true }
       );
-      console.log('Login response:', loginResponse.data);
-      // Now that they're logged in, redirect to your main dashboard:
-      window.location.href = '/dashboard';
-      */
-
-      // ------------------------------------------------------
-      // Option B: Direct them to the login page
-      // ------------------------------------------------------
-      // If you'd rather not auto-login, just show a success message and redirect:
+      console.log('Register response:', response.data);
       alert('Registration successful! Please log in.');
-      window.location.href = '/login';
-
+      navigate('/login');
     } catch (error) {
       console.error('Registration error:', error);
-      // Provide a user-friendly alert or UI message
-      alert('Failed to register. Try another username.');
+      alert('Failed to register. If an account already exists, try logging in.');
     }
   };
 
+  const toggleShowPassword = () => {
+    setShowPassword(prev => !prev);
+  };
+
   return (
-    <div className="register-container">
-      <h2>Create an Account</h2>
-      <form onSubmit={handleRegister}>
-        <div className="form-group">
-          <label htmlFor="username">Username:</label>
-          <input
-            id="username"
-            type="text"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            required
-          />
-        </div>
+    <div className="login-container">
+      <div className="login-header">
+        <img src="/icon.svg" alt="BitcoinTX Logo" className="login-logo" />
+        <h1 className="login-title">Welcome to BitcoinTX</h1>
+      </div>
 
-        <div className="form-group">
-          <label htmlFor="password">Password:</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-          />
-        </div>
+      <div className="login-card">
+        <h2 className="login-card-title">Create Account</h2>
 
-        <button type="submit">Register</button>
-      </form>
+        <form onSubmit={handleRegister} className="login-form">
+          <div className="login-form-group">
+            <label htmlFor="username" className="login-label">Username</label>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              required
+              className="login-input"
+            />
+          </div>
+
+          <div className="login-form-group">
+            <div className="password-label-row">
+              <label htmlFor="password" className="login-label">Password</label>
+              <button
+                type="button"
+                className="toggle-password-btn"
+                onClick={toggleShowPassword}
+              >
+                {showPassword ? 'Hide Password' : 'Show Password'}
+              </button>
+            </div>
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              className="login-input"
+            />
+          </div>
+
+          <button type="submit" className="accent-btn login-btn">Register</button>
+        </form>
+
+        <div className="login-create-account">
+          <span className="create-account-text">Already have an account?</span>
+          <Link to="/login" className="create-account-link">Log In</Link>
+        </div>
+      </div>
     </div>
   );
 };

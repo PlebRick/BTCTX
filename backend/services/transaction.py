@@ -305,6 +305,7 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
     amount = Decimal(tx_data.get("amount", 0))
     fee_amount = Decimal(tx_data.get("fee_amount", 0))
     fee_currency = (tx_data.get("fee_currency") or "BTC").upper()
+    ledger_entries = []
 
     # If user provided None or empty proceeds_usd, treat it as "0"
     proceeds_raw = tx_data.get("proceeds_usd") or "0"
@@ -559,20 +560,94 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     except (ValueError, TypeError):
         total_proceeds = 0.0
 
-    # 2) Check purpose for forced 0 or "Spent" logic
+    # -----------------------------------------------------------
+    # 2) Withdrawal logic: apply purpose-based proceeds logic
+    #    and always ledger BTC leaving the account (MAIN_OUT)
+    # -----------------------------------------------------------
     purpose_lower = (tx.purpose or "").lower()
-    if tx.type == "Withdrawal" and purpose_lower in ("gift", "donation", "lost"):
-        total_proceeds = 0.0
-    elif tx.type == "Withdrawal" and purpose_lower == "spent":
+
+    if tx.type == "Withdrawal" and from_acct and from_acct.currency == "BTC":
+        # 1) Force proceeds to 0 for special non-sale withdrawals
+        if purpose_lower in ("gift", "donation", "lost"):
+            total_proceeds = 0.0
+
+        # 2) For "Spent", reduce proceeds if BTC fee is present
+        elif purpose_lower == "spent":
+            fee_btc = float(tx.fee_amount or 0)
+            fee_cur = (tx.fee_currency or "").upper()
+
+            if fee_btc > 0 and fee_cur == "BTC" and btc_outflow > 0 and total_proceeds > 0:
+                implied_price = total_proceeds / btc_outflow
+                fee_in_usd = fee_btc * implied_price
+                total_proceeds = max(total_proceeds - fee_in_usd, 0.0)
+
+        # 3) Always add a MAIN_OUT entry for BTC leaving the account
+        entries.append(
+            LedgerEntry(
+                transaction_id=tx.id,
+                account_id=from_acct.id,
+                amount=-btc_outflow,
+                currency="BTC",
+                entry_type="MAIN_OUT"
+            )
+        )
+
+        # 4) Add BTC fee if specified
         fee_btc = float(tx.fee_amount or 0)
         fee_cur = (tx.fee_currency or "").upper()
-        if fee_btc > 0 and fee_cur == "BTC" and btc_outflow > 0 and total_proceeds > 0:
-            implied_price = total_proceeds / btc_outflow
-            fee_in_usd = fee_btc * implied_price
-            net_proceeds = total_proceeds - fee_in_usd
-            if net_proceeds < 0:
-                net_proceeds = 0.0
-            total_proceeds = net_proceeds
+
+        if fee_btc > 0 and fee_cur == "BTC":
+            btc_fee_acct = db.query(Account).filter_by(name="BTC Fees").first()
+            if btc_fee_acct:
+                entries.append(
+                    LedgerEntry(
+                        transaction_id=tx.id,
+                        account_id=btc_fee_acct.id,
+                        amount=Decimal(str(fee_btc)),
+                        currency="BTC",
+                        entry_type="FEE"
+                    )
+                )
+
+
+    # 4) If there's a nonzero BTC fee, add a FEE ledger entry
+    fee_btc = float(tx.fee_amount or 0)
+    fee_cur = (tx.fee_currency or "").upper()
+
+    if fee_btc > 0 and fee_cur == "BTC":
+        # Example: look up your "BTC Fees" account
+        btc_fee_acct = db.query(Account).filter_by(name="BTC Fees").first()
+        if btc_fee_acct:
+            entries.append(
+                LedgerEntry(
+                    transaction_id=tx.id,
+                    account_id=btc_fee_acct.id,
+                    amount=Decimal(fee_btc),  # or decimalify as needed
+                    currency="BTC",
+                    entry_type="FEE"
+                )
+            )
+
+    # (You can flush here or at the end, depending on your pattern)
+    db.flush()
+
+
+    # 4) Add BTC fee if specified
+    fee_btc = float(tx.fee_amount or 0)
+    fee_cur = (tx.fee_currency or "").upper()
+
+    if fee_btc > 0 and fee_cur == "BTC":
+        btc_fee_acct = db.query(Account).filter_by(name="BTC Fees").first()
+        if btc_fee_acct:
+            ledger_entries.append(
+                LedgerEntry(
+                    transaction_id=tx.id,
+                    account_id=btc_fee_acct.id,
+                    amount=Decimal(str(fee_btc)),  # safer decimal conversion
+                    currency="BTC",
+                    entry_type="FEE"
+                )
+            )
 
     # 3) FIFO disposal across lots
     lots = (

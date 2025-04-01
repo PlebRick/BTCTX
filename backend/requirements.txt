@@ -29,3 +29,6 @@ pdfkit==1.0.0
 
 # For HTML templating (useful if generating HTML then converting to PDF)
 jinja2==3.1.2
+
+# For testing
+pytest==8.1.1  # or the latest stable version you prefer
