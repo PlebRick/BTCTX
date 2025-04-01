@@ -117,3 +117,19 @@ def delete_user(user_id: int, request: Request, db: Session = Depends(get_db)):
     # ✅ Clear the session after successful deletion
     request.session.clear()
     return
+
+@router.get("/protected")
+def protected_route(request: Request, db: Session = Depends(get_db)):
+    user_id = request.session.get("user_id")
+    print("🔐 /protected called, user_id:", user_id)  # ADD THIS
+    if not user_id:
+        raise HTTPException(status_code=403, detail="Not authenticated")
+
+    from backend.models.user import User
+
+    user = db.query(User).filter_by(id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    print("✅ Returning username:", user.username)  # ADD THIS
+    return {"username": user.username}
