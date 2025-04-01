@@ -63,18 +63,18 @@ def get_irs_reports(
     path_sched_d = "backend/assets/irs_templates/Schedule_D_Fillable_2024.pdf"
     partial_pdfs: List[bytes] = []
 
-    # 2) Fill short-term chunks (max 14 rows per page)
-    for i in range(0, len(short_rows), 14):
+    # 2) Fill short-term chunks (increment page number)
+    for page_idx, i in enumerate(range(0, len(short_rows), 14), start=1):
         chunk = short_rows[i : i + 14]
-        field_data = map_8949_rows_to_field_data(chunk, page=1)
-        # Now simply call fill_pdf_with_pdftk(...) without drop_xfa
+        field_data = map_8949_rows_to_field_data(chunk, page=page_idx)
         pdf_bytes = fill_pdf_with_pdftk(path_8949, field_data)
         partial_pdfs.append(pdf_bytes)
 
-    # 3) Fill long-term chunks (max 14 rows per page)
-    for i in range(0, len(long_rows), 14):
+    # 3) Fill long-term chunks (continue page numbering)
+    long_start_page = (len(short_rows) + 13) // 14 + 1
+    for page_idx, i in enumerate(range(0, len(long_rows), 14), start=long_start_page):
         chunk = long_rows[i : i + 14]
-        field_data = map_8949_rows_to_field_data(chunk, page=2)
+        field_data = map_8949_rows_to_field_data(chunk, page=page_idx)
         pdf_bytes = fill_pdf_with_pdftk(path_8949, field_data)
         partial_pdfs.append(pdf_bytes)
 
