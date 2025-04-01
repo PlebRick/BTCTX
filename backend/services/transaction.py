@@ -547,6 +547,8 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
         return
 
     btc_outflow = float(tx.amount or 0)
+    if (tx.fee_currency or "").upper() == "BTC":
+        btc_outflow += float(tx.fee_amount or 0)
     if btc_outflow <= 0:
         return
 
