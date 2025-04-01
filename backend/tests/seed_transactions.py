@@ -58,7 +58,7 @@ def seed_transactions():
         try:
             tx = normalize_decimal_fields(tx)
             tx_data = TransactionCreate(**tx)
-            created_tx = create_transaction_record(tx_data.dict(), db)
+            created_tx = create_transaction_record(tx_data.model_dump(), db)
             created += 1
         except Exception as e:
             print(f"[ERROR] Failed to insert transaction {tx.get('id','?')}: {e}")

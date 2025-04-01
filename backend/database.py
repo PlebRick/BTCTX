@@ -74,6 +74,7 @@ Base = declarative_base()
 # 3) Custom UTC DateTime for SQLite
 # ------------------------------------------------------------------
 class UTCDateTime(TypeDecorator):
+    cache_ok = True
     """
     Stores Python datetime objects as ISO8601 strings with 'Z' in SQLite,
     ensuring they are read back as offset-aware UTC datetimes.
