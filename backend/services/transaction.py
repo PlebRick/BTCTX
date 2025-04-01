@@ -303,7 +303,7 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
     to_acct_id = tx_data.get("to_account_id")
     tx_type = tx_data.get("type", "")
     amount = Decimal(tx_data.get("amount", 0))
-    fee_amount = Decimal(tx_data.get("fee_amount", 0))
+    fee_amount = Decimal(tx_data.get("fee_amount") or "0.0")
     fee_currency = (tx_data.get("fee_currency") or "BTC").upper()
 
     # If user provided None or empty proceeds_usd, treat it as "0"
@@ -518,7 +518,7 @@ def maybe_create_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
 
     cost_basis = Decimal(tx_data.get("cost_basis_usd", "0"))
     fee_cur = (tx_data.get("fee_currency") or "").upper()
-    fee_amt = Decimal(tx_data.get("fee_amount", "0"))
+    fee_amt = Decimal(tx_data.get("fee_amount") or "0.0")
 
     # If it's a Buy w/ USD fee, add that fee to cost basis
     if tx.type == "Buy" and fee_cur == "USD":
