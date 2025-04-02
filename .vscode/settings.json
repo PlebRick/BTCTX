@@ -1,84 +1,85 @@
 {
-    "cSpell.words": [
-      "acroform",
-      "autoflush",
-      "Avenir",
-      "BTCTX",
-      "btctxdev",
-      "coindesk",
-      "condecimal",
-      "dateutil",
-      "dbaeumer",
-      "disp",
-      "dotenv",
-      "ehthumbs",
-      "fastapi",
-      "FONTSIZE",
-      "ghostscript",
-      "htmlcov",
-      "httpx",
-      "itsdangerous",
-      "maxfail",
-      "MREV",
-      "njsproj",
-      "NOPAUSE",
-      "ntvs",
-      "oaicite",
-      "pagesizes",
-      "passlib",
-      "pdfgen",
-      "pdfkit",
-      "pdfs",
-      "PDFSETTINGS",
-      "pdfwrite",
-      "Perc",
-      "prepress",
-      "pycache",
-      "pydantic",
-      "pypdf",
-      "pytest",
-      "PYTHONPATH",
-      "reinit",
-      "reportlab",
-      "Satoshi",
-      "Satoshis",
-      "sessionmaker",
-      "sqlalchemy",
-      "starlette",
-      "Subform",
-      "toolsai",
-      "typer",
-      "uvicorn",
-      "venv",
-      "vwap",
-      "weasyprint",
-      "XXBTZUSD"
-    ],
-    "python.pythonPath": "/opt/homebrew/Caskroom/miniforge/base/envs/bitcoin-tx/bin/python",
-    "python.envFile": "${workspaceFolder}/backend/.env",
-    "terminal.integrated.shellArgs.osx": [
-      "-l",
-      "-c",
-      "conda activate bitcoin-tx; exec bash"
-    ],
-    "python.testing.pytestEnabled": true,
-    "python.testing.unittestEnabled": false,
-  
-    // ✅ Auto-format on save
-    "editor.formatOnSave": true,
-  
-    // ✅ Use Prettier as default formatter
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-  
-    // ✅ Optional: format specific languages
-    "[javascript]": {
-      "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
-    "[typescript]": {
-      "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
-    "[json]": {
-      "editor.defaultFormatter": "esbenp.prettier-vscode"
-    }
+  "cSpell.words": [
+    "acroform",
+    "autoflush",
+    "Avenir",
+    "BTCTX",
+    "btctxdev",
+    "ciphertext",
+    "coindesk",
+    "condecimal",
+    "dateutil",
+    "dbaeumer",
+    "disp",
+    "dotenv",
+    "ehthumbs",
+    "fastapi",
+    "FONTSIZE",
+    "ghostscript",
+    "htmlcov",
+    "httpx",
+    "itsdangerous",
+    "maxfail",
+    "MREV",
+    "njsproj",
+    "NOPAUSE",
+    "ntvs",
+    "oaicite",
+    "pagesizes",
+    "passlib",
+    "pdfgen",
+    "pdfkit",
+    "pdfs",
+    "PDFSETTINGS",
+    "pdfwrite",
+    "Perc",
+    "prepress",
+    "pycache",
+    "pycryptodome",
+    "pydantic",
+    "pypdf",
+    "pytest",
+    "PYTHONPATH",
+    "reinit",
+    "reportlab",
+    "Satoshi",
+    "Satoshis",
+    "sessionmaker",
+    "sqlalchemy",
+    "starlette",
+    "Subform",
+    "toolsai",
+    "typer",
+    "uvicorn",
+    "venv",
+    "vwap",
+    "weasyprint",
+    "XXBTZUSD"
+  ],
+  "python.pythonPath": "/opt/homebrew/Caskroom/miniforge/base/envs/bitcoin-tx/bin/python",
+  "python.envFile": "${workspaceFolder}/backend/.env",
+  "terminal.integrated.shellArgs.osx": [
+    "-l",
+    "-c",
+    "conda activate bitcoin-tx; exec bash"
+  ],
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+
+  // ✅ Auto-format on save
+  "editor.formatOnSave": true,
+
+  // ✅ Use Prettier as default formatter
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  // ✅ Optional: format specific languages
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   }
-  
+}

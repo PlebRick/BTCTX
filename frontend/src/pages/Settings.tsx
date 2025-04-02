@@ -1,10 +1,9 @@
 // FILE: frontend/src/pages/Settings.tsx
 
 import React, { useState } from "react";
-import api from "../api";   // your centralized Axios client
+import api from "../api";
 import "../styles/settings.css";
 
-// (Optional) If you have a specific shape for error responses:
 interface ApiErrorResponse {
   detail?: string;
 }
@@ -13,12 +12,9 @@ const Settings: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  /**
-   * Fetch the first user's ID (single-user assumption).
-   */
   const getUserId = async (): Promise<number | null> => {
     try {
-      const res = await api.get("/users"); // Should return an array
+      const res = await api.get("/users");
       const users = res.data as { id: number; username: string }[];
       return users.length > 0 ? users[0].id : null;
     } catch (err) {
@@ -27,9 +23,6 @@ const Settings: React.FC = () => {
     }
   };
 
-  /**
-   * Logs out by calling /api/logout, then redirects to /login.
-   */
   const logoutAndRedirect = async () => {
     try {
       await api.post("/logout", {}, { withCredentials: true });
@@ -40,24 +33,16 @@ const Settings: React.FC = () => {
     }
   };
 
-  /**
-   * 1) Logout
-   */
   const handleLogout = async () => {
     if (!window.confirm("Are you sure you want to log out?")) return;
     setLoading(true);
     setMessage("");
-
     await logoutAndRedirect();
     setLoading(false);
   };
 
-  /**
-   * 2) Reset Username & Password (keep transactions)
-   */
   const handleResetCredentials = async () => {
-    const confirmMsg = 
-      "This will reset your username and password, but keep existing transactions.\n\nContinue?";
+    const confirmMsg = "This will reset your username and password, but keep existing transactions.\n\nContinue?";
     if (!window.confirm(confirmMsg)) return;
 
     setLoading(true);
@@ -96,12 +81,8 @@ const Settings: React.FC = () => {
     }
   };
 
-  /**
-   * 3) Delete All Transactions
-   */
   const handleDeleteTransactions = async () => {
     if (!window.confirm("Delete ALL transactions? This cannot be undone.")) return;
-
     setLoading(true);
     setMessage("");
 
@@ -110,49 +91,26 @@ const Settings: React.FC = () => {
       setMessage("All transactions deleted.");
     } catch (error) {
       console.error("Error deleting transactions:", error);
-
-      // If you want to handle axios errors specifically:
-      // if (axios.isAxiosError<ApiErrorResponse>(error)) {
-      //   setMessage(error.response?.data?.detail ?? "Failed to delete transactions.");
-      // } else if (error instanceof Error) {
-      //   setMessage(error.message);
-      // } else {
-      //   setMessage("Unknown error while deleting transactions.");
-      // }
-
-      // Simpler fallback:
       setMessage(error instanceof Error ? error.message : "Failed to delete transactions.");
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * 4) Reset Account (delete transactions + delete user + logout → /register)
-   */
   const handleResetAccount = async () => {
-    const confirmMsg = 
-      "This will delete ALL transactions AND your user account.\n\n" +
-      "Continue? You’ll be redirected to /register after reset.";
+    const confirmMsg = "This will delete ALL transactions AND your user account.\n\nContinue? You’ll be redirected to /register after reset.";
     if (!window.confirm(confirmMsg)) return;
-  
+
     setLoading(true);
     setMessage("");
-  
+
     try {
-      // 1) Logout first to clear session
       await api.post("/logout", {}, { withCredentials: true });
-  
-      // 2) Delete transactions
       await api.delete("/transactions/delete_all");
-  
-      // 3) Delete the user
       const userId = await getUserId();
       if (userId) {
         await api.delete(`/users/${userId}`);
       }
-  
-      // 4) Redirect
       setMessage("Account reset. Redirecting to register...");
       window.location.href = "/register";
     } catch (error) {
@@ -163,7 +121,69 @@ const Settings: React.FC = () => {
     }
   };
 
-  // Return valid JSX (ReactNode). This is crucial!
+  const handleDownloadBackup = async () => {
+    const password = prompt("Enter a password to encrypt the backup:");
+    if (!password) {
+      setMessage("Backup canceled.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("password", password);
+
+      const res = await api.post("/backup/download", formData, {
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "bitcoin_backup.btx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      setMessage("Backup downloaded.");
+    } catch (err) {
+      console.error("Backup download failed:", err);
+      setMessage("Failed to download backup.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestoreBackup = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    setMessage("");
+
+    const formData = new FormData(event.currentTarget);
+    const password = formData.get("password");
+    const file = formData.get("file");
+
+    if (!password || !(file instanceof File)) {
+      setMessage("Please provide both a password and a file.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      formData.set("file", file);
+      const res = await api.post("/backup/restore", formData);
+      setMessage(res.data.message || "Backup restored. Reloading...");
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (err) {
+      console.error("Restore failed:", err);
+      setMessage("Failed to restore backup.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="settings-container">
       <h2 className="settings-title">Settings</h2>
@@ -174,15 +194,9 @@ const Settings: React.FC = () => {
         <div className="settings-option">
           <div className="option-info">
             <span className="settings-option-title">Logout</span>
-            <p className="settings-option-subtitle">
-              Sign out of your account.
-            </p>
+            <p className="settings-option-subtitle">Sign out of your account.</p>
           </div>
-          <button
-            onClick={handleLogout}
-            disabled={loading}
-            className="settings-button"
-          >
+          <button onClick={handleLogout} disabled={loading} className="settings-button">
             {loading ? "Processing..." : "Logout"}
           </button>
         </div>
@@ -194,11 +208,7 @@ const Settings: React.FC = () => {
               Change your username and password without deleting any transactions.
             </p>
           </div>
-          <button
-            onClick={handleResetCredentials}
-            disabled={loading}
-            className="settings-button"
-          >
+          <button onClick={handleResetCredentials} disabled={loading} className="settings-button">
             {loading ? "Processing..." : "Change"}
           </button>
         </div>
@@ -214,11 +224,7 @@ const Settings: React.FC = () => {
               Remove all transaction history. This action cannot be undone.
             </p>
           </div>
-          <button
-            onClick={handleDeleteTransactions}
-            disabled={loading}
-            className="settings-button danger"
-          >
+          <button onClick={handleDeleteTransactions} disabled={loading} className="settings-button danger">
             {loading ? "Processing..." : "Delete"}
           </button>
         </div>
@@ -230,17 +236,45 @@ const Settings: React.FC = () => {
               Delete all transactions AND remove the user account for a fresh start.
             </p>
           </div>
-          <button
-            onClick={handleResetAccount}
-            disabled={loading}
-            className="settings-button danger"
-          >
+          <button onClick={handleResetAccount} disabled={loading} className="settings-button danger">
             {loading ? "Processing..." : "Reset"}
           </button>
         </div>
       </div>
 
-      {/* Application (Placeholder) */}
+      {/* Backup & Restore Section */}
+      <div className="settings-section">
+        <h3>Backup & Restore</h3>
+        <div className="settings-option">
+          <div className="option-info">
+            <span className="settings-option-title">Download Encrypted Backup</span>
+            <p className="settings-option-subtitle">
+              Save a secure backup of all app data (encrypted SQLite file).
+            </p>
+          </div>
+          <button onClick={handleDownloadBackup} disabled={loading} className="settings-button">
+            {loading ? "Processing..." : "Download"}
+          </button>
+        </div>
+
+        <div className="settings-option">
+          <form onSubmit={handleRestoreBackup} className="option-info" encType="multipart/form-data">
+            <span className="settings-option-title">Restore from Backup</span>
+            <p className="settings-option-subtitle">
+              Upload a previously saved backup file and enter your password.
+            </p>
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+              <input type="file" name="file" accept=".btx" required style={{ color: "#fff", flex: "1" }} />
+              <input type="password" name="password" placeholder="Password" required style={{ flex: "1", padding: "0.5rem" }} />
+              <button type="submit" disabled={loading} className="settings-button" style={{ flexShrink: 0 }}>
+                {loading ? "Processing..." : "Restore"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* Application Section */}
       <div className="settings-section">
         <h3>Application</h3>
         <div className="settings-option">

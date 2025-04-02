@@ -20,6 +20,7 @@ dependencies:
       - itsdangerous==2.1.2
       - requests>=2.28.1
       - python-dateutil==2.8.2
+      - pycryptodome>=3.22,<4.0
       - pandas==2.0.3
       - pypdf==5.4.0
       - reportlab==3.6.12
@@ -27,3 +28,4 @@ dependencies:
       - pdfkit==1.0.0
       - jinja2==3.1.2
       - pytest
+      - cryptography==44.0.2

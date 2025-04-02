@@ -64,3 +64,11 @@ export: ensure-write
 # 🔒 Count locked transactions
 check-locks: ensure-write
 	python -c "from backend.database import SessionLocal; from backend.models.transaction import Transaction; db = SessionLocal(); locked = db.query(Transaction).filter_by(is_locked=True).all(); print(f'{len(locked)} locked transaction(s)'); db.close()"
+
+# 🔐 Create an encrypted backup file (AES-256)
+backup:
+	python -c "from backend.services.backup import make_backup; from pathlib import Path; make_backup('password', Path('backup_encrypted.btx'))"
+
+# ♻️ Restore from encrypted backup file
+restore:
+	python -c "from backend.services.backup import restore_backup; from pathlib import Path; restore_backup('password', Path('backup_encrypted.btx'))"

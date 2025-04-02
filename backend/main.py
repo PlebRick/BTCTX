@@ -19,8 +19,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import FileResponse
-
-# NEW IMPORTS for JSON-based login & DB usage
+from backend.routers import backup
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -97,7 +96,7 @@ def startup_event():
 # Routers (Transaction, User, Account, Calculation, Bitcoin, Reports, Debug)
 # ---------------------------------------------------------
 # (Mandatory) Routers (Transaction, User, Account, Calculation, Bitcoin, Reports)
-from backend.routers import transaction, user, account, calculation, bitcoin, reports
+from backend.routers import transaction, user, account, calculation, bitcoin, reports, backup
 
 # Mandatory routers
 app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
@@ -106,6 +105,7 @@ app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
 app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"])
 app.include_router(bitcoin.router, prefix="/api/bitcoin", tags=["Bitcoin"])
 app.include_router(reports.reports_router, prefix="/api/reports", tags=["reports"])
+app.include_router(backup.router, prefix="/api/backup", tags=["backup"])
 
 # (Optional) Debug Router
 try:
@@ -230,4 +230,3 @@ if __name__ == "__main__":
     import sys
     sys.path.append(os.getenv("PYTHONPATH", "."))
     # e.g. run: uvicorn main:app --reload
-    # Session-based auth is now set up in place of JWT.
