@@ -21,6 +21,11 @@
 ensure-write:
 	@if [ -f backend/bitcoin_tracker.db ]; then chmod +w backend/bitcoin_tracker.db; fi
 
+# 🧹 "Clean" target: Wipe DB then create fresh tables with default user + accounts only
+clean: clean-db create-db
+	@echo "🧹 Created a clean database with default user + accounts (no transactions)."
+
+
 # 💥 Full audit pipeline
 audit: clean-db seed test
 

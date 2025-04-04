@@ -1,47 +1,62 @@
 # -------------------------
-# Stage 1: Build Vite Frontend
+#    Stage 1: Frontend
 # -------------------------
-  FROM node:18-alpine AS frontend-builder
+  FROM node:18-slim AS frontend-builder
 
-  WORKDIR /frontend
+  # Create and move into /app/frontend
+  WORKDIR /app/frontend
   
-  # Copy and install frontend deps
+  # Copy package files and install (includes devDependencies for build)
   COPY frontend/package*.json ./
-  RUN npm install
+  RUN npm ci
   
-  # Copy rest of frontend and build
-  COPY frontend/ ./
+  # Copy the rest of your frontend source
+  COPY frontend/. .
+  
+  # Build the React app into frontend/dist
   RUN npm run build
   
-  # -------------------------
-  # Stage 2: Final Python + FastAPI + pdftk image
-  # -------------------------
-  FROM python:3.11-slim AS final
   
-  WORKDIR /app
+  # -------------------------
+  #    Stage 2: Backend
+  # -------------------------
+  FROM python:3.11-slim AS backend
   
-  # Install system-level tools like pdftk
+  # Avoid caching pip packages
+  ENV PIP_NO_CACHE_DIR=1
+  # Ensures stdout/stderr is unbuffered, so logs appear immediately
+  ENV PYTHONUNBUFFERED=1
+  # Give the app a default DB path in /data for persistence
+  # (You can override this at runtime if StartOS or Docker sets DATABASE_FILE)
+  ENV DATABASE_FILE=/data/bitcoin_tracker.db
+  
+  # Install system-level dependencies (pdftk, etc.)
   RUN apt-get update && apt-get install -y --no-install-recommends \
       pdftk \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+   && apt-get clean \
+   && rm -rf /var/lib/apt/lists/*
   
-  # Copy and install backend dependencies
-  COPY backend/requirements.txt ./backend/requirements.txt
-  RUN pip install --no-cache-dir -r backend/requirements.txt
+  # Create a directory for the backend code
+  WORKDIR /app
   
-  # Copy backend code
-  COPY backend/ ./backend/
+  # Copy your production Python requirements
+  COPY backend/requirements.txt .
+  RUN pip install --no-cache-dir -r requirements.txt
   
-  # Copy built frontend files from first stage
-  COPY --from=frontend-builder /frontend/dist ./frontend/dist
+  # Copy the backend source code and the built frontend files
+  COPY backend/. ./backend
+  COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
   
-  # Set environment for production
-  ENV PYTHONUNBUFFERED=1
+  # Create non-root user and group for security
+  RUN groupadd -r app && useradd -r -g app app && \
+      mkdir -p /data && chown -R app:app /app /data
   
-  # Expose default port
+  # Switch to that user
+  USER app
+  
+  # Expose port 80 for StartOS to map
   EXPOSE 80
   
-  # Start FastAPI app with Uvicorn, serving the frontend from backend.main
+  # Final startup command: run FastAPI via Uvicorn
   CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "80"]
   

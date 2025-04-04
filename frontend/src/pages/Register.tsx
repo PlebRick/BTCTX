@@ -1,36 +1,114 @@
 // FILE: frontend/src/pages/Register.tsx
 
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import '../styles/login.css'; // Reuse the same login styles
+import api from '../api';
+import '../styles/login.css';
 
 const RegisterPage: React.FC = () => {
+  // States for new credentials.
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  // This state is used only when the default account has been updated already.
+  const [overridePassword, setOverridePassword] = useState('');
+  // Track whether the current account is still the default account.
+  // (Checking if username is "admin" indicates default status.)
+  const [isDefault, setIsDefault] = useState<boolean | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
 
-  const handleRegister = async (e: React.FormEvent) => {
+  // On mount, fetch the current user and check if the account is still default.
+  useEffect(() => {
+    const checkDefaultAccount = async () => {
+      try {
+        const res = await api.get("/users/");
+        const users = res.data as { id: number; username: string }[];
+        if (users.length > 0) {
+          // Determine if the current account is default (username "admin")
+          setIsDefault(users[0].username === "admin");
+        } else {
+          // No user found: assume default for safety.
+          setIsDefault(true);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user:", err);
+        // In case of error, assume registration is not allowed.
+        setIsDefault(false);
+      }
+    };
+    checkDefaultAccount();
+  }, []);
+
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMsg("");
+
+    // ----------------- INSERTED LOGIC -----------------
+    // Prevent registration using the reserved username "admin"
+    if (username.trim().toLowerCase() === "admin") {
+      setErrorMsg("The username 'admin' is reserved and cannot be used. Please choose a different username.");
+      setIsSubmitting(false);
+      return;
+    }
+    // ----------------------------------------------------
+
+    // Check registration flow based on account state.
+    if (isDefault === false) {
+      // If the account is already registered (i.e. not default),
+      // require an override password to prevent unauthorized re-registration.
+      if (!overridePassword) {
+        setErrorMsg("Account is already registered. Please enter the override password to proceed.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (!window.confirm("Warning: The account is already registered. Re-registering will delete all transactions and update your credentials. Proceed?")) {
+        setIsSubmitting(false);
+        return;
+      }
+    } else {
+      // If the account is still default, confirm the registration action.
+      if (!window.confirm("This will update your username and password and delete any existing transactions. Continue?")) {
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     try {
-      const response = await axios.post(
-        '/api/users/register',
-        { username, password },
-        { withCredentials: true }
-      );
-      console.log('Register response:', response.data);
-      alert('Registration successful! Please log in.');
+      // Continue with fetching the current user.
+      const res = await api.get("/users/");
+      const users = res.data as { id: number; username: string }[];
+      if (users.length === 0) {
+        setErrorMsg("No user found to update credentials.");
+        setIsSubmitting(false);
+        return;
+      }
+      const userId = users[0].id;
+
+      // Update the user's credentials.
+      await api.patch(`/users/${userId}`, {
+        username: username || undefined,
+        password: password || undefined,
+      });
+
+      // Delete all transactions to "reset" the account.
+      await api.delete("/transactions/delete_all");
+
+      alert("Registration successful! Your credentials have been updated and all transactions have been deleted.");
       navigate('/login');
     } catch (error) {
-      console.error('Registration error:', error);
-      alert('Failed to register. If an account already exists, try logging in.');
+      console.error("Registration error:", error);
+      setErrorMsg("Failed to register. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const toggleShowPassword = () => {
-    setShowPassword(prev => !prev);
-  };
+  // Until the account status is determined, show a loading message.
+  if (isDefault === null) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="login-container">
@@ -40,11 +118,11 @@ const RegisterPage: React.FC = () => {
       </div>
 
       <div className="login-card">
-        <h2 className="login-card-title">Create Account</h2>
+        <h2 className="login-card-title">Register Account</h2>
 
         <form onSubmit={handleRegister} className="login-form">
           <div className="login-form-group">
-            <label htmlFor="username" className="login-label">Username</label>
+            <label htmlFor="username" className="login-label">New Username</label>
             <input
               id="username"
               type="text"
@@ -56,19 +134,10 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <div className="login-form-group">
-            <div className="password-label-row">
-              <label htmlFor="password" className="login-label">Password</label>
-              <button
-                type="button"
-                className="toggle-password-btn"
-                onClick={toggleShowPassword}
-              >
-                {showPassword ? 'Hide Password' : 'Show Password'}
-              </button>
-            </div>
+            <label htmlFor="password" className="login-label">New Password</label>
             <input
               id="password"
-              type={showPassword ? 'text' : 'password'}
+              type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
@@ -76,7 +145,25 @@ const RegisterPage: React.FC = () => {
             />
           </div>
 
-          <button type="submit" className="accent-btn login-btn">Register</button>
+          {/* If the account is already registered, require an override password */}
+          {isDefault === false && (
+            <div className="login-form-group">
+              <label htmlFor="override" className="login-label">Override Password</label>
+              <input
+                id="override"
+                type="password"
+                value={overridePassword}
+                onChange={e => setOverridePassword(e.target.value)}
+                required
+                className="login-input"
+              />
+            </div>
+          )}
+
+          <button type="submit" className="accent-btn login-btn" disabled={isSubmitting}>
+            {isSubmitting ? "Processing..." : "Register"}
+          </button>
+          {errorMsg && <div className="login-error-msg">{errorMsg}</div>}
         </form>
 
         <div className="login-create-account">

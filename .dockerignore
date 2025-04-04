@@ -1,12 +1,60 @@
-# Node + Python environment files
-frontend/node_modules
-backend/venv
+# -----------------------------
+# Node dependencies / build output
+# -----------------------------
+node_modules/
+frontend/node_modules/
+frontend/dist/
 
-# Git + Python junk
-.git
+# -----------------------------
+# Python bytecode, caches, and virtual env files
+# -----------------------------
 __pycache__/
-*.pyc
+**/__pycache__/
+*.py[cod]
+**/*.py[cod]
+.venv
+.venv/
+.mypy_cache/
+**/.mypy_cache/
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+*.pytest_cache/
+**/.pytest_cache/
 
-# Never copy local config files or secrets into Docker
+# -----------------------------
+# OS-specific files
+# -----------------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------------
+# Environment / config files
+# -----------------------------
 .env
 .env.*
+environment.yml
+
+# -----------------------------
+# Local dev / container configs
+# -----------------------------
+.devcontainer/
+.vscode/
+.github/
+
+# -----------------------------
+# Tests (excluded from final image)
+# -----------------------------
+tests/
+**/tests/
+*.test.*
+
+# -----------------------------
+# Auditing / local build artifacts
+# -----------------------------
+Makefile
+
+# -----------------------------
+# Docker build files
+# -----------------------------
+Dockerfile
+docker-compose*
