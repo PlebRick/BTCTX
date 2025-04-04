@@ -1,73 +1,81 @@
-# --- Python (Backend) ---
-__pycache__/                # Python cache files
-*.py[cod]                   # Compiled Python files
-*.pyo                       # Python optimized files
-*.pyd                       # Compiled dynamic Python library files (Windows)
-*.pdb                       # Debug files
-*.pyc
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# --- Virtual Environment ---
-venv/                       # Local virtual environment (if present)
-env/                        # Alternative virtual environment folder name
-.bitcoin-tx/                # Your project's specific virtual environment folder
+# --- Node.js ---
+node_modules/
+dist/
+dist-ssr/
+*.local
 
-# --- SQLite Database ---
-*.db                        # SQLite database files
-*.sqlite3                   # SQLite backup/alternative file types
-backend/bitcoin_tracker.db
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
 # --- Environment Variables ---
-.env                        # Environment variable file for secrets (root, backend, frontend)
-backend/.env                # Backend-specific environment file
-frontend/.env               # Frontend-specific environment file
+.env
+.env.*
+.env_backup
 
-# --- Logs and Runtime ---
-*.log                       # Log files
-*.pid                       # PID files for server instances
-*.seed                      # Seed files (if applicable)
+# --- Editor Directories and Files ---
+.vscode/
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.iml
+*.ipr
+*.iws
 
-# --- Test Artifacts ---
-.coverage                   # Coverage reports from tests
-htmlcov/                    # HTML coverage report
-pytest_cache/               # Pytest cache directory
-.tox/                       # tox environment
-
-# --- FastAPI/Uvicorn ---
-*.db-journal                # SQLite database journal files
-logs/                       # Log directory (if used for Uvicorn or other services)
-
-# --- IDE and Editor Files ---
-.vscode/                    # VSCode workspace settings
-.idea/                      # JetBrains IDE settings (PyCharm, WebStorm, etc.)
-*.swp                       # Swap files (e.g., from Vim)
-*.swo                       # Another Vim swap file
-*.bak                       # Backup files
-
-# --- Node.js (Frontend) ---
-node_modules/               # Node.js modules
-dist/                       # Production build output
-*.lock                      # Lock files (package-lock.json, yarn.lock)
+# --- OS Generated Files ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
 # --- Static and Temporary Files ---
-public/build/               # Frontend build artifacts (if applicable)
-.DS_Store                   # macOS Finder metadata
-Thumbs.db                   # Windows Explorer metadata
+public/build/
+frontend/temp_frontend/
+
+# --- SQLite Database ---
+*.db
+*.sqlite3
+*.db-journal
+backend/bitcoin_tracker.db
+
+# --- Test Artifacts ---
+.coverage
+htmlcov/
+pytest_cache/
+.tox/
+
+# --- FastAPI/Uvicorn ---
+logs/  # Log directory (if used for Uvicorn or other services)
 
 # --- Optional Backend Artifacts ---
-migrations/                 # Database migrations (if using Alembic/Prisma)
-backend/create_db.py        # Temporary or test database scripts (if not needed)
+migrations/
+backend/create_db.py
 
-# --- Git-specific ---
-*.orig                      # Merge conflict backup files
-.gitignore                  # Ensure `.gitignore` itself is tracked
+# --- Git-Specific ---
+*.orig  # Merge conflict backup files
+.gitignore  # Ensure `.gitignore` itself is tracked
 
 # --- Additional Notes ---
-# If there are any other temporary or sensitive directories/files specific to your development setup,
-# you can add them here.commands.md
-commands.md
-frontend/temp_frontend/
-.env
-.env
-
-# --- Debug SwaggerUI router endpoints ---
-backend/routers/debug.py
+# Add any other temporary or sensitive directories/files specific to your development setup here.

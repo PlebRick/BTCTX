@@ -138,3 +138,63 @@ input[type="file"]::file-selector-button {
 input[type="file"]::file-selector-button:hover {
   background-color: var(--color-accent-hover);
 }
+
+.credential-update-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  max-width: 400px;
+}
+
+.credential-input {
+  background-color: #2c2c2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 0.5rem;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.credential-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.credential-submit-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+/* 👇 Reused for password styling in Restore section */
+.credential-input {
+  background-color: #2c2c2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 0.5rem;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+/* 👇 Update file+password+button row for restore form */
+.restore-input-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.restore-input-row input[type="password"] {
+  flex: 1;
+  min-width: 140px;
+}
+
+.settings-note {
+  font-size: 0.9rem;
+  color: var(--color-text-dim);
+  margin-top: 0.5rem;
+  padding-left: 0.25rem;
+}
