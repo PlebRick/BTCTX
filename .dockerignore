@@ -1,5 +1,12 @@
+# Node + Python environment files
 frontend/node_modules
 backend/venv
+
+# Git + Python junk
 .git
+__pycache__/
 *.pyc
-__pycache__.env
+
+# Never copy local config files or secrets into Docker
+.env
+.env.*
