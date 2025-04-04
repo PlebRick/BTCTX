@@ -9,11 +9,26 @@ interface ApiErrorResponse {
 }
 
 const Settings: React.FC = () => {
+  // -------------------------------------------
+  // Existing state variables
+  // -------------------------------------------
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  // -------------------------------------------
+  // New: local states for credential form
+  // -------------------------------------------
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+
+  // -------------------------------------------
+  // Utility: Fetch current user ID
+  // -------------------------------------------
   const getUserId = async (): Promise<number | null> => {
     try {
+      // 🐛 Debug baseURL
+    console.log("🔥 Axios baseURL:", api.defaults.baseURL);
+    
       const res = await api.get("/users");
       const users = res.data as { id: number; username: string }[];
       return users.length > 0 ? users[0].id : null;
@@ -23,6 +38,9 @@ const Settings: React.FC = () => {
     }
   };
 
+  // -------------------------------------------
+  // Logout
+  // -------------------------------------------
   const logoutAndRedirect = async () => {
     try {
       await api.post("/logout", {}, { withCredentials: true });
@@ -41,38 +59,47 @@ const Settings: React.FC = () => {
     setLoading(false);
   };
 
-  const handleResetCredentials = async () => {
-    const confirmMsg = "This will reset your username and password, but keep existing transactions.\n\nContinue?";
-    if (!window.confirm(confirmMsg)) return;
-
+  // -------------------------------------------
+  // NEW: Replace handleResetCredentials with a form submission
+  // -------------------------------------------
+  const handleCredentialUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setLoading(true);
     setMessage("");
 
     try {
+      // Optional confirm (mimics your original message):
+      if (
+        !window.confirm(
+          "This will reset your username and password, but keep existing transactions.\n\nContinue?"
+        )
+      ) {
+        setLoading(false);
+        return;
+      }
+
       const userId = await getUserId();
       if (!userId) {
         setMessage("No user found to reset credentials.");
         return;
       }
 
-      const newUsername = prompt("Enter new username", "NewUser");
-      if (!newUsername) {
-        setMessage("Username reset canceled.");
+      // Ensure at least one field is provided
+      if (!newUsername && !newPassword) {
+        setMessage("Please enter a new username or password (or both).");
         return;
       }
 
-      const newPassword = prompt("Enter new password", "Pass1234!");
-      if (!newPassword) {
-        setMessage("Password reset canceled.");
-        return;
-      }
-
+      // PATCH /users/{id} with new fields
       await api.patch(`/users/${userId}`, {
-        username: newUsername,
-        password: newPassword
+        username: newUsername || undefined,
+        password: newPassword || undefined,
       });
 
-      setMessage("Credentials reset. Please log in again.");
+      setMessage("Credentials updated successfully. Please log in again if required.");
+      // Clear out fields
+      setNewUsername("");
+      setNewPassword("");
     } catch (error) {
       console.error("Error resetting credentials:", error);
       setMessage("Failed to reset credentials.");
@@ -81,6 +108,9 @@ const Settings: React.FC = () => {
     }
   };
 
+  // -------------------------------------------
+  // Delete All Transactions
+  // -------------------------------------------
   const handleDeleteTransactions = async () => {
     if (!window.confirm("Delete ALL transactions? This cannot be undone.")) return;
     setLoading(true);
@@ -97,8 +127,12 @@ const Settings: React.FC = () => {
     }
   };
 
+  // -------------------------------------------
+  // Reset Account (delete user + transactions)
+  // -------------------------------------------
   const handleResetAccount = async () => {
-    const confirmMsg = "This will delete ALL transactions AND your user account.\n\nContinue? You’ll be redirected to /register after reset.";
+    const confirmMsg =
+      "This will delete ALL transactions AND your user account.\n\nContinue? You’ll be redirected to /register after reset.";
     if (!window.confirm(confirmMsg)) return;
 
     setLoading(true);
@@ -121,6 +155,9 @@ const Settings: React.FC = () => {
     }
   };
 
+  // -------------------------------------------
+  // Backup: Download
+  // -------------------------------------------
   const handleDownloadBackup = async () => {
     const password = prompt("Enter a password to encrypt the backup:");
     if (!password) {
@@ -156,6 +193,9 @@ const Settings: React.FC = () => {
     }
   };
 
+  // -------------------------------------------
+  // Backup: Restore
+  // -------------------------------------------
   const handleRestoreBackup = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
@@ -184,13 +224,20 @@ const Settings: React.FC = () => {
     }
   };
 
+  // -------------------------------------------
+  // Render
+  // -------------------------------------------
   return (
     <div className="settings-container">
       <h2 className="settings-title">Settings</h2>
 
-      {/* Account Section */}
+      {/* ------------------------------------------
+          Account Section
+      ------------------------------------------ */}
       <div className="settings-section">
         <h3>Account</h3>
+
+        {/* Logout */}
         <div className="settings-option">
           <div className="option-info">
             <span className="settings-option-title">Logout</span>
@@ -201,6 +248,7 @@ const Settings: React.FC = () => {
           </button>
         </div>
 
+        {/* Change Username & Password - now a form */}
         <div className="settings-option">
           <div className="option-info">
             <span className="settings-option-title">Reset Username &amp; Password</span>
@@ -208,15 +256,37 @@ const Settings: React.FC = () => {
               Change your username and password without deleting any transactions.
             </p>
           </div>
-          <button onClick={handleResetCredentials} disabled={loading} className="settings-button">
-            {loading ? "Processing..." : "Change"}
-          </button>
+
+          <form onSubmit={handleCredentialUpdate} className="credential-update-form">
+            <input
+              type="text"
+              placeholder="New Username"
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+              style={{ marginRight: "0.5rem" }}
+            />
+            <input
+              type="password"
+              placeholder="New Password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              style={{ marginRight: "0.5rem" }}
+            />
+
+            <button type="submit" className="settings-button" disabled={loading}>
+              {loading ? "Processing..." : "Update"}
+            </button>
+          </form>
         </div>
       </div>
 
-      {/* Data Management Section */}
+      {/* ------------------------------------------
+          Data Management Section
+      ------------------------------------------ */}
       <div className="settings-section">
         <h3>Data Management</h3>
+
+        {/* Delete All Transactions */}
         <div className="settings-option">
           <div className="option-info">
             <span className="settings-option-title">Delete All Transactions</span>
@@ -229,6 +299,7 @@ const Settings: React.FC = () => {
           </button>
         </div>
 
+        {/* Reset Account */}
         <div className="settings-option">
           <div className="option-info">
             <span className="settings-option-title">Reset Account</span>
@@ -242,7 +313,9 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* Backup & Restore Section */}
+      {/* ------------------------------------------
+          Backup & Restore Section
+      ------------------------------------------ */}
       <div className="settings-section">
         <h3>Backup & Restore</h3>
         <div className="settings-option">
@@ -265,7 +338,13 @@ const Settings: React.FC = () => {
             </p>
             <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
               <input type="file" name="file" accept=".btx" required style={{ color: "#fff", flex: "1" }} />
-              <input type="password" name="password" placeholder="Password" required style={{ flex: "1", padding: "0.5rem" }} />
+              <input
+                type="password"
+                name="password"
+                placeholder="Password"
+                required
+                style={{ flex: "1", padding: "0.5rem" }}
+              />
               <button type="submit" disabled={loading} className="settings-button" style={{ flexShrink: 0 }}>
                 {loading ? "Processing..." : "Restore"}
               </button>
@@ -274,7 +353,9 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* Application Section */}
+      {/* ------------------------------------------
+          Application Section
+      ------------------------------------------ */}
       <div className="settings-section">
         <h3>Application</h3>
         <div className="settings-option">
