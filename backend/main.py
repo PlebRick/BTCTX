@@ -53,7 +53,8 @@ app = FastAPI(
         "double-entry system and FIFO cost basis. Session-based auth."
     ),
     version="1.0",
-    debug=True
+    debug=True,
+    redirect_slashes=True
 )
 
 # ---------------------------------------------------------
@@ -198,20 +199,24 @@ def logout(request: Request, response: Response):
     return {"detail": "Logged out successfully"}
 
 # ---------------------------------------------------------
-# Serve Vite Frontend Static Files with SPA Routing
+# ✅ Production: Serve React/Vite frontend
 # ---------------------------------------------------------
-class SPAStaticFiles(StaticFiles):
-    async def get_response(self, path: str, scope):
-        try:
-            return await super().get_response(path, scope)
-        except StarletteHTTPException as ex:
-            if ex.status_code == 404:
-                # Serve index.html for any 404 (unmatched routes)
-                return FileResponse(os.path.join(self.directory, "index.html"))
-            else:
-                raise
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi import HTTPException
 
-app.mount("/", SPAStaticFiles(directory="frontend/dist", html=True), name="static")
+# ✅ Serve built static assets (JS, CSS, fonts) under /static
+app.mount("/static", StaticFiles(directory="frontend/dist/assets"), name="static")
+
+# ✅ Catch-all route: Serve SPA index.html for unmatched frontend paths
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    # Prevent fallback from hijacking real API routes
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API route not found")
+
+    index_path = os.path.join("frontend", "dist", "index.html")
+    return FileResponse(index_path)
 
 # ---------------------------------------------------------
 # Root Route

@@ -26,10 +26,7 @@ const Settings: React.FC = () => {
   // -------------------------------------------
   const getUserId = async (): Promise<number | null> => {
     try {
-      // 🐛 Debug baseURL
-    console.log("🔥 Axios baseURL:", api.defaults.baseURL);
-    
-      const res = await api.get("/users");
+      const res = await api.get("/users/");
       const users = res.data as { id: number; username: string }[];
       return users.length > 0 ? users[0].id : null;
     } catch (err) {

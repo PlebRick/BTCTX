@@ -75,12 +75,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.get("/", response_model=List[UserRead])
 def get_users(db: Session = Depends(get_db)):
-    """
-    Retrieve all registered users: GET /api/users
-
-    - In a single-user system, returns at most one user.
-    - Useful for debugging or verifying user existence.
-    """
+    print("✅ get_users() called")
     return get_all_users(db)
 
 @router.patch("/{user_id}", response_model=UserRead)
