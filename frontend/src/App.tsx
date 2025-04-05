@@ -1,4 +1,4 @@
-// FILE: frontend/src/App.tsx
+// frontend/src/App.tsx
 
 import React, { useEffect, useState } from "react";
 import "./styles/app.css";

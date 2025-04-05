@@ -18,7 +18,6 @@
     # 5) Build the React/Vite app into /app/frontend/dist
     RUN npm run build
     
-    
     # ------------------------------------------------------------------
     # Stage 2: Final (Backend + Frontend)
     # ------------------------------------------------------------------
@@ -29,11 +28,6 @@
     # Avoid caching pip packages
     ENV PIP_NO_CACHE_DIR=1
     
-    # Optional default secret key (override in production via environment variables)
-    ENV SECRET_KEY=default_secret_key
-    # Default DB path (again, overridden in production via environment variables)
-    ENV DATABASE_FILE=/data/bitcoin_tracker.db
-    
     # Install system-level dependencies
     RUN apt-get update && apt-get install -y --no-install-recommends \
         pdftk \
@@ -42,9 +36,11 @@
     
     # Create the /app directory and /data for DB storage
     WORKDIR /app
-    RUN mkdir -p /data
+    RUN mkdir -p /data && chmod 777 /data
     
-    # (Note: This Dockerfile runs as root by default, which is simplest for binding port 80.)
+    # If you remain root in python:3.11-slim, you don't need chown. 
+    # But if you switch to a non-root user, do:
+    # RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /data
     
     # Copy Python deps (requirements.txt) and install
     COPY backend/requirements.txt .

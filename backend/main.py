@@ -8,7 +8,7 @@ Key Roles:
  - Loads environment variables & configures session-based authentication
  - Adds CORS middleware for frontend integration
  - Includes 'transaction', 'account', 'user', 'bitcoin', and calculation routers
- - Serves the Vite frontend static files for SPA routing
+ - Serves the built React/Vite frontend from 'frontend/dist'
 """
 
 import os
@@ -16,12 +16,10 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import FileResponse
-from backend.routers import backup
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 # Load environment variables from a .env file at the project root
 load_dotenv()
@@ -113,8 +111,10 @@ try:
     from backend.routers import debug
     app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
 except ImportError:
-    print("WARNING: Could not import 'debug' router. If you need debug features, "
-          "ensure 'backend/routers/debug.py' exists.")
+    print(
+        "WARNING: Could not import 'debug' router. If you need debug features, "
+        "ensure 'backend/routers/debug.py' exists."
+    )
 
 # ---------------------------------------------------------
 # Session-Based Auth Helpers
@@ -174,20 +174,15 @@ def login(
       3) If valid, store user.id in session
       4) Return success message
     """
-    # 1) Get user from DB by username
     user = get_user_by_username(login_req.username, db)
     if not user:
         # For security, don't reveal which part is invalid
         raise HTTPException(status_code=401, detail="Invalid username or password.")
 
-    # 2) Check password with passlib
     if not user.verify_password(login_req.password):
         raise HTTPException(status_code=401, detail="Invalid username or password.")
 
-    # 3) Store user.id in session (or store username if you prefer)
     request.session["user_id"] = user.id
-
-    # 4) Return success
     return {"detail": f"Logged in as {user.username}"}
 
 @app.post("/api/logout")
@@ -199,34 +194,17 @@ def logout(request: Request, response: Response):
     return {"detail": "Logged out successfully"}
 
 # ---------------------------------------------------------
-# ✅ Production: Serve React/Vite frontend
+# Production: Serve React/Vite frontend from dist/ at "/"
 # ---------------------------------------------------------
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from fastapi import HTTPException
 
-# ✅ Serve built static assets (JS, CSS, fonts) under /static
-app.mount("/static", StaticFiles(directory="frontend/dist/assets"), name="static")
+# 1) Get absolute path to the compiled frontend dist folder
+frontend_dist = os.path.join(os.path.dirname(__file__), "../frontend/dist")
 
-# ✅ Catch-all route: Serve SPA index.html for unmatched frontend paths
-@app.get("/{full_path:path}")
-async def serve_spa(full_path: str):
-    # Prevent fallback from hijacking real API routes
-    if full_path.startswith("api/"):
-        raise HTTPException(status_code=404, detail="API route not found")
-
-    index_path = os.path.join("frontend", "dist", "index.html")
-    return FileResponse(index_path)
-
-# ---------------------------------------------------------
-# Root Route
-# ---------------------------------------------------------
-@app.get("/")
-def read_root():
-    """
-    Basic root path to confirm the API is running.
-    """
-    return {"message": "Welcome to BitcoinTX - Double-Entry Accounting Ready!"}
+# 2) Mount the entire dist/ at root ("/"), enabling SPA fallback with html=True
+#    - This means if a path doesn't match a file in dist/, FastAPI serves index.html.
+#    - This automatically covers your JS, CSS, images, and client-side routes.
+app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
 # ---------------------------------------------------------
 # Local Testing
