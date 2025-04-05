@@ -1,62 +1,64 @@
-# -------------------------
-#    Stage 1: Frontend
-# -------------------------
-  FROM node:18-slim AS frontend-builder
+# ------------------------------------------------------------------
+# Stage 1: Frontend Builder
+# ------------------------------------------------------------------
+    FROM node:18-slim AS frontend-builder
 
-  # Create and move into /app/frontend
-  WORKDIR /app/frontend
-  
-  # Copy package files and install (includes devDependencies for build)
-  COPY frontend/package*.json ./
-  RUN npm ci
-  
-  # Copy the rest of your frontend source
-  COPY frontend/. .
-  
-  # Build the React app into frontend/dist
-  RUN npm run build
-  
-  
-  # -------------------------
-  #    Stage 2: Backend
-  # -------------------------
-  FROM python:3.11-slim AS backend
-  
-  # Avoid caching pip packages
-  ENV PIP_NO_CACHE_DIR=1
-  # Ensures stdout/stderr is unbuffered, so logs appear immediately
-  ENV PYTHONUNBUFFERED=1
-  # Give the app a default DB path in /data for persistence
-  # (You can override this at runtime if StartOS or Docker sets DATABASE_FILE)
-  ENV DATABASE_FILE=/data/bitcoin_tracker.db
-  
-  # Install system-level dependencies (pdftk, etc.)
-  RUN apt-get update && apt-get install -y --no-install-recommends \
-      pdftk \
-   && apt-get clean \
-   && rm -rf /var/lib/apt/lists/*
-  
-  # Create a directory for the backend code
-  WORKDIR /app
-  
-  # Copy your production Python requirements
-  COPY backend/requirements.txt .
-  RUN pip install --no-cache-dir -r requirements.txt
-  
-  # Copy the backend source code and the built frontend files
-  COPY backend/. ./backend
-  COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
-  
-  # Create non-root user and group for security
-  RUN groupadd -r app && useradd -r -g app app && \
-      mkdir -p /data && chown -R app:app /app /data
-  
-  # Switch to that user
-  USER app
-  
-  # Expose port 80 for StartOS to map
-  EXPOSE 80
-  
-  # Final startup command: run FastAPI via Uvicorn
-  CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "80"]
-  
+    # 1) Create and move into /app/frontend
+    WORKDIR /app/frontend
+    
+    # 2) Copy package.json + package-lock.json (or yarn.lock) for the frontend
+    COPY frontend/package*.json ./
+    
+    # 3) Install dependencies (includes devDependencies, used for build)
+    RUN npm ci
+    
+    # 4) Copy the rest of your frontend source
+    COPY frontend/ ./
+    
+    # 5) Build the React/Vite app into /app/frontend/dist
+    RUN npm run build
+    
+    
+    # ------------------------------------------------------------------
+    # Stage 2: Final (Backend + Frontend)
+    # ------------------------------------------------------------------
+    FROM python:3.11-slim AS backend
+    
+    # Ensures stdout/stderr is unbuffered, so logs appear immediately
+    ENV PYTHONUNBUFFERED=1
+    # Avoid caching pip packages
+    ENV PIP_NO_CACHE_DIR=1
+    
+    # Optional default secret key (override in production via environment variables)
+    ENV SECRET_KEY=default_secret_key
+    # Default DB path (again, overridden in production via environment variables)
+    ENV DATABASE_FILE=/data/bitcoin_tracker.db
+    
+    # Install system-level dependencies
+    RUN apt-get update && apt-get install -y --no-install-recommends \
+        pdftk \
+     && apt-get clean \
+     && rm -rf /var/lib/apt/lists/*
+    
+    # Create the /app directory and /data for DB storage
+    WORKDIR /app
+    RUN mkdir -p /data
+    
+    # (Note: This Dockerfile runs as root by default, which is simplest for binding port 80.)
+    
+    # Copy Python deps (requirements.txt) and install
+    COPY backend/requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+    
+    # Copy the backend code
+    COPY backend/ ./backend
+    
+    # Copy the built frontend artifacts from the first stage
+    COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+    
+    # Expose port 80 for production
+    EXPOSE 80
+    
+    # Final command: run the FastAPI app with Uvicorn on port 80
+    CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "80"]
+    
