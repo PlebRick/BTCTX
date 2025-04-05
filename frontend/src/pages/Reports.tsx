@@ -3,28 +3,27 @@ import { downloadPdfWithAxios } from "../api";
 import "../styles/reports.css"; // Our spinner CSS is also in here
 
 // Hardcoded base URL for your FastAPI server:
-const API_BASE = "http://localhost:8000";
+const API_BASE = "/api";
 
 // Example list of possible reports
 const REPORTS = [
   {
     key: "completeTax",
     label: "Complete Tax Report",
-    endpoint: "/api/reports/complete_tax_report",
+    endpoint: "/reports/complete_tax_report",
     pdfOnly: true,
   },
   {
     key: "irsReports",
     label: "IRS Reports (Form 8949, Schedule D, etc.)",
-    endpoint: "/api/reports/irs_reports",
+    endpoint: "/reports/irs_reports",
     pdfOnly: true,
   },
   {
     
-    // to "/api/reports/simple_transaction_history"
     key: "transactionHistory",
     label: "Transaction History",
-    endpoint: "/api/reports/simple_transaction_history",
+    endpoint: "/reports/simple_transaction_history",
     pdfOnly: false,
   },
 ];
