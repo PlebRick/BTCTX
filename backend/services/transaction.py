@@ -135,6 +135,21 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
     if new_tx.type in ("Sell", "Withdrawal"):
         compute_sell_summary_from_disposals(new_tx, db)
 
+    # Check if this is a backdated transaction (timestamp earlier than existing transactions)
+    # If so, we need to recalculate to ensure FIFO ordering is correct
+    latest_other_tx = (
+        db.query(Transaction)
+        .filter(Transaction.id != new_tx.id)
+        .order_by(Transaction.timestamp.desc())
+        .first()
+    )
+    if latest_other_tx and new_tx.timestamp < latest_other_tx.timestamp:
+        logger.info(
+            f"[Backdated Create] New tx {new_tx.id} at {new_tx.timestamp} is earlier than "
+            f"existing tx {latest_other_tx.id} at {latest_other_tx.timestamp}. Triggering recalculation."
+        )
+        recalculate_all_transactions(db)
+
     db.commit()
     db.refresh(new_tx)
     return new_tx
