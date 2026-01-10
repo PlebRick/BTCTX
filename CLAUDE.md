@@ -66,6 +66,9 @@ LotDisposal (FIFO consumption record)
 - **Image:** `b1ackswan/btctx:latest`
 - **Port:** 80
 - **Data Volume:** `/data` (SQLite database)
+- **Architectures:** `linux/amd64`, `linux/arm64` (multi-arch)
+
+> **IMPORTANT:** See [docs/STARTOS_COMPATIBILITY.md](docs/STARTOS_COMPATIBILITY.md) for critical requirements that must be maintained for StartOS packaging compatibility.
 
 ### Git State
 - **Primary Repo:** BitcoinTX-org/BTCTX (origin)
@@ -165,9 +168,16 @@ cd frontend && npm run build
 
 ### Running in Docker
 ```bash
+# Local single-arch build
 docker build -t btctx .
 docker run -p 80:80 -v btctx-data:/data btctx
+
+# Multi-arch build for production (required for StartOS compatibility)
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t b1ackswan/btctx:latest --push .
 ```
+
+> See [docs/STARTOS_COMPATIBILITY.md](docs/STARTOS_COMPATIBILITY.md) for full multi-arch build requirements.
 
 ### Testing Reports
 ```bash
@@ -195,8 +205,9 @@ When starting a new session, the AI should:
 1. Read this file first (`CLAUDE.md` - auto-detected in root)
 2. Check `docs/CHANGELOG.md` for recent changes
 3. Check `docs/ROADMAP.md` for current goals
-4. Run `git status` to see uncommitted changes
-5. Run `git log -5 --oneline` to see recent commits
+4. **Before any Docker/Dockerfile changes:** Review `docs/STARTOS_COMPATIBILITY.md`
+5. Run `git status` to see uncommitted changes
+6. Run `git log -5 --oneline` to see recent commits
 
 When ending a session:
 1. Update this file with any significant changes
