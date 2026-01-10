@@ -2,7 +2,162 @@
 
 > **CRITICAL:** This document explains how BitcoinTX generates IRS tax forms. This is complex code that uses workarounds for PDF form filling. Keep this document updated whenever changes are made.
 
-**Last Updated:** 2025-01-10
+**Last Updated:** 2026-01-10
+
+---
+
+## Year-Specific Field Differences (CRITICAL)
+
+> **READ THIS FIRST:** IRS changes PDF field names between years. The field mappings that work for 2024 forms will NOT work for 2025 forms. This section documents known differences.
+
+### Known Differences by Year
+
+| Year | Form 8949 Table Name | Field Format | Checkboxes (Short) | Checkboxes (Long) |
+|------|---------------------|--------------|--------------------|--------------------|
+| 2024 | `Table_Line1[0]` | `f1_3`, `f1_4` | A, B, C | D, E, F |
+| 2025 | `Table_Line1_Part1[0]` (Page 1), `Table_Line1_Part2[0]` (Page 2) | `f1_03`, `f1_04` (zero-padded) | A, B, C, G, H, I | D, E, F, J, K, L |
+
+### 2024 → 2025 Breaking Changes
+
+The IRS made significant field name changes for 2025:
+
+**1. Table Name Changed:**
+```
+# 2024
+topmostSubform[0].Page1[0].Table_Line1[0].Row1[0].f1_3[0]
+
+# 2025
+topmostSubform[0].Page1[0].Table_Line1_Part1[0].Row1[0].f1_03[0]
+```
+
+**2. Field Numbers Are Zero-Padded:**
+```
+# 2024: f1_3, f1_4, f1_5 ...
+# 2025: f1_03, f1_04, f1_05 ...
+```
+
+**3. New Checkboxes for Form 1099-DA:**
+
+| Box | Holding Period | Form 1099-DA | Basis Reported |
+|-----|----------------|--------------|----------------|
+| G | Short-term | Yes | Yes |
+| H | Short-term | Yes | No |
+| I | Short-term | Yes | Unknown |
+| J | Long-term | Yes | Yes |
+| K | Long-term | Yes | No |
+| L | Long-term | Yes | Unknown |
+
+**4. Schedule D Field Changes:**
+```
+# 2024: f1_07, f1_08, f1_01, f1_02
+# 2025: f1_7, f1_8, f1_1, f1_2 (NOT zero-padded, opposite of Form 8949!)
+```
+
+### How to Discover Field Names for New Years
+
+```bash
+# Extract all field names from a PDF
+pdftk backend/assets/irs_templates/2025/f8949.pdf dump_data_fields | grep FieldName
+
+# Compare two years
+pdftk backend/assets/irs_templates/2024/f8949.pdf dump_data_fields | grep FieldName > /tmp/2024.txt
+pdftk backend/assets/irs_templates/2025/f8949.pdf dump_data_fields | grep FieldName > /tmp/2025.txt
+diff /tmp/2024.txt /tmp/2025.txt
+```
+
+---
+
+## Dynamic Template and Field Selection (REQUIRED)
+
+### Template Path Selection
+
+The code MUST select the correct template folder based on the `year` parameter:
+
+```python
+# In reports.py - REQUIRED PATTERN
+def get_template_path(year: int, form_name: str) -> str:
+    """Get the template path for a specific tax year."""
+    template_path = os.path.join(_ASSETS_DIR, str(year), form_name)
+    if not os.path.exists(template_path):
+        raise HTTPException(
+            status_code=400,
+            detail=f"No template available for tax year {year}"
+        )
+    return template_path
+
+# Usage
+form_8949_path = get_template_path(year, "f8949.pdf")
+schedule_d_path = get_template_path(year, "f1040sd.pdf")
+```
+
+### Field Mapping Selection
+
+Field mappings vary by year. The code MUST use year-specific mappings:
+
+**Option A: In-Code Mappings (Current Approach)**
+```python
+# In form_8949.py
+def get_8949_field_config(year: int) -> dict:
+    """Return year-specific field configuration."""
+    if year >= 2025:
+        return {
+            "table_name_page1": "Table_Line1_Part1",
+            "table_name_page2": "Table_Line1_Part2",
+            "field_format": "{:02d}",  # Zero-padded
+            "checkboxes_short": ["A", "B", "C", "G", "H", "I"],
+            "checkboxes_long": ["D", "E", "F", "J", "K", "L"],
+        }
+    else:  # 2024 and earlier
+        return {
+            "table_name_page1": "Table_Line1",
+            "table_name_page2": "Table_Line1",
+            "field_format": "{}",  # Not zero-padded
+            "checkboxes_short": ["A", "B", "C"],
+            "checkboxes_long": ["D", "E", "F"],
+        }
+```
+
+**Option B: Config Files Per Year (Alternative)**
+```
+backend/assets/irs_templates/
+├── 2024/
+│   ├── f8949.pdf
+│   ├── f1040sd.pdf
+│   └── field_config.json    # Year-specific field mappings
+├── 2025/
+│   ├── f8949.pdf
+│   ├── f1040sd.pdf
+│   └── field_config.json
+```
+
+### Supported Years Validation
+
+The API should validate that templates exist for the requested year:
+
+```python
+def get_supported_years() -> list[int]:
+    """Return list of years with available templates."""
+    years = []
+    for item in os.listdir(_ASSETS_DIR):
+        item_path = os.path.join(_ASSETS_DIR, item)
+        if os.path.isdir(item_path) and item.isdigit():
+            # Check that required templates exist
+            if (os.path.exists(os.path.join(item_path, "f8949.pdf")) and
+                os.path.exists(os.path.join(item_path, "f1040sd.pdf"))):
+                years.append(int(item))
+    return sorted(years)
+
+# In endpoint
+@router.get("/irs_reports")
+def get_irs_reports(year: int, db: Session = Depends(get_db)):
+    supported = get_supported_years()
+    if year not in supported:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tax year {year} not supported. Available years: {supported}"
+        )
+    # ... continue with generation
+```
 
 ---
 
@@ -155,14 +310,23 @@ Return PDF bytes
 
 ## Form 8949 Field Mapping
 
-### Field Naming Convention
+> **Note:** This section shows the 2024 field patterns. See "Year-Specific Field Differences" above for 2025+ changes.
+
+### Field Naming Convention (2024)
 
 IRS PDF forms use deeply nested XPath-style field names:
 
 ```
 topmostSubform[0].Page1[0].Table_Line1[0].Row1[0].f1_3[0]
-                 ↑                        ↑       ↑
-                 Page number              Row     Field index
+                 ↑         ↑              ↑       ↑
+                 Page      Table name     Row     Field index
+```
+
+**For 2025+**, the pattern changes to:
+```
+topmostSubform[0].Page1[0].Table_Line1_Part1[0].Row1[0].f1_03[0]
+                          ↑                            ↑
+                          Part1 or Part2               Zero-padded
 ```
 
 ### Row Field Indices
@@ -197,11 +361,23 @@ base_index = 3 + (row_number - 1) * 8
 
 ### Full Field Name Construction
 
+**2024 Version:**
 ```python
-def field_name(page: int, row: int, field_offset: int) -> str:
+def field_name_2024(page: int, row: int, field_offset: int) -> str:
     base_index = 3 + (row - 1) * 8
     field_no = base_index + field_offset
     return f"topmostSubform[0].Page{page}[0].Table_Line1[0].Row{row}[0].f{page}_{field_no}[0]"
+```
+
+**2025+ Version:**
+```python
+def field_name_2025(page: int, row: int, field_offset: int) -> str:
+    base_index = 3 + (row - 1) * 8
+    field_no = base_index + field_offset
+    # Part1 for short-term (Page 1), Part2 for long-term (Page 2)
+    part = "Part1" if page == 1 else "Part2"
+    # Zero-pad field numbers
+    return f"topmostSubform[0].Page{page}[0].Table_Line1_{part}[0].Row{row}[0].f{page}_{field_no:02d}[0]"
 ```
 
 ### Multi-Page Handling
@@ -219,8 +395,11 @@ When there are more than 14 rows:
 
 Schedule D summarizes the Form 8949 totals.
 
+> **Note:** Schedule D field naming is inconsistent with Form 8949. In 2025, Schedule D uses NON-zero-padded field numbers while Form 8949 uses zero-padded.
+
 ### Short-Term (Part I, Line 1b)
 
+**2024:**
 ```python
 "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]"  # Proceeds
 "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_08[0]"  # Cost
@@ -228,8 +407,17 @@ Schedule D summarizes the Form 8949 totals.
 "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]"  # Gain/Loss
 ```
 
+**2025:**
+```python
+"topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_7[0]"   # Proceeds (NOT zero-padded!)
+"topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_8[0]"   # Cost
+"topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_9[0]"   # Adjustment (empty)
+"topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]"  # Gain/Loss
+```
+
 ### Long-Term (Part II, Line 8b)
 
+**2024:**
 ```python
 "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]"  # Proceeds
 "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]"  # Cost
@@ -237,38 +425,87 @@ Schedule D summarizes the Form 8949 totals.
 "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]"  # Gain/Loss
 ```
 
+**2025:** (Same field names - no changes detected)
+
 ---
 
 ## Checkbox Logic (Box Selection)
 
-Form 8949 has checkboxes to indicate the type of transaction:
+Form 8949 has checkboxes to indicate the type of transaction. **These changed significantly in 2025.**
 
-### Current Implementation (2024 Forms)
+### 2024 Checkboxes
 
-| Holding Period | Basis Reported to IRS | Box |
-|----------------|----------------------|-----|
-| Short-term | Yes | A |
-| Short-term | No | C |
-| Long-term | Yes | D |
-| Long-term | No | F |
+| Box | Holding Period | Form Type | Basis Reported |
+|-----|----------------|-----------|----------------|
+| A | Short-term | 1099-B | Yes |
+| B | Short-term | 1099-B | No |
+| C | Short-term | No 1099-B | N/A |
+| D | Long-term | 1099-B | Yes |
+| E | Long-term | 1099-B | No |
+| F | Long-term | No 1099-B | N/A |
 
 ```python
-def _determine_box(holding_period: str, basis_reported: bool):
+# 2024 Implementation
+def _determine_box_2024(holding_period: str, basis_reported: bool):
     if holding_period == "LONG":
         return "D" if basis_reported else "F"
     return "A" if basis_reported else "C"
 ```
 
-### 2025 Form Changes (Future)
+### 2025 Checkboxes (NEW - Includes Form 1099-DA)
 
-The 2025 forms add new boxes for digital assets reported on Form 1099-DA:
-- **Box G**: Short-term, 1099-DA, basis reported
-- **Box H**: Short-term, 1099-DA, basis NOT reported
-- **Box J**: Long-term, 1099-DA, basis reported
-- **Box K**: Long-term, 1099-DA, basis NOT reported
-- **Box L**: Long-term digital assets NOT on 1099-DA or 1099-B
+| Box | Holding Period | Form Type | Basis Reported |
+|-----|----------------|-----------|----------------|
+| A | Short-term | 1099-B | Yes |
+| B | Short-term | 1099-B | No |
+| C | Short-term | No 1099-B/1099-DA | N/A |
+| **G** | Short-term | **1099-DA** | Yes |
+| **H** | Short-term | **1099-DA** | No |
+| **I** | Short-term | **1099-DA** | Unknown |
+| D | Long-term | 1099-B | Yes |
+| E | Long-term | 1099-B | No |
+| F | Long-term | No 1099-B/1099-DA | N/A |
+| **J** | Long-term | **1099-DA** | Yes |
+| **K** | Long-term | **1099-DA** | No |
+| **L** | Long-term | **1099-DA** | Unknown |
 
-This will require updating `_determine_box()` when 2025 templates are adopted.
+```python
+# 2025 Implementation (requires knowing if transaction was on 1099-DA)
+def _determine_box_2025(holding_period: str, basis_reported: bool, has_1099_da: bool = False):
+    if holding_period == "LONG":
+        if has_1099_da:
+            return "J" if basis_reported else "K"
+        return "D" if basis_reported else "F"
+    else:  # SHORT
+        if has_1099_da:
+            return "G" if basis_reported else "H"
+        return "A" if basis_reported else "C"
+```
+
+### Checkbox Field Names
+
+**2024:** 3 checkboxes per part
+```
+topmostSubform[0].Page1[0].c1_1[0]  # Box A
+topmostSubform[0].Page1[0].c1_1[1]  # Box B
+topmostSubform[0].Page1[0].c1_1[2]  # Box C
+```
+
+**2025:** 6 checkboxes per part
+```
+topmostSubform[0].Page1[0].c1_1[0]  # Box A
+topmostSubform[0].Page1[0].c1_1[1]  # Box B
+topmostSubform[0].Page1[0].c1_1[2]  # Box C
+topmostSubform[0].Page1[0].c1_1[3]  # Box G (NEW)
+topmostSubform[0].Page1[0].c1_1[4]  # Box H (NEW)
+topmostSubform[0].Page1[0].c1_1[5]  # Box I (NEW)
+```
+
+### Note on 1099-DA Support
+
+For a self-custody Bitcoin tracker like BitcoinTX, users typically do NOT receive Form 1099-DA (which is issued by custodial exchanges). The app currently assumes Box C/F (no 1099 received).
+
+Future enhancement could add a field to transactions indicating whether a 1099-DA was received, enabling proper box G-L selection.
 
 ---
 
