@@ -1,4 +1,3 @@
-
 # BitcoinTX – Bitcoin Portfolio & Tax Tracker
 
 **BitcoinTX** is a free, open-source Bitcoin portfolio tracker and tax report generator.
@@ -23,49 +22,65 @@ It tracks your BTC and USD balances using **double-entry accounting** and helps 
 
 ---
 
-## Live Tech Stack
+## Tech Stack
 
 | Layer        | Tech                                      |
 | ------------ | ----------------------------------------- |
 | Frontend     | React + TypeScript + Vite                 |
 | Backend      | FastAPI + SQLAlchemy + SQLite             |
-| Dev Tools    | Conda + VSCode DevContainer + Docker      |
-| Report Tools | pandas, pdftk, WeasyPrint, PyPDF2, Jinja2 |
-| Bitcoin API  | Kraken (primary), CoinGecko, CoinDesk     |
+| Deployment   | Docker (single container)                 |
+| Report Tools | pdftk, pypdf, ReportLab                   |
+| Bitcoin API  | CoinGecko (primary), Kraken, CoinDesk     |
 
 ---
 
 ## Features
 
-- 📈 **Dashboard**: BTC holdings, USD balance, realized/unrealized gains
-- 🧾 **Transaction Form**: Deposits, Withdrawals, Transfers, Buys, Sells
-- 💼 **Double-Entry Ledger**: Every transaction creates linked debit/credit lines
-- 🪙 **BTC Lots & FIFO Tracking**: Acquired BTC is consumed in order
-- 📊 **Reports**: Tax reports, cost basis summaries, income history
-- 🧮 **BTC Tools**: Calculator and converter with historical BTC price support
-- 🔐 **Session-based Auth**: Login system for single user with hashed password
+- **Dashboard**: BTC holdings, USD balance, realized/unrealized gains
+- **Transaction Form**: Deposits, Withdrawals, Transfers, Buys, Sells
+- **Double-Entry Ledger**: Every transaction creates linked debit/credit lines
+- **BTC Lots & FIFO Tracking**: Acquired BTC is consumed in order
+- **Reports**: IRS Form 8949, Schedule D, tax summaries, transaction history (PDF/CSV)
+- **BTC Tools**: Calculator and converter with historical BTC price support
+- **Session-based Auth**: Login system for single user with hashed password
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-> 📘 See [`SETUP_GUIDE.md`](./SETUP_GUIDE.md) for step-by-step instructions.
+### Docker (Recommended)
+
+```bash
+# Pull and run
+docker pull b1ackswan/btctx:latest
+docker run -d -p 80:80 -v btctx-data:/data b1ackswan/btctx:latest
+
+# Open http://localhost in your browser
+```
+
+### Local Development
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourname/BitcoinTX.git
-cd BitcoinTX
+git clone https://github.com/BitcoinTX-org/BTCTX.git
+cd BTCTX
 
-# Set up Conda and frontend
-conda activate btctx-env
-conda env update -f environment.yml
-cd frontend && npm install
+# Backend setup (Python 3.9+)
+cp .env.example .env
+pip install -r backend/requirements.txt
 
-# Create DB & start backend
-cd ..
-python backend/create_db.py
-uvicorn backend.main:app --reload
+# Frontend setup
+cd frontend && npm install && npm run build && cd ..
 
-# In new terminal
-cd frontend && npm run dev
+# Run
+uvicorn backend.main:app --reload --port 8000
+# Open http://localhost:8000
 ```
+
+### Requirements
+
+- **Python 3.9+** (3.11 recommended)
+- **Node.js 18+** (for frontend build)
+- **pdftk** (for IRS form generation)
+  - macOS: `brew install pdftk-java`
+  - Linux: `apt-get install pdftk`
