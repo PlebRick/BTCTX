@@ -6,9 +6,10 @@ All notable changes to BitcoinTX are documented in this file.
 
 ### Added
 - `docs/` directory for project documentation
-- `docs/CLAUDE.md` - AI assistant context file for session continuity
+- `CLAUDE.md` - AI assistant context file (root directory for auto-detection)
 - `docs/CHANGELOG.md` - This file
 - `docs/ROADMAP.md` - Future goals and planned features
+- `docs/STARTOS_COMPATIBILITY.md` - Docker requirements for StartOS packaging
 
 ### Changed
 - Updated `README.md` with current Docker instructions and accurate tech stack

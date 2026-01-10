@@ -4,19 +4,26 @@
 
 Package BitcoinTX for Start9's StartOS platform to enable easy self-hosting.
 
-### Requirements
-- [ ] Create `manifest.yaml` with app metadata
-- [ ] Create `docker_entrypoint.sh` for container startup
-- [ ] Add health check endpoint (may use existing `/api/health` or create new)
-- [ ] Create `instructions.md` for user documentation
-- [ ] Add app icon (`icon.png`)
-- [ ] Configure Tor integration (StartOS apps typically run over Tor)
+### Status
+A separate wrapper repository handles StartOS packaging: [BTCTX-StartOS](https://github.com/PlebRick/BTCTX-StartOS)
+
+### Requirements (This Repo)
+- [x] Docker image published to `b1ackswan/btctx:latest`
+- [x] Multi-arch support (amd64/arm64) - see `docs/STARTOS_COMPATIBILITY.md`
+- [x] Single container with FastAPI + React on port 80
+- [x] Data persistence via `/data` volume mount
+- [ ] Build and push multi-arch image to Docker Hub
+- [ ] Test sideload to StartOS
+
+### Requirements (Wrapper Repo)
+- [ ] Create StartOS manifest and procedures
+- [ ] Configure Tor integration
 - [ ] Set up backup/restore for SQLite database
 - [ ] Build and test `.s9pk` package
 
 ### Resources
 - Start9 Developer Docs: https://docs.start9.com/latest/developer-docs/
-- Example packages: https://github.com/Start9Labs/
+- StartOS SDK: https://github.com/Start9Labs/start-sdk
 
 ---
 

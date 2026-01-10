@@ -14,11 +14,11 @@ It tracks your BTC and USD balances using **double-entry accounting** and helps 
 
 ## Project Goals
 
-- ✅ Track every Bitcoin transaction manually (no exchange sync)
-- ✅ Use **FIFO** for cost basis tracking
-- ✅ Produce IRS-compliant reports (PDF or CSV)
-- ✅ Give you full control and visibility — **self-hosted**
-- ✅ Educate new developers with clear architecture and documentation
+- Track every Bitcoin transaction manually (no exchange sync)
+- Use **FIFO** for cost basis tracking
+- Produce IRS-compliant reports (PDF or CSV)
+- Full control and visibility — **self-hosted**
+- Clear architecture and documentation for developers
 
 ---
 
