@@ -35,12 +35,13 @@
   gap: 1.5rem;
   margin-bottom: 1.5rem;
   justify-content: flex-start;  /* left‐justify the cards */
+  align-items: stretch;    /* make cards equal height within row */
 }
 
 /* Cards:
    - bigger min/max widths, so they start out larger & remain responsive. */
 .card {
-  flex: 1 1 auto;        /* grow & shrink as needed */
+  flex: 1 1 0;           /* equal basis for all cards */
   min-width: 360px;      /* bigger minimum than before */
   max-width: 650px;      /* bigger maximum than before */
   background-color: var(--card-bg);
@@ -115,7 +116,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 4rem;
+  flex: 1;                 /* fill remaining vertical space */
 }
 
 .btc-price-value {
