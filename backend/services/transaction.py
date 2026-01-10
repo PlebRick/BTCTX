@@ -677,33 +677,46 @@ def compute_sell_summary_from_disposals(tx: Transaction, db: Session):
 
 def get_btc_price(timestamp: datetime, db: Session) -> Decimal:
     """
-    Fetch the historical BTC price in USD at the given timestamp from /api/bitcoin/price/history.
-    If that fails, fallback to live price.
+    Fetch the historical BTC price in USD at the given timestamp.
+    Uses the bitcoin service directly (no HTTP calls to self).
+    If historical fails, fallback to live price.
     """
+    import asyncio
+    from backend.services.bitcoin import get_historical_price, get_current_price
+
+    timestamp_str = timestamp.strftime("%Y-%m-%d")
+
     try:
-        timestamp_str = timestamp.strftime("%Y-%m-%d")
-        response = requests.get(
-            "http://localhost:8000/api/bitcoin/price/history",
-            params={"date": timestamp_str}
-        )
-        response.raise_for_status()
-        price_data = response.json()
-        if "USD" not in price_data:
-            raise ValueError("USD price not found in response")
-        return Decimal(str(price_data["USD"]))
-    except (requests.RequestException, ValueError, KeyError) as e:
-        # Attempt fallback to live
+        # Try to get historical price
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            live_resp = requests.get("http://localhost:8000/api/bitcoin/price")
-            live_resp.raise_for_status()
-            live_price_data = live_resp.json()
-            if "USD" in live_price_data:
-                return Decimal(str(live_price_data["USD"]))
-        except (requests.RequestException, ValueError, KeyError):
+            price_data = loop.run_until_complete(get_historical_price(timestamp_str))
+            if "USD" in price_data:
+                return Decimal(str(price_data["USD"]))
+        finally:
+            loop.close()
+    except Exception as e:
+        # Fallback to live price
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                live_price_data = loop.run_until_complete(get_current_price())
+                if "USD" in live_price_data:
+                    return Decimal(str(live_price_data["USD"]))
+            finally:
+                loop.close()
+        except Exception:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to fetch BTC price: {str(e)}"
             )
+
+    raise HTTPException(
+        status_code=500,
+        detail="Failed to fetch BTC price: No USD price returned"
+    )
 
 
 def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
