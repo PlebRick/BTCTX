@@ -104,8 +104,9 @@ git push plebrick master --tags  # Sync backup at releases
 ```
 
 ### Current Version
-- **Latest Tag:** (none yet - pre-release)
-- **Next Milestone:** v1.0.0 (after StartOS packaging)
+- **Latest Tag:** `v0.1.0-alpha` (2025-01-10)
+- **Next Milestone:** `v0.2.0-beta` (after StartOS packaging)
+- **Target Release:** `v1.0.0`
 
 ---
 
