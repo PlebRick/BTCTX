@@ -71,7 +71,41 @@ LotDisposal (FIFO consumption record)
 - **Primary Repo:** BitcoinTX-org/BTCTX (origin)
 - **Backup Repo:** PlebRick/BTCTX (plebrick remote)
 - **Branches:** `master` (production), `develop` (active work)
-- **Current Commit:** 446a551 "Fix BTC price fetching for Docker compatibility"
+
+---
+
+## Git Workflow & Versioning
+
+### Remotes
+| Remote | Repo | Push Frequency |
+|--------|------|----------------|
+| `origin` | BitcoinTX-org/BTCTX | Every commit during development |
+| `plebrick` | PlebRick/BTCTX | **Only at stable milestones/releases** |
+
+**IMPORTANT:** Do NOT push to `plebrick` automatically. Only sync when explicitly requested or at tagged releases.
+
+### Branches
+- `develop` - Active development, push here regularly
+- `master` - Production-ready code, merge from develop when stable
+
+### Tags & Releases
+Use semantic versioning: `vMAJOR.MINOR.PATCH`
+- **MAJOR**: Breaking changes
+- **MINOR**: New features (backward compatible)
+- **PATCH**: Bug fixes
+
+```bash
+# Create a release
+git checkout master
+git merge develop
+git tag -a v1.0.0 -m "Release v1.0.0: Description"
+git push origin master --tags
+git push plebrick master --tags  # Sync backup at releases
+```
+
+### Current Version
+- **Latest Tag:** (none yet - pre-release)
+- **Next Milestone:** v1.0.0 (after StartOS packaging)
 
 ---
 
@@ -157,7 +191,7 @@ curl "http://localhost:8000/api/reports/simple_transaction_history?year=2024&for
 ## Handoff Checklist
 
 When starting a new session, the AI should:
-1. Read this file first (`docs/CLAUDE.md`)
+1. Read this file first (`CLAUDE.md` - auto-detected in root)
 2. Check `docs/CHANGELOG.md` for recent changes
 3. Check `docs/ROADMAP.md` for current goals
 4. Run `git status` to see uncommitted changes
