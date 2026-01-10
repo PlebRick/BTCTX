@@ -696,15 +696,12 @@ def test_withdrawal_btc_donation():
 
 
 def test_withdrawal_btc_lost():
-    """Test: Withdrawal BTC as Lost (currently treated as no gain/loss per code).
+    """Test: Withdrawal BTC as Lost (capital loss equal to cost basis).
 
-    BUG IDENTIFIED: The current implementation forces realized_gain to 0 for "Lost"
-    withdrawals (line 625-626 in transaction.py). According to IRS rules, lost BTC
-    should result in a capital loss equal to the cost basis (proceeds=0, gain=-cost_basis).
-
-    This test documents the CURRENT behavior, not the EXPECTED IRS-compliant behavior.
+    Lost BTC should result in a capital loss: proceeds = $0, so
+    gain = $0 - cost_basis = negative (a deductible loss).
     """
-    log("TEST: Withdrawal BTC (Lost) - KNOWN BUG", "TEST")
+    log("TEST: Withdrawal BTC (Lost)", "TEST")
     delete_all_transactions()
 
     create_tx({
@@ -732,14 +729,13 @@ def test_withdrawal_btc_lost():
 
     assert_true("error" not in lost_tx, "Lost withdrawal created")
 
-    # CURRENT BEHAVIOR (BUG): Lost BTC shows 0 gain (should be -$4,000 loss)
-    # TODO: Fix transaction.py lines 625-626 to allow negative gain for "Lost"
+    # Lost BTC should show a capital loss equal to cost basis
     lost_detail = get_transaction(lost_tx["id"])
     realized_gain = float(lost_detail.get("realized_gain_usd") or 0)
 
-    # Document current behavior (BUG: should be -4000.0)
-    assert_equal(realized_gain, 0.0, "Lost BTC - CURRENT BUG: shows 0 instead of loss")
-    log("BUG: Lost BTC should show loss of $4,000 (0 proceeds - $4,000 cost basis)", "WARN")
+    # Cost basis for 0.1 BTC at $40,000/BTC = $4,000
+    # Proceeds = $0, so loss = $0 - $4,000 = -$4,000
+    assert_equal(realized_gain, -4000.0, "Lost BTC results in capital loss")
 
     return True
 
@@ -1247,16 +1243,8 @@ def test_sell_with_loss():
 
 
 def test_insufficient_btc_balance():
-    """Test: Attempting to sell more BTC than available.
-
-    BUG IDENTIFIED: The current implementation does NOT validate that sufficient BTC
-    is available before a Sell/Withdrawal. The FIFO disposal simply stops when lots
-    run out, potentially leaving a partial disposal without error.
-
-    This is inconsistent with Transfer validation which DOES check for sufficient BTC.
-    The sell/withdrawal should fail with an error when trying to dispose more than available.
-    """
-    log("TEST: Insufficient BTC Balance - KNOWN BUG", "TEST")
+    """Test: Attempting to sell more BTC than available should fail."""
+    log("TEST: Insufficient BTC Balance", "TEST")
     delete_all_transactions()
 
     # Setup: Only 1 BTC available
@@ -1282,7 +1270,7 @@ def test_insufficient_btc_balance():
         "cost_basis_usd": "40000"
     })
 
-    # Try to sell 2 BTC (only 1 available)
+    # Try to sell 2 BTC (only 1 available) - should fail
     sell_tx = create_tx({
         "type": "Sell",
         "timestamp": "2024-02-01T12:00:00Z",
@@ -1294,19 +1282,9 @@ def test_insufficient_btc_balance():
         "gross_proceeds_usd": "100000"
     })
 
-    # BUG: Currently this SUCCEEDS and does a partial disposal
-    # EXPECTED: Should fail with 400 error "Not enough BTC"
-    if "error" in sell_tx or sell_tx.get("status_code", 200) >= 400:
-        assert_true(True, "Selling more than available correctly fails")
-    else:
-        # Document the bug - it should have failed but didn't
-        assert_true(True, "BUG: Sell succeeded despite insufficient BTC")
-        log("BUG: Sell of 2 BTC succeeded with only 1 BTC available (should fail)", "WARN")
-
-        # Check what actually happened
-        sell_detail = get_transaction(sell_tx["id"])
-        cost_basis = float(sell_detail.get("cost_basis_usd", 0))
-        log(f"  Transaction cost_basis shows: ${cost_basis} (from partial disposal)", "WARN")
+    # Should fail with 400 error
+    assert_true("error" in sell_tx or sell_tx.get("status_code", 200) >= 400,
+                "Selling more than available correctly fails with error")
 
     return True
 
