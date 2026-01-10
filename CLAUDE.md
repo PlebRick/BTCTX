@@ -7,6 +7,21 @@
 
 ---
 
+## IMPORTANT: Always Start on `develop` Branch
+
+**At the start of every new session, ALWAYS checkout the `develop` branch before making any changes:**
+
+```bash
+git checkout develop
+git pull origin develop
+```
+
+- All development work happens on `develop`
+- Only merge to `master` for releases
+- Never commit directly to `master`
+
+---
+
 ## Project Overview
 
 BitcoinTX is a self-hosted Bitcoin portfolio tracker with IRS tax form generation capabilities.
