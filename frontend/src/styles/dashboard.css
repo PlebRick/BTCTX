@@ -14,17 +14,6 @@
   color: var(--text-color);
   padding: 2rem;
   min-height: 100vh;
-  font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
-}
-
-.dashboard {
-  /* Keep your existing background, text color, etc. */
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  /* Keep the same padding so there's consistent spacing from header/sidebar */
-  padding: 2rem;
-  min-height: 100vh;
-  font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
 /* Each row of cards can wrap if the screen is too narrow */

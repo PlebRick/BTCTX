@@ -62,7 +62,6 @@
 }
 
 .login-title {
-  font-family: 'Poppins', sans-serif; /* Or your preferred modern font */
   font-size: 2.4rem;
   font-weight: 600;
   color: var(--color-text);
@@ -96,7 +95,6 @@
   font-weight: 600;
   color: var(--color-text);
   text-align: center;
-  font-family: 'Poppins', sans-serif;
 }
 
 /* 

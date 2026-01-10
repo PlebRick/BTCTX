@@ -22,8 +22,8 @@
   --bitcoin-orange-hover: #e5830f;     /* Hover for the orange */
 
   /* Easily adjustable sidebar width & base font size */
-  --sidebar-width: 360px;
-  --base-font-size: 20px;
+  --sidebar-width: 300px;
+  --base-font-size: 16px;
 }
 
 /* Base font sizing & body defaults */
@@ -32,15 +32,26 @@ body {
   padding: 0;
   background-color: var(--color-bg);
   color: var(--color-text);
-  font-family: sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: var(--base-font-size);
   line-height: 1.4;
+}
+
+/* Ensure form elements inherit the font family */
+button,
+input,
+select,
+textarea,
+option {
+  font-family: inherit;
 }
 
 /* Flex container for sidebar + main content */
 .app-container {
   display: flex;
   min-height: 100vh; /* so the container spans full screen height */
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 /* ===============================
@@ -159,11 +170,14 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0; /* Allow flex item to shrink below content size */
+  overflow-x: auto;
 }
 
 .main-content {
   flex: 1;
   padding: 1rem;
+  min-width: 0; /* Allow content to shrink */
 }
 
 /* ===============================

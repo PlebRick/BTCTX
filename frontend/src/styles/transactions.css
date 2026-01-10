@@ -92,22 +92,20 @@
 /* 4) Transaction Row / Card */
 .transaction-card {
   display: grid;
-  /* For wide screens, define columns
-     (time, type, account, amount, fee, extra, disposal, edit button).
-  */
+  /* Flexible columns that adapt to available space */
   grid-template-columns:
-    80px   /* time-col */
-    80px   /* type-col */
-    160px  /* account-col */
-    300px  /* amount-col */
-    160px  /* fee-col */
-    1fr    /* extra col */
-    300px  /* disposal col */
-    45px;  /* edit button */
+    minmax(60px, 80px)   /* time-col */
+    minmax(50px, 70px)   /* type-col */
+    minmax(80px, 120px)  /* account-col */
+    minmax(150px, 1fr)   /* amount-col */
+    minmax(80px, 120px)  /* fee-col */
+    minmax(0, 1fr)       /* extra col */
+    minmax(150px, 1fr)   /* disposal col */
+    45px;                /* edit button */
 
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
 
   /* 
     5) Alternating row colors:
