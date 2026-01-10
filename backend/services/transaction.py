@@ -621,8 +621,10 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
             partial_proceeds = (ratio * Decimal(total_proceeds)).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
 
         disposal_gain = partial_proceeds - disposal_basis
-        # If Gift/Donation/Lost => override gain to 0
-        if tx.type == "Withdrawal" and purpose_lower in ("gift", "donation", "lost"):
+        # If Gift/Donation => override gain to 0 (no taxable event for giver)
+        # Note: "Lost" is NOT included here - lost BTC results in a capital loss
+        # (proceeds=0, gain = 0 - cost_basis = negative loss, which is deductible)
+        if tx.type == "Withdrawal" and purpose_lower in ("gift", "donation"):
             disposal_gain = Decimal("0.0")
 
         # Determine holding period
@@ -645,6 +647,13 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
 
         lot.remaining_btc -= Decimal(can_use)
         remaining_outflow -= can_use
+
+    # Validate that we had enough BTC to complete the disposal
+    if remaining_outflow > 0.000000001:  # Small epsilon for floating point
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not enough BTC to {tx.type.lower()} {btc_outflow:.8f} BTC"
+        )
 
     db.flush()
 
