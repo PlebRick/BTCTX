@@ -1,36 +1,15 @@
 # Roadmap
 
-## Current Priority: StartOS Packaging
+## Current Priority: Beta Testing & Refinement
 
-Package BitcoinTX for Start9's StartOS platform to enable easy self-hosting.
-
-### Status
-A separate wrapper repository handles StartOS packaging: [BTCTX-StartOS](https://github.com/PlebRick/BTCTX-StartOS)
-
-### Requirements (This Repo)
-- [x] Docker image published to `b1ackswan/btctx:latest`
-- [x] Multi-arch support (amd64/arm64) - see `docs/STARTOS_COMPATIBILITY.md`
-- [x] Single container with FastAPI + React on port 80
-- [x] Data persistence via `/data` volume mount
-- [ ] Build and push multi-arch image to Docker Hub
-- [ ] Test sideload to StartOS
-
-### Requirements (Wrapper Repo)
-- [ ] Create StartOS manifest and procedures
-- [ ] Configure Tor integration
-- [ ] Set up backup/restore for SQLite database
-- [ ] Build and test `.s9pk` package
-
-### Resources
-- Start9 Developer Docs: https://docs.start9.com/latest/developer-docs/
-- StartOS SDK: https://github.com/Start9Labs/start-sdk
+With StartOS packaging complete, focus shifts to testing and refining the application for production use.
 
 ---
 
 ## Future Enhancements
 
 ### High Priority
-- [ ] **Backdated transactions**: Recalculate cost basis when transactions are added with past dates
+- [ ] **2025 IRS form updates**: Update Form 8949/Schedule D templates when IRS releases 2025 versions
 - [ ] **CSV import**: Bulk import transactions from exchange exports
 - [ ] **Improved error handling**: Better user feedback for failed operations
 
@@ -51,6 +30,13 @@ A separate wrapper repository handles StartOS packaging: [BTCTX-StartOS](https:/
 ## Completed
 
 ### January 2025
+- [x] **StartOS packaging complete** - `.s9pk` tested and working
+- [x] Multi-arch Docker image (amd64/arm64) on Docker Hub
+- [x] Backdated transaction FIFO recalculation
+- [x] Lost BTC capital loss tax treatment fix
+- [x] Insufficient BTC validation
+- [x] UI responsiveness improvements
+- [x] IRS form generation documentation
 - [x] Docker container working with PDF generation
 - [x] All three report endpoints functional
 - [x] Python 3.9 compatibility

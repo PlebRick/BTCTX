@@ -122,8 +122,8 @@ git push plebrick master --tags  # Sync backup at releases
 ```
 
 ### Current Version
-- **Latest Tag:** `v0.1.1-alpha` (2025-01-10)
-- **Next Milestone:** `v0.2.0-beta` (after StartOS packaging)
+- **Latest Tag:** `v0.2.0-beta` (2025-01-10)
+- **Status:** StartOS packaging complete, entering beta testing
 - **Target Release:** `v1.0.0`
 
 ---
@@ -154,14 +154,20 @@ git push plebrick master --tags  # Sync backup at releases
 ## Known Issues & Future Work
 
 ### Deferred Items
-- [ ] Backdated transaction handling (recalculate cost basis retroactively)
 - [ ] Edge cases in FIFO calculations
 - [ ] Review PDF calculations for accuracy
+- [ ] 2025 IRS form template updates (when released)
 
 ### Planned Features
-- [ ] StartOS (Start9) packaging
 - [ ] CSV import for bulk transactions
 - [ ] Multi-user support (optional)
+
+### Completed This Session
+- [x] StartOS packaging (tested `.s9pk` working)
+- [x] Backdated transaction FIFO recalculation
+- [x] Lost BTC capital loss tax treatment
+- [x] Insufficient BTC validation
+- [x] UI responsiveness improvements
 
 ---
 
