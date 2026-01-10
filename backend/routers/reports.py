@@ -1,10 +1,23 @@
 # FILE: backend/routers/reports.py
 
-from fastapi import APIRouter, Depends, Response, Query
+from fastapi import APIRouter, Depends, Response, Query, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, List
 from io import BytesIO
 from pypdf import PdfReader, PdfWriter
+import os
+import subprocess
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Get absolute paths to IRS templates (works regardless of working directory)
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_BACKEND_DIR = os.path.dirname(_THIS_DIR)
+_ASSETS_DIR = os.path.join(_BACKEND_DIR, "assets", "irs_templates")
+
+PATH_FORM_8949 = os.path.join(_ASSETS_DIR, "Form_8949_Fillable_2024.pdf")
+PATH_SCHEDULE_D = os.path.join(_ASSETS_DIR, "Schedule_D_Fillable_2024.pdf")
 
 # Database & internal imports
 from backend.database import get_db
@@ -54,59 +67,78 @@ def get_irs_reports(
     using pdftk to remove XFA and flatten at each step.
     Then merges all partial PDFs into a final flattened file.
     """
-    # 1) Gather rows for Form 8949 + schedule totals
-    report_data = build_form_8949_and_schedule_d(year, db)
-    short_rows = [Form8949Row(**r) for r in report_data["short_term"]]
-    long_rows = [Form8949Row(**r) for r in report_data["long_term"]]
+    # 0) Pre-flight checks
+    _verify_pdftk_installed()
+    _verify_templates_exist()
 
-    path_8949 = "backend/assets/irs_templates/Form_8949_Fillable_2024.pdf"
-    path_sched_d = "backend/assets/irs_templates/Schedule_D_Fillable_2024.pdf"
-    partial_pdfs: List[bytes] = []
+    try:
+        # 1) Gather rows for Form 8949 + schedule totals
+        report_data = build_form_8949_and_schedule_d(year, db)
+        short_rows = [Form8949Row(**r) for r in report_data["short_term"]]
+        long_rows = [Form8949Row(**r) for r in report_data["long_term"]]
 
-    # 2) Fill short-term chunks (increment page number)
-    for page_idx, i in enumerate(range(0, len(short_rows), 14), start=1):
-        chunk = short_rows[i : i + 14]
-        field_data = map_8949_rows_to_field_data(chunk, page=page_idx)
-        pdf_bytes = fill_pdf_with_pdftk(path_8949, field_data)
-        partial_pdfs.append(pdf_bytes)
+        logger.info(f"Generating IRS reports for {year}: {len(short_rows)} short-term, {len(long_rows)} long-term disposals")
 
-    # 3) Fill long-term chunks (continue page numbering)
-    long_start_page = (len(short_rows) + 13) // 14 + 1
-    for page_idx, i in enumerate(range(0, len(long_rows), 14), start=long_start_page):
-        chunk = long_rows[i : i + 14]
-        field_data = map_8949_rows_to_field_data(chunk, page=page_idx)
-        pdf_bytes = fill_pdf_with_pdftk(path_8949, field_data)
-        partial_pdfs.append(pdf_bytes)
+        partial_pdfs: List[bytes] = []
 
-    # 4) Fill Schedule D totals
-    schedule_d_fields = {
-        # Short-term (line 1b)
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]": str(report_data["schedule_d"]["short_term"]["proceeds"]),
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_08[0]": str(report_data["schedule_d"]["short_term"]["cost"]),
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_09[0]": "",
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]": str(report_data["schedule_d"]["short_term"]["gain_loss"]),
+        # 2) Fill short-term chunks (increment page number)
+        for page_idx, i in enumerate(range(0, len(short_rows), 14), start=1):
+            chunk = short_rows[i : i + 14]
+            field_data = map_8949_rows_to_field_data(chunk, page=page_idx)
+            pdf_bytes = fill_pdf_with_pdftk(PATH_FORM_8949, field_data)
+            partial_pdfs.append(pdf_bytes)
 
-        # Long-term (line 8b)
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]": str(report_data["schedule_d"]["long_term"]["proceeds"]),
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]": str(report_data["schedule_d"]["long_term"]["cost"]),
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]": "",
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]": str(report_data["schedule_d"]["long_term"]["gain_loss"]),
-    }
-    # Also call fill_pdf_with_pdftk(...) for Schedule D
-    filled_sd_bytes = fill_pdf_with_pdftk(path_sched_d, schedule_d_fields)
-    partial_pdfs.append(filled_sd_bytes)
+        # 3) Fill long-term chunks (continue page numbering)
+        long_start_page = (len(short_rows) + 13) // 14 + 1
+        for page_idx, i in enumerate(range(0, len(long_rows), 14), start=long_start_page):
+            chunk = long_rows[i : i + 14]
+            field_data = map_8949_rows_to_field_data(chunk, page=page_idx)
+            pdf_bytes = fill_pdf_with_pdftk(PATH_FORM_8949, field_data)
+            partial_pdfs.append(pdf_bytes)
 
-    # 5) Merge partial PDFs in memory with pypdf
-    merged_pdf = _merge_all_pdfs(partial_pdfs)
+        # 4) Fill Schedule D totals
+        schedule_d_fields = {
+            # Short-term (line 1b)
+            "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]": str(report_data["schedule_d"]["short_term"]["proceeds"]),
+            "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_08[0]": str(report_data["schedule_d"]["short_term"]["cost"]),
+            "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_09[0]": "",
+            "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]": str(report_data["schedule_d"]["short_term"]["gain_loss"]),
 
-    # 6) Flatten the final merged PDF
-    final_pdf = flatten_pdf_with_pdftk(merged_pdf)
+            # Long-term (line 8b)
+            "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]": str(report_data["schedule_d"]["long_term"]["proceeds"]),
+            "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]": str(report_data["schedule_d"]["long_term"]["cost"]),
+            "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]": "",
+            "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]": str(report_data["schedule_d"]["long_term"]["gain_loss"]),
+        }
+        filled_sd_bytes = fill_pdf_with_pdftk(PATH_SCHEDULE_D, schedule_d_fields)
+        partial_pdfs.append(filled_sd_bytes)
 
-    return Response(
-        content=final_pdf,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename=\"IRSReports_{year}.pdf\"'}
-    )
+        # 5) Merge partial PDFs in memory with pypdf
+        merged_pdf = _merge_all_pdfs(partial_pdfs)
+
+        # 6) Flatten the final merged PDF
+        final_pdf = flatten_pdf_with_pdftk(merged_pdf)
+
+        logger.info(f"Successfully generated IRS reports for {year} ({len(final_pdf)} bytes)")
+
+        return Response(
+            content=final_pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename=\"IRSReports_{year}.pdf\"'}
+        )
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"pdftk failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"PDF generation failed: pdftk error - {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"IRS report generation failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"IRS report generation failed: {str(e)}"
+        )
 
 
 @reports_router.get("/simple_transaction_history")
@@ -147,3 +179,37 @@ def _merge_all_pdfs(pdf_list: List[bytes]) -> bytes:
     merged_stream = BytesIO()
     writer.write(merged_stream)
     return merged_stream.getvalue()
+
+
+def _verify_pdftk_installed():
+    """
+    Verify pdftk is installed and accessible.
+    Raises HTTPException with helpful message if not found.
+    """
+    import shutil
+    if shutil.which("pdftk") is None:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "pdftk is not installed or not in PATH. "
+                "Install with: brew install pdftk-java (macOS) or apt-get install pdftk (Linux)"
+            )
+        )
+
+
+def _verify_templates_exist():
+    """
+    Verify IRS PDF templates exist.
+    Raises HTTPException with helpful message if not found.
+    """
+    missing = []
+    if not os.path.exists(PATH_FORM_8949):
+        missing.append(f"Form 8949: {PATH_FORM_8949}")
+    if not os.path.exists(PATH_SCHEDULE_D):
+        missing.append(f"Schedule D: {PATH_SCHEDULE_D}")
+
+    if missing:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Missing IRS template PDFs: {', '.join(missing)}"
+        )

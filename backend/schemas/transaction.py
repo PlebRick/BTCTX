@@ -20,6 +20,8 @@ FIFO acquisitions/disposals are in BitcoinLot and LotDisposal schemas.
 - LotDisposalCreate, LotDisposalRead: partial usage of those BTC lots
 """
 
+from __future__ import annotations
+
 from enum import Enum
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional

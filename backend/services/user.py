@@ -10,6 +10,8 @@ Refactored to:
  - Use set_password(...) to hash it before storing.
 """
 
+from __future__ import annotations
+
 from sqlalchemy.orm import Session
 from backend.models.user import User
 from backend.schemas.user import UserCreate, UserUpdate
