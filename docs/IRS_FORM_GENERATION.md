@@ -45,13 +45,50 @@ We use `pdftk` (PDF Toolkit) with a multi-step workaround:
 
 ---
 
+## Multi-Year Form Strategy
+
+**Design Decision:** The app maintains all historical IRS form templates, allowing users to generate reports for any supported tax year.
+
+### Directory Structure
+
+```
+backend/assets/irs_templates/
+├── 2024/
+│   ├── f8949.pdf
+│   └── f1040sd.pdf
+├── 2025/
+│   ├── f8949.pdf
+│   └── f1040sd.pdf
+└── 2026/
+    └── (added January 2027)
+```
+
+### Why This Approach
+
+1. **Single codebase** - No maintaining multiple app versions
+2. **Amended returns** - Users can file late/amended returns for prior years
+3. **Simple updates** - New tax year = new folder + any field mapping changes
+4. **No version rollback** - Users always have latest app with all form years
+
+### Adding New Tax Year Forms
+
+When IRS releases new forms (typically late December):
+1. Create new year folder in `backend/assets/irs_templates/`
+2. Download fillable PDFs from IRS.gov
+3. Extract and compare field names (see "Updating for New Tax Years" section)
+4. Update field mappings if changed
+5. Bump minor version (e.g., v0.3.0 for 2025 forms)
+
+---
+
 ## File Structure
 
 ```
 backend/
 ├── assets/irs_templates/
-│   ├── Form_8949_Fillable_2024.pdf    # IRS Form 8949 template
-│   └── Schedule_D_Fillable_2024.pdf   # IRS Schedule D template
+│   └── [year]/                        # One folder per tax year
+│       ├── f8949.pdf                  # IRS Form 8949 template
+│       └── f1040sd.pdf                # IRS Schedule D template
 ├── services/reports/
 │   ├── pdftk_filler.py                # Core pdftk operations
 │   ├── pdf_utils.py                   # PDF flattening utility

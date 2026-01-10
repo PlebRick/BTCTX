@@ -22,6 +22,32 @@ git pull origin develop
 
 ---
 
+## Key Architectural Decisions
+
+### Multi-Year IRS Form Support
+
+**Decision:** The app maintains all historical IRS form templates in a year-based folder structure. This allows users to generate reports for any supported tax year without needing old app versions.
+
+```
+backend/assets/irs_templates/
+├── 2024/
+│   ├── f8949.pdf
+│   └── f1040sd.pdf
+├── 2025/
+│   └── ...
+```
+
+**Rationale:**
+- Users may need to file amended/late returns for prior years
+- Single codebase is simpler than maintaining multiple app versions
+- New tax year = add folder + update field mappings if changed
+
+**Versioning:** Bump minor version when adding new tax year forms (e.g., v0.3.0 for 2025 forms).
+
+See [docs/IRS_FORM_GENERATION.md](docs/IRS_FORM_GENERATION.md) for complete details.
+
+---
+
 ## Project Overview
 
 BitcoinTX is a self-hosted Bitcoin portfolio tracker with IRS tax form generation capabilities.
