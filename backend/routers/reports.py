@@ -24,6 +24,7 @@ from backend.services.reports import transaction_history
 from backend.services.reports.form_8949 import (
     build_form_8949_and_schedule_d,
     map_8949_rows_to_field_data,
+    get_schedule_d_field_config,
     Form8949Row,
 )
 
@@ -87,7 +88,7 @@ def get_irs_reports(
         # 2) Fill short-term chunks (increment page number)
         for page_idx, i in enumerate(range(0, len(short_rows), 14), start=1):
             chunk = short_rows[i : i + 14]
-            field_data = map_8949_rows_to_field_data(chunk, page=page_idx)
+            field_data = map_8949_rows_to_field_data(chunk, page=page_idx, year=year)
             pdf_bytes = fill_pdf_with_pdftk(path_form_8949, field_data)
             partial_pdfs.append(pdf_bytes)
 
@@ -95,24 +96,23 @@ def get_irs_reports(
         long_start_page = (len(short_rows) + 13) // 14 + 1
         for page_idx, i in enumerate(range(0, len(long_rows), 14), start=long_start_page):
             chunk = long_rows[i : i + 14]
-            field_data = map_8949_rows_to_field_data(chunk, page=page_idx)
+            field_data = map_8949_rows_to_field_data(chunk, page=page_idx, year=year)
             pdf_bytes = fill_pdf_with_pdftk(path_form_8949, field_data)
             partial_pdfs.append(pdf_bytes)
 
-        # 4) Fill Schedule D totals
-        # NOTE: Field mappings are currently 2024 format. Phase 3 will add year-specific mappings.
+        # 4) Fill Schedule D totals using year-specific field names
+        sd_config = get_schedule_d_field_config(year)
         schedule_d_fields = {
             # Short-term (line 1b)
-            "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]": str(report_data["schedule_d"]["short_term"]["proceeds"]),
-            "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_08[0]": str(report_data["schedule_d"]["short_term"]["cost"]),
-            "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_09[0]": "",
-            "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]": str(report_data["schedule_d"]["short_term"]["gain_loss"]),
-
+            sd_config["short_proceeds"]: str(report_data["schedule_d"]["short_term"]["proceeds"]),
+            sd_config["short_cost"]: str(report_data["schedule_d"]["short_term"]["cost"]),
+            sd_config["short_adjustment"]: "",
+            sd_config["short_gain_loss"]: str(report_data["schedule_d"]["short_term"]["gain_loss"]),
             # Long-term (line 8b)
-            "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]": str(report_data["schedule_d"]["long_term"]["proceeds"]),
-            "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]": str(report_data["schedule_d"]["long_term"]["cost"]),
-            "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]": "",
-            "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]": str(report_data["schedule_d"]["long_term"]["gain_loss"]),
+            sd_config["long_proceeds"]: str(report_data["schedule_d"]["long_term"]["proceeds"]),
+            sd_config["long_cost"]: str(report_data["schedule_d"]["long_term"]["cost"]),
+            sd_config["long_adjustment"]: "",
+            sd_config["long_gain_loss"]: str(report_data["schedule_d"]["long_term"]["gain_loss"]),
         }
         filled_sd_bytes = fill_pdf_with_pdftk(path_schedule_d, schedule_d_fields)
         partial_pdfs.append(filled_sd_bytes)

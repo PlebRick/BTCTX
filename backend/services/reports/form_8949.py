@@ -201,20 +201,120 @@ def _build_schedule_d_data(short_rows: List[Form8949Row], long_rows: List[Form89
 
 
 ##############################################################################
-# 3) FIELD-MAPPING HELPERS
+# 3) YEAR-SPECIFIC FIELD CONFIGURATION
 ##############################################################################
-def map_8949_rows_to_field_data(rows: List[Form8949Row], page: int = 1) -> Dict[str, str]:
+def get_8949_field_config(year: int) -> Dict:
     """
-    Fills up to 14 lines on a single Form 8949 page, matching official field naming
-    like:
-      Row1 => f1_3..f1_10,
-      Row2 => f1_11..f1_18, etc.
+    Return year-specific field configuration for Form 8949.
+
+    The IRS changes field names between years. Key differences:
+    - 2024: Table_Line1, fields start at f1_3 (not zero-padded)
+    - 2025+: Table_Line1_Part1/Part2, fields start at f1_03 (zero-padded for row 1)
+
+    Args:
+        year: Tax year (e.g., 2024, 2025)
+
+    Returns:
+        Dictionary with field naming configuration
+    """
+    if year >= 2025:
+        return {
+            "table_name_page1": "Table_Line1_Part1",
+            "table_name_page2": "Table_Line1_Part2",
+            "row1_base_index": 3,  # Row 1 starts at field index 3
+            "row1_zero_pad": True,  # f1_03, f1_04, ... f1_10
+            "row2_plus_zero_pad": False,  # f1_11, f1_12, ... (no padding after row 1)
+        }
+    else:  # 2024 and earlier
+        return {
+            "table_name_page1": "Table_Line1",
+            "table_name_page2": "Table_Line1",  # Same table name for both pages
+            "row1_base_index": 3,
+            "row1_zero_pad": False,  # f1_3, f1_4, ...
+            "row2_plus_zero_pad": False,
+        }
+
+
+def get_schedule_d_field_config(year: int) -> Dict[str, str]:
+    """
+    Return year-specific field names for Schedule D.
+
+    Key differences:
+    - 2024: Short-term row 1b uses f1_07, f1_08 (zero-padded)
+    - 2025+: Short-term row 1b uses f1_7, f1_8 (NOT zero-padded)
+    - Long-term row 8b is the same in both years
+
+    Args:
+        year: Tax year (e.g., 2024, 2025)
+
+    Returns:
+        Dictionary mapping field purposes to actual field names
+    """
+    if year >= 2025:
+        return {
+            # Short-term (line 1b) - NOT zero-padded in 2025
+            "short_proceeds": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_7[0]",
+            "short_cost": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_8[0]",
+            "short_adjustment": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_9[0]",
+            "short_gain_loss": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]",
+            # Long-term (line 8b) - same as 2024
+            "long_proceeds": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]",
+            "long_cost": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]",
+            "long_adjustment": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]",
+            "long_gain_loss": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]",
+        }
+    else:  # 2024 and earlier
+        return {
+            # Short-term (line 1b) - zero-padded in 2024
+            "short_proceeds": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]",
+            "short_cost": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_08[0]",
+            "short_adjustment": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_09[0]",
+            "short_gain_loss": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]",
+            # Long-term (line 8b)
+            "long_proceeds": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]",
+            "long_cost": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]",
+            "long_adjustment": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]",
+            "long_gain_loss": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]",
+        }
+
+
+##############################################################################
+# 4) FIELD-MAPPING HELPERS
+##############################################################################
+def map_8949_rows_to_field_data(rows: List[Form8949Row], page: int = 1, year: int = 2024) -> Dict[str, str]:
+    """
+    Fills up to 14 lines on a single Form 8949 page, using year-specific field naming.
+
+    Field naming varies by year:
+    - 2024: Table_Line1, f1_3, f1_4, ... (not zero-padded)
+    - 2025+: Table_Line1_Part1/Part2, f1_03, f1_04, ... (zero-padded for row 1)
 
     This version supports unlimited pages via dynamic naming:
       page=1 => f1_..., page=2 => f2_..., page=3 => f3_..., etc.
+
+    Args:
+        rows: List of Form8949Row objects (max 14 per page)
+        page: Page number (1, 2, 3, ...)
+        year: Tax year for field name selection
+
+    Returns:
+        Dictionary mapping field names to values
     """
     if len(rows) > 14:
         raise ValueError("Cannot fit more than 14 rows on one page")
+
+    # Get year-specific configuration
+    config = get_8949_field_config(year)
+
+    # Select table name based on page (Part1 for page 1, Part2 for page 2 in 2025+)
+    # For additional pages beyond 2, we use Part1 naming (short-term continuation)
+    if page == 1:
+        table_name = config["table_name_page1"]
+    elif page == 2:
+        table_name = config["table_name_page2"]
+    else:
+        # For pages 3+, use the page1 pattern (additional short-term pages)
+        table_name = config["table_name_page1"]
 
     # Use page as the prefix number => f1_, f2_, ...
     prefix_num = page
@@ -226,10 +326,18 @@ def map_8949_rows_to_field_data(rows: List[Form8949Row], page: int = 1) -> Dict[
         # row1 => base=3, row2 => base=11, row3 => base=19, etc.
         base_index = 3 + (i - 1) * 8
 
+        # Helper to format field number based on year/row
+        def format_field_no(field_no: int, row_num: int) -> str:
+            # In 2025, row 1 fields (3-10) are zero-padded, but row 2+ are not
+            if config["row1_zero_pad"] and row_num == 1 and field_no < 10:
+                return f"{field_no:02d}"
+            return str(field_no)
+
         # Helper to build the actual PDF field name
         def field_name(row_i: int, field_no: int) -> str:
+            formatted_no = format_field_no(field_no, row_i)
             return (
-                f"topmostSubform[0].Page{prefix_num}[0].Table_Line1[0].Row{row_i}[0].{prefix}{field_no}[0]"
+                f"topmostSubform[0].Page{prefix_num}[0].{table_name}[0].Row{row_i}[0].{prefix}{formatted_no}[0]"
             )
 
         # col (a) => offset=0 => description
@@ -267,61 +375,71 @@ def map_8949_rows_to_field_data(rows: List[Form8949Row], page: int = 1) -> Dict[
     return field_data
 
 
-def map_schedule_d_fields(schedule_d: Dict[str, Dict[str, Decimal]]) -> Dict[str, str]:
+def map_schedule_d_fields(schedule_d: Dict[str, Dict[str, Decimal]], year: int = 2024) -> Dict[str, str]:
     """
     Adapts short_term (line 1b) & long_term (line 8b) totals from 'schedule_d'
-    to your fillable PDF field naming:
+    to year-specific fillable PDF field naming.
 
-      topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0] => short proceeds
-      ...
-      topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0] => long proceeds
+    Field naming varies by year:
+    - 2024: Short-term row 1b uses f1_07, f1_08 (zero-padded)
+    - 2025+: Short-term row 1b uses f1_7, f1_8 (NOT zero-padded)
+
+    Args:
+        schedule_d: Dictionary with short_term and long_term totals
+        year: Tax year for field name selection
+
+    Returns:
+        Dictionary mapping field names to values
     """
     short_data = schedule_d["short_term"]
-    long_data  = schedule_d["long_term"]
+    long_data = schedule_d["long_term"]
+
+    # Get year-specific field names
+    config = get_schedule_d_field_config(year)
 
     return {
-        # short => line 1b fields
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]": str(short_data["proceeds"]),
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_08[0]": str(short_data["cost"]),
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_09[0]": "",  # adjustments
-        "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]": str(short_data["gain_loss"]),
-
-        # long => line 8b
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]": str(long_data["proceeds"]),
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]": str(long_data["cost"]),
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]": "",
-        "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]": str(long_data["gain_loss"]),
+        # Short-term (line 1b)
+        config["short_proceeds"]: str(short_data["proceeds"]),
+        config["short_cost"]: str(short_data["cost"]),
+        config["short_adjustment"]: "",  # adjustments
+        config["short_gain_loss"]: str(short_data["gain_loss"]),
+        # Long-term (line 8b)
+        config["long_proceeds"]: str(long_data["proceeds"]),
+        config["long_cost"]: str(long_data["cost"]),
+        config["long_adjustment"]: "",
+        config["long_gain_loss"]: str(long_data["gain_loss"]),
     }
 
 
 ##############################################################################
-# 4) MULTI-PAGE PDF GENERATION (HYBRID APPROACH)
+# 5) MULTI-PAGE PDF GENERATION (HYBRID APPROACH)
 ##############################################################################
 def fill_8949_multi_page(
     rows: List[Form8949Row],
     template_pdf_path: str,
     flatten: bool = True,
-    remove_xfa: bool = True
+    remove_xfa: bool = True,
+    year: int = 2024
 ) -> BytesIO:
     """
     Generates a multi-page Form 8949 PDF, handling more than 2 pages if needed.
-    Merges the best of both refactors:
-      1) Dynamic page numbers => unlimited pages (your approach).
-      2) Robust error handling + edge-case coverage (alternative approach).
+    Uses year-specific field naming for compatibility with different IRS form versions.
+
     - Splits rows into 14-row chunks.
-    - Maps each chunk to field data for its page index.
+    - Maps each chunk to field data for its page index using year-specific naming.
     - Fills and merges, removing XFA if requested.
     - Optionally flattens the final PDF.
-    
+
     Args:
         rows (List[Form8949Row]): The line items for Form 8949.
         template_pdf_path (str): Path to the fillable PDF template.
         flatten (bool, optional): Whether to flatten the final PDF. Defaults to True.
         remove_xfa (bool, optional): Whether to remove XFA references. Defaults to True.
+        year (int, optional): Tax year for field name selection. Defaults to 2024.
 
     Returns:
         BytesIO: A buffer containing the merged Form 8949 PDF. Caller must close if needed.
-    
+
     Raises:
         FileNotFoundError: If the template PDF is not found.
         RuntimeError: For failures during PDF fill/flatten operations.
@@ -351,8 +469,8 @@ def fill_8949_multi_page(
         for page_num, chunk in enumerate(chunks, start=1):
             logger.info(f"Processing Form 8949 page {page_num} with {len(chunk)} rows")
             try:
-                # Map to the correct field data, with dynamic page numbering
-                field_data = map_8949_rows_to_field_data(chunk, page=page_num)
+                # Map to the correct field data, with dynamic page numbering and year-specific naming
+                field_data = map_8949_rows_to_field_data(chunk, page=page_num, year=year)
             except ValueError as e:
                 raise RuntimeError(f"Page {page_num} chunk error: {str(e)}")
 
