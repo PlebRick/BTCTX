@@ -4,10 +4,30 @@ All notable changes to BitcoinTX are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **CSV import plan**: Comprehensive multi-phase plan for bulk transaction import
+  - Phase 1 (v0.4.0): Koinly CSV import, empty database only
+  - Phase 2 (v0.5.0): Native format + column mapping UI
+  - Phase 3 (future): Merge with existing data
+  - See `docs/CSV_IMPORT_PLAN.md` for full details
+
+---
+
+## [v0.3.1] - 2025-01-10
+
 ### Fixed
 - **Backup/restore in Docker/StartOS**: Fixed `backup.py` to use `DATABASE_FILE` environment variable
   - Previously used hardcoded path `backend/bitcoin_tracker.db` which didn't match Docker's `/data/btctx.db`
   - Backup and restore now work correctly in containerized environments
+- **Backup file cleanup race condition**: Fixed temp file deletion before streaming complete
+  - Now uses FastAPI `BackgroundTasks` to delete temp file after response completes
+
+### Documentation
+- **StartOS container architecture**: Comprehensive documentation in `docs/STARTOS_COMPATIBILITY.md`
+  - Two-repository architecture explanation
+  - Volume mounts and data persistence
+  - DATABASE_FILE environment variable
+  - Common mistakes to avoid
 
 ---
 

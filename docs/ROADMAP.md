@@ -1,36 +1,44 @@
 # Roadmap
 
-## Current Status: v0.3.0 - 2025 IRS Form Support ✅ COMPLETE
+## Current Status: v0.3.1 - Stable Release ✅
 
-Multi-year IRS form support is now implemented. Users can generate Form 8949 and Schedule D for both 2024 and 2025 tax years.
+Multi-year IRS form support is implemented. Users can generate Form 8949 and Schedule D for both 2024 and 2025 tax years.
 
 **Details:** See [2025_FORM_UPDATE_PLAN.md](2025_FORM_UPDATE_PLAN.md)
 
-### Completed Phases
-- [x] Phase 1: Reorganize templates into year-based folders
-- [x] Phase 2: Add dynamic template path selection
-- [x] Phase 3: Implement year-specific field mappings
-- [x] Phase 4: Enable and test 2025 form support
-- [ ] Phase 5: (Deferred to v0.4.0) Add 1099-DA checkbox support
-- [ ] Phase 6: Release v0.3.0 (pending Docker build/test)
-
-### Key Fixes in This Release
-- Schedule D uses Line 3/10 (Box C/F) for self-tracked crypto, not Line 1b/8b
-- Complete Tax Report generation fixed - Transfer lot restoration in partial re-lot
-- Comprehensive test dataset covering all deposit sources and withdrawal purposes
+### v0.3.1 Fixes
+- StartOS compatibility: DATABASE_FILE env var support in backup/restore
+- Fixed race condition in backup file download using BackgroundTasks
+- Comprehensive StartOS container documentation
 
 ---
 
-## Next Up: Beta Testing & Refinement
+## Next Up: v0.4.0 - CSV Import
 
-With 2025 form support complete, focus shifts to testing and refining the application.
+Enable users to import transactions from CSV files (Koinly exports, exchange exports, personal spreadsheets).
+
+**Details:** See [CSV_IMPORT_PLAN.md](CSV_IMPORT_PLAN.md)
+
+### Phase 1 (v0.4.0)
+- [ ] Koinly CSV import only
+- [ ] Empty database requirement (prevents accidental data corruption)
+- [ ] Preview before commit
+- [ ] Full validation and rollback safety
+
+### Phase 2 (v0.5.0)
+- [ ] BitcoinTX native CSV format
+- [ ] Column mapping UI for arbitrary CSVs
+- [ ] Saved mapping presets
+
+### Phase 3 (Future)
+- [ ] Merge with existing data (complex - requires duplicate detection)
 
 ---
 
 ## Future Enhancements
 
 ### High Priority
-- [ ] **CSV import**: Bulk import transactions from exchange exports
+- [ ] **CSV import**: See [CSV_IMPORT_PLAN.md](CSV_IMPORT_PLAN.md) - Target v0.4.0
 - [ ] **Improved error handling**: Better user feedback for failed operations
 
 ### Medium Priority
