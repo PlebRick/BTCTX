@@ -82,11 +82,11 @@ See [docs/IRS_FORM_GENERATION.md](IRS_FORM_GENERATION.md) section "Year-Specific
 
 ## Phased Implementation Plan
 
-### Phase 1: Infrastructure Setup (Low Risk) - COMPLETED
+### Phase 1: Infrastructure Setup (Low Risk) - ✅ COMPLETED
 
 **Goal:** Reorganize templates without changing any code logic
 
-**Status:** ✅ DONE
+**Status:** ✅ DONE (commit: 5f63277)
 
 **Completed:**
 - Created year-based folder structure
@@ -109,9 +109,11 @@ backend/assets/irs_templates/
 
 ---
 
-### Phase 2: Dynamic Template Selection (Medium Risk)
+### Phase 2: Dynamic Template Selection (Medium Risk) - ✅ COMPLETED
 
 **Goal:** Add year-based template path selection to reports.py
+
+**Status:** ✅ DONE (commit: afe7a49)
 
 **Tasks:**
 1. Add helper function in `reports.py`:
@@ -147,9 +149,11 @@ backend/assets/irs_templates/
 
 ---
 
-### Phase 3: Year-Specific Field Mappings (High Risk - Core Logic)
+### Phase 3: Year-Specific Field Mappings (High Risk - Core Logic) - ✅ COMPLETED
 
 **Goal:** Refactor field mapping to support different years
+
+**Status:** ✅ DONE (commit: 610113e)
 
 **Tasks:**
 1. Add field configuration function in `form_8949.py`:
@@ -196,9 +200,11 @@ backend/assets/irs_templates/
 
 ---
 
-### Phase 4: 2025 Form Support (Medium Risk)
+### Phase 4: 2025 Form Support (Medium Risk) - ✅ COMPLETED
 
 **Goal:** Verify and enable 2025 form filling
+
+**Status:** ✅ DONE - All field mappings verified against actual PDFs
 
 **Tasks:**
 1. Extract field names from 2025 PDFs:
@@ -260,8 +266,8 @@ backend/assets/irs_templates/
 | File | Changes | Status |
 |------|---------|--------|
 | `backend/assets/irs_templates/` | Reorganize to year folders | ✅ Done |
-| `backend/routers/reports.py` | Add `get_template_path()`, `get_supported_years()`, pass year to functions | Pending |
-| `backend/services/reports/form_8949.py` | Add `get_8949_field_config()`, update `map_8949_rows_to_field_data()`, `map_schedule_d_fields()` | Pending |
+| `backend/routers/reports.py` | Add `get_template_path()`, `get_supported_years()`, pass year to functions | ✅ Done |
+| `backend/services/reports/form_8949.py` | Add `get_8949_field_config()`, update `map_8949_rows_to_field_data()`, `map_schedule_d_fields()` | ✅ Done |
 | `docs/CHANGELOG.md` | Document changes | Pending |
 | `docs/ROADMAP.md` | Update status | Pending |
 
