@@ -3,8 +3,10 @@
 > **Purpose:** This document provides complete context for implementing 2025 IRS form support in BitcoinTX. It is designed to be read by a new AI chat session with full context.
 
 **Created:** 2025-01-10
+**Last Updated:** 2025-01-10
 **Pre-refactor Tag:** `v0.2.1-pre-refactor`
 **Target Release:** `v0.3.0`
+**Status:** ✅ **IMPLEMENTATION COMPLETE** - Ready for Phase 6 (Release)
 
 ---
 
@@ -204,32 +206,32 @@ backend/assets/irs_templates/
 
 **Goal:** Verify and enable 2025 form filling
 
-**Status:** ✅ DONE - All field mappings verified against actual PDFs
+**Status:** ✅ DONE (commits: 954617b, 4e3debe)
 
-**Tasks:**
-1. Extract field names from 2025 PDFs:
-   ```bash
-   pdftk backend/assets/irs_templates/2025/f8949.pdf dump_data_fields | grep FieldName
-   ```
+**Completed:**
+1. ✅ Extracted and verified field names from 2025 PDFs
+2. ✅ Fixed Schedule D field mapping to use Line 3/10 (Box C/F) instead of Line 1b/8b
+   - Self-tracked crypto uses Box C (short-term) and Box F (long-term) - not reported on 1099
+   - Line 3 for short-term totals, Line 10 for long-term totals
+3. ✅ Fixed Complete Tax Report generation bug - Transfer lot restoration in partial re-lot
+4. ✅ Created comprehensive test dataset (40 transactions spanning 2023-2025)
+5. ✅ Verified all reports generate correctly:
+   - Form 8949 (long-term transactions correctly categorized)
+   - Schedule D (Line 3 for short-term fee disposals, Line 10 for long-term gains)
+   - Complete Tax Report PDF
+   - Transaction History CSV
 
-2. Compare extracted fields with expected mappings from documentation
+**Key Fix:** `reporting_core.py` - `_partial_relot_strictly_after()` now properly restores lot balances for Transfer transactions when rebuilding after year boundary
 
-3. Adjust 2025 field config if any discrepancies found
+**Testing Results:**
+- ✅ 2025 Form 8949 generates with all fields populated
+- ✅ Schedule D Line 10 shows $69,775.92 long-term gains (correct)
+- ✅ Complete Tax Report generates without errors
+- ✅ Transaction History CSV matches all PDF data
 
-4. Test PDF generation with 2025 forms:
-   - Create test transactions dated in 2025
-   - Generate IRS reports for year=2025
-   - Verify all fields fill correctly
-
-5. Verify checkbox handling (currently uses C/F for all - correct for self-custody)
-
-**Testing:**
-- Generate 2024 report, verify unchanged
-- Generate 2025 report, verify all fields populate
-- Test multi-page scenarios
-- Test edge cases (empty data, single row, 14 rows, 15 rows)
-
-**Commit:** "Phase 4: Enable 2025 IRS form support"
+**Commits:**
+- `954617b` - Phase 4: Verify 2025 IRS form support complete
+- `4e3debe` - fix: Complete Tax Report generation and Schedule D field mapping
 
 ---
 
@@ -261,37 +263,39 @@ backend/assets/irs_templates/
 
 ---
 
-## Files to Modify
+## Files Modified
 
 | File | Changes | Status |
 |------|---------|--------|
 | `backend/assets/irs_templates/` | Reorganize to year folders | ✅ Done |
 | `backend/routers/reports.py` | Add `get_template_path()`, `get_supported_years()`, pass year to functions | ✅ Done |
-| `backend/services/reports/form_8949.py` | Add `get_8949_field_config()`, update `map_8949_rows_to_field_data()`, `map_schedule_d_fields()` | ✅ Done |
-| `docs/CHANGELOG.md` | Document changes | Pending |
-| `docs/ROADMAP.md` | Update status | Pending |
+| `backend/services/reports/form_8949.py` | Add `get_8949_field_config()`, update field mappings, fix Schedule D Line 3/10 | ✅ Done |
+| `backend/services/reports/reporting_core.py` | Fix Transfer lot restoration in `_partial_relot_strictly_after()` | ✅ Done |
+| `backend/tests/transaction_seed_data.json` | Comprehensive 40-transaction test dataset | ✅ Done |
+| `docs/CHANGELOG.md` | Document changes | ✅ Done |
+| `docs/ROADMAP.md` | Update status | ✅ Done |
 
 ---
 
 ## Testing Checklist
 
 ### Before Starting (Baseline)
-- [ ] Run existing tests: `python -m pytest backend/tests/`
-- [ ] Generate 2024 IRS report manually, save as reference
-- [ ] Verify `v0.2.1-pre-refactor` tag exists
+- [x] Run existing tests: `python -m pytest backend/tests/`
+- [x] Generate 2024 IRS report manually, save as reference
+- [x] Verify `v0.2.1-pre-refactor` tag exists
 
 ### After Each Phase
-- [ ] All existing tests pass
-- [ ] 2024 reports generate correctly
-- [ ] Compare output to baseline (should be identical until Phase 4)
+- [x] All existing tests pass
+- [x] 2024 reports generate correctly
+- [x] Compare output to baseline (should be identical until Phase 4)
 
 ### Final Verification
-- [ ] 2024 report matches baseline exactly
-- [ ] 2025 report generates without errors
-- [ ] 2025 report fields are filled correctly (manual inspection)
-- [ ] Multi-page reports work for both years
-- [ ] Docker build succeeds
-- [ ] Docker container generates reports correctly
+- [x] 2024 report matches baseline exactly
+- [x] 2025 report generates without errors
+- [x] 2025 report fields are filled correctly (manual inspection)
+- [x] Multi-page reports work for both years
+- [ ] Docker build succeeds (pending Phase 6)
+- [ ] Docker container generates reports correctly (pending Phase 6)
 
 ---
 
@@ -326,13 +330,25 @@ Read docs/2025_FORM_UPDATE_PLAN.md and docs/IRS_FORM_GENERATION.md. Phase 1 is c
 
 ## Summary for AI Assistant
 
-When starting this implementation:
+### Current Status: ✅ Phases 1-4 COMPLETE
 
-1. **Read first:** This file + `docs/IRS_FORM_GENERATION.md`
-2. **Verify baseline:** Run tests, generate 2024 report as reference
-3. **Follow phases sequentially:** Don't skip ahead
-4. **Commit after each phase:** Small, testable increments
-5. **Test thoroughly:** Compare outputs, run test suite
-6. **Rollback if needed:** `git checkout v0.2.1-pre-refactor`
+Implementation is complete and verified. Remaining work:
+- **Phase 5** (Optional): 1099-DA checkbox support - deferred to v0.4.0
+- **Phase 6**: Release v0.3.0 - Docker build, tag, push
 
-The goal is **working 2025 form support** without breaking 2024 functionality.
+### Key Implementation Details
+
+1. **Schedule D uses Line 3/10 (not 1b/8b)** for self-tracked crypto:
+   - Line 3: Short-term from Box C (no 1099)
+   - Line 10: Long-term from Box F (no 1099)
+
+2. **Transfer lot restoration fix** in `reporting_core.py`:
+   - `_partial_relot_strictly_after()` now restores source lot balances when undoing Transfers
+   - Uses LIFO to reverse FIFO consumption
+
+3. **Test data** covers all scenarios:
+   - Deposit sources: Income, Interest, Reward, Gift, MyBTC
+   - Withdrawal purposes: Spent, Gift, Donation, Lost
+   - FIFO with lots from 2023/2024 consumed in 2025 (long-term gains)
+
+The goal of **working 2025 form support without breaking 2024 functionality** has been achieved.
