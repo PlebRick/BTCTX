@@ -239,10 +239,13 @@ def get_schedule_d_field_config(year: int) -> Dict[str, str]:
     """
     Return year-specific field names for Schedule D.
 
-    Key differences:
-    - 2024: Short-term row 1b uses f1_07, f1_08 (zero-padded)
-    - 2025+: Short-term row 1b uses f1_7, f1_8 (NOT zero-padded)
-    - Long-term row 8b is the same in both years
+    IMPORTANT: Self-tracked crypto transactions (not reported on 1099-B/1099-DA) use:
+    - Line 3 (Box C or Box I) for short-term
+    - Line 10 (Box F or Box L) for long-term
+
+    Key differences by year:
+    - 2024: Row3 uses f1_15-f1_18, Row10 uses f1_35-f1_38
+    - 2025+: Same field numbers, different structure confirmed
 
     Args:
         year: Tax year (e.g., 2024, 2025)
@@ -252,29 +255,29 @@ def get_schedule_d_field_config(year: int) -> Dict[str, str]:
     """
     if year >= 2025:
         return {
-            # Short-term (line 1b) - NOT zero-padded in 2025
-            "short_proceeds": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_7[0]",
-            "short_cost": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_8[0]",
-            "short_adjustment": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_9[0]",
-            "short_gain_loss": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]",
-            # Long-term (line 8b) - same as 2024
-            "long_proceeds": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]",
-            "long_cost": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]",
-            "long_adjustment": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]",
-            "long_gain_loss": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]",
+            # Short-term (line 3 - Box C/I: not reported on 1099)
+            "short_proceeds": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_15[0]",
+            "short_cost": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_16[0]",
+            "short_adjustment": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_17[0]",
+            "short_gain_loss": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_18[0]",
+            # Long-term (line 10 - Box F/L: not reported on 1099)
+            "long_proceeds": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_35[0]",
+            "long_cost": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_36[0]",
+            "long_adjustment": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_37[0]",
+            "long_gain_loss": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_38[0]",
         }
     else:  # 2024 and earlier
         return {
-            # Short-term (line 1b) - zero-padded in 2024
-            "short_proceeds": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]",
-            "short_cost": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_08[0]",
-            "short_adjustment": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_09[0]",
-            "short_gain_loss": "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_10[0]",
-            # Long-term (line 8b)
-            "long_proceeds": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_27[0]",
-            "long_cost": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_28[0]",
-            "long_adjustment": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]",
-            "long_gain_loss": "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]",
+            # Short-term (line 3 - Box C: not reported on 1099)
+            "short_proceeds": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_15[0]",
+            "short_cost": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_16[0]",
+            "short_adjustment": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_17[0]",
+            "short_gain_loss": "topmostSubform[0].Page1[0].Table_PartI[0].Row3[0].f1_18[0]",
+            # Long-term (line 10 - Box F: not reported on 1099)
+            "long_proceeds": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_35[0]",
+            "long_cost": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_36[0]",
+            "long_adjustment": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_37[0]",
+            "long_gain_loss": "topmostSubform[0].Page1[0].Table_PartII[0].Row10[0].f1_38[0]",
         }
 
 

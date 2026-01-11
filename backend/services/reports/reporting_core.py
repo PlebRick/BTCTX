@@ -207,6 +207,64 @@ def _partial_relot_strictly_after(db: Session, boundary_dt: datetime):
     # 2) Delete ledger entries, disposals, and newly created lots for these TXs
     tx_ids = [tx.id for tx in affected_txs]
     db.query(LedgerEntry).filter(LedgerEntry.transaction_id.in_(tx_ids)).delete(synchronize_session=False)
+
+    # Before deleting disposals, restore remaining_btc to the source lots
+    # This ensures pre-boundary lots have correct balances for rebuilding
+    disposals_to_restore = (
+        db.query(LotDisposal)
+        .filter(LotDisposal.transaction_id.in_(tx_ids))
+        .all()
+    )
+    for disp in disposals_to_restore:
+        if disp.lot and disp.disposed_btc:
+            disp.lot.remaining_btc += disp.disposed_btc
+            db.add(disp.lot)
+    db.flush()
+
+    # For Transfer transactions, the destination lots need to be deleted
+    # and their amounts restored to source lots. Track what needs restoring.
+    transfer_lots_to_restore = (
+        db.query(BitcoinLot)
+        .join(Transaction, Transaction.id == BitcoinLot.created_txn_id)
+        .filter(
+            BitcoinLot.created_txn_id.in_(tx_ids),
+            Transaction.type == "Transfer"
+        )
+        .all()
+    )
+
+    # Find the source lots for each transfer and restore their remaining_btc
+    for dest_lot in transfer_lots_to_restore:
+        transfer_tx = dest_lot.created_transaction
+        if not transfer_tx:
+            continue
+        # The transfer moved BTC from from_account to to_account
+        # Find pre-boundary lots in the source account (from_account)
+        # and restore the transferred amount to them (LIFO to undo FIFO consumption)
+        amount_to_restore = dest_lot.total_btc + (transfer_tx.fee_amount or Decimal("0"))
+        source_lots = (
+            db.query(BitcoinLot)
+            .join(Transaction, Transaction.id == BitcoinLot.created_txn_id)
+            .filter(
+                Transaction.to_account_id == transfer_tx.from_account_id,
+                Transaction.timestamp <= boundary_dt,
+                BitcoinLot.created_txn_id.notin_(tx_ids)  # Pre-boundary lots only
+            )
+            .order_by(BitcoinLot.acquired_date.desc())  # LIFO to undo FIFO
+            .all()
+        )
+        for src_lot in source_lots:
+            if amount_to_restore <= 0:
+                break
+            # Restore up to the lot's original total
+            can_restore = src_lot.total_btc - src_lot.remaining_btc
+            restore_amt = min(can_restore, amount_to_restore)
+            if restore_amt > 0:
+                src_lot.remaining_btc += restore_amt
+                db.add(src_lot)
+                amount_to_restore -= restore_amt
+    db.flush()
+
     db.query(LotDisposal).filter(LotDisposal.transaction_id.in_(tx_ids)).delete(synchronize_session=False)
     db.query(BitcoinLot).filter(BitcoinLot.created_txn_id.in_(tx_ids)).delete(synchronize_session=False)
     db.flush()
