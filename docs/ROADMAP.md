@@ -1,23 +1,24 @@
 # Roadmap
 
-## Current Priority: Beta Testing & Refinement
+## Current Status: v0.3.0 - 2025 IRS Form Support ✅ COMPLETE
 
-With StartOS packaging complete, focus shifts to testing and refining the application for production use.
+Multi-year IRS form support is now implemented. Users can generate Form 8949 and Schedule D for both 2024 and 2025 tax years.
+
+**Details:** See [2025_FORM_UPDATE_PLAN.md](2025_FORM_UPDATE_PLAN.md)
+
+### Completed Phases
+- [x] Phase 1: Reorganize templates into year-based folders
+- [x] Phase 2: Add dynamic template path selection
+- [x] Phase 3: Implement year-specific field mappings
+- [x] Phase 4: Enable and test 2025 form support
+- [ ] Phase 5: (Deferred) Add 1099-DA checkbox support
+- [x] Phase 6: Release v0.3.0
 
 ---
 
-## Next Up: v0.3.0 - 2025 IRS Form Support
+## Next Up: Beta Testing & Refinement
 
-**Status:** Planning complete, ready for implementation
-**Details:** See [2025_FORM_UPDATE_PLAN.md](2025_FORM_UPDATE_PLAN.md)
-
-### Phases
-- [ ] Phase 1: Reorganize templates into year-based folders
-- [ ] Phase 2: Add dynamic template path selection
-- [ ] Phase 3: Implement year-specific field mappings
-- [ ] Phase 4: Enable and test 2025 form support
-- [ ] Phase 5: (Optional) Add 1099-DA checkbox support
-- [ ] Phase 6: Release v0.3.0
+With 2025 form support complete, focus shifts to testing and refining the application.
 
 ---
 
@@ -44,6 +45,7 @@ With StartOS packaging complete, focus shifts to testing and refining the applic
 ## Completed
 
 ### January 2025
+- [x] **v0.3.0: 2025 IRS form support** - Multi-year form generation working
 - [x] **2025 IRS form update planning** - Research and documentation complete
 - [x] **StartOS packaging complete** - `.s9pk` tested and working
 - [x] Multi-arch Docker image (amd64/arm64) on Docker Hub
