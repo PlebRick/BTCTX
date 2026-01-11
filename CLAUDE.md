@@ -29,7 +29,7 @@ git log -3 --oneline  # See recent commits
 
 | Branch | Purpose | Status |
 |--------|---------|--------|
-| `feature/2025-forms` | 2025 IRS form support (v0.3.0) | **COMPLETE** - Ready to merge to develop |
+| `feature/2025-forms` | 2025 IRS form support (v0.3.0) | **MERGED** - Released as v0.3.2 |
 
 ### Feature Branch Rules
 
@@ -183,8 +183,9 @@ git push plebrick master --tags  # Sync backup at releases
 ```
 
 ### Current Version
-- **Latest Tag:** `v0.2.0-beta` (2025-01-10)
-- **Status:** StartOS packaging complete, entering beta testing
+- **Latest Tag:** `v0.3.2` (2025-01-10)
+- **Status:** Stable release with 2025 IRS form support and backup/restore fixes
+- **Docker Image:** `b1ackswan/btctx:v0.3.2` (also `latest`)
 - **Target Release:** `v1.0.0`
 
 ---

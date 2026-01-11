@@ -1,10 +1,13 @@
 # Roadmap
 
-## Current Status: v0.3.1 - Stable Release ✅
+## Current Status: v0.3.2 - Stable Release ✅
 
 Multi-year IRS form support is implemented. Users can generate Form 8949 and Schedule D for both 2024 and 2025 tax years.
 
 **Details:** See [2025_FORM_UPDATE_PLAN.md](2025_FORM_UPDATE_PLAN.md)
+
+### v0.3.2 Fix
+- Fixed "Not Found" error after backup restore (session clearing + login redirect)
 
 ### v0.3.1 Fixes
 - StartOS compatibility: DATABASE_FILE env var support in backup/restore
@@ -58,6 +61,8 @@ Enable users to import transactions from CSV files (Koinly exports, exchange exp
 ## Completed
 
 ### January 2025
+- [x] **v0.3.2: Backup restore fix** - Session clearing and login redirect
+- [x] **v0.3.1: StartOS compatibility** - DATABASE_FILE env var, BackgroundTasks cleanup
 - [x] **v0.3.0: 2025 IRS form support** - Multi-year form generation working
 - [x] **2025 IRS form update planning** - Research and documentation complete
 - [x] **StartOS packaging complete** - `.s9pk` tested and working

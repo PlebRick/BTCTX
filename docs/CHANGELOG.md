@@ -13,6 +13,17 @@ All notable changes to BitcoinTX are documented in this file.
 
 ---
 
+## [v0.3.2] - 2025-01-10
+
+### Fixed
+- **Backup restore redirect**: Fixed "Not Found" error after successful backup restore
+  - After restoring a backup, the session cookie still referenced the old user_id
+  - Backend now clears session after restore (`request.session.clear()`)
+  - Frontend redirects to `/login` instead of reloading the page
+  - Users now see success message and are redirected to login properly
+
+---
+
 ## [v0.3.1] - 2025-01-10
 
 ### Fixed
