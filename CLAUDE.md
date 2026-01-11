@@ -7,18 +7,53 @@
 
 ---
 
-## IMPORTANT: Always Start on `develop` Branch
+## IMPORTANT: Check Current Branch First
 
-**At the start of every new session, ALWAYS checkout the `develop` branch before making any changes:**
+**At the start of every new session, check what branch you're on and what work is in progress:**
 
 ```bash
-git checkout develop
-git pull origin develop
+git branch          # See current branch
+git status          # See uncommitted changes
+git log -3 --oneline  # See recent commits
 ```
 
-- All development work happens on `develop`
-- Only merge to `master` for releases
+### Branch Workflow
+
+| Branch | Purpose | When to Use |
+|--------|---------|-------------|
+| `develop` | Stable development | Normal bug fixes, small changes |
+| `feature/*` | Major changes | Risky/complex work (e.g., `feature/2025-forms`) |
+| `master` | Production releases | Only merge from develop when stable |
+
+### Active Feature Branches
+
+| Branch | Purpose | Status |
+|--------|---------|--------|
+| `feature/2025-forms` | 2025 IRS form support (v0.3.0) | **ACTIVE** - Use this for 2025 form work |
+
+### Feature Branch Rules
+
+1. **For 2025 form work:** Always use `feature/2025-forms`
+   ```bash
+   git checkout feature/2025-forms
+   git pull origin feature/2025-forms
+   ```
+
+2. **When feature is complete and tested:**
+   ```bash
+   git checkout develop
+   git merge feature/2025-forms
+   # Then normal flow to master
+   ```
+
+3. **Keep feature branch updated with develop:**
+   ```bash
+   git checkout feature/2025-forms
+   git merge develop  # Pull in any bug fixes from develop
+   ```
+
 - Never commit directly to `master`
+- Use feature branches for major/risky changes
 
 ---
 
