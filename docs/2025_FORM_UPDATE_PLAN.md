@@ -257,13 +257,13 @@ backend/assets/irs_templates/
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `backend/assets/irs_templates/` | Reorganize to year folders |
-| `backend/routers/reports.py` | Add `get_template_path()`, `get_supported_years()`, pass year to functions |
-| `backend/services/reports/form_8949.py` | Add `get_8949_field_config()`, update `map_8949_rows_to_field_data()`, `map_schedule_d_fields()` |
-| `docs/CHANGELOG.md` | Document changes |
-| `docs/ROADMAP.md` | Update status |
+| File | Changes | Status |
+|------|---------|--------|
+| `backend/assets/irs_templates/` | Reorganize to year folders | ✅ Done |
+| `backend/routers/reports.py` | Add `get_template_path()`, `get_supported_years()`, pass year to functions | Pending |
+| `backend/services/reports/form_8949.py` | Add `get_8949_field_config()`, update `map_8949_rows_to_field_data()`, `map_schedule_d_fields()` | Pending |
+| `docs/CHANGELOG.md` | Document changes | Pending |
+| `docs/ROADMAP.md` | Update status | Pending |
 
 ---
 
@@ -304,7 +304,7 @@ This restores the codebase to the known-good state before any changes.
 
 Start the new chat with:
 ```
-Read docs/2025_FORM_UPDATE_PLAN.md and docs/IRS_FORM_GENERATION.md, then implement the phased plan starting with Phase 1. After each phase, commit and test before proceeding.
+Read docs/2025_FORM_UPDATE_PLAN.md and docs/IRS_FORM_GENERATION.md. Phase 1 is complete (templates reorganized). Start with Phase 2: update reports.py to use dynamic template path selection. After each phase, commit and test before proceeding.
 ```
 
 ---
