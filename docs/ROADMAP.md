@@ -11,8 +11,13 @@ Multi-year IRS form support is now implemented. Users can generate Form 8949 and
 - [x] Phase 2: Add dynamic template path selection
 - [x] Phase 3: Implement year-specific field mappings
 - [x] Phase 4: Enable and test 2025 form support
-- [ ] Phase 5: (Deferred) Add 1099-DA checkbox support
-- [x] Phase 6: Release v0.3.0
+- [ ] Phase 5: (Deferred to v0.4.0) Add 1099-DA checkbox support
+- [ ] Phase 6: Release v0.3.0 (pending Docker build/test)
+
+### Key Fixes in This Release
+- Schedule D uses Line 3/10 (Box C/F) for self-tracked crypto, not Line 1b/8b
+- Complete Tax Report generation fixed - Transfer lot restoration in partial re-lot
+- Comprehensive test dataset covering all deposit sources and withdrawal purposes
 
 ---
 

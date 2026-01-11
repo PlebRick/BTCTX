@@ -18,6 +18,15 @@ _Nothing yet_
 - `get_8949_field_config(year)` - Year-specific Form 8949 field naming
 - `get_schedule_d_field_config(year)` - Year-specific Schedule D field naming
 - 2025 IRS Form 8949 and Schedule D templates
+- Comprehensive test dataset (40 transactions spanning 2023-2025)
+
+### Fixed
+- **Schedule D field mapping**: Changed from Line 1b/8b to Line 3/10 for self-tracked crypto
+  - Self-custody Bitcoin uses Box C (short-term) and Box F (long-term) - not reported on 1099
+  - Line 3 for short-term totals from Box C, Line 10 for long-term totals from Box F
+- **Complete Tax Report generation**: Fixed Transfer lot restoration in `_partial_relot_strictly_after()`
+  - Transfer transactions now properly restore source lot balances during year-boundary recalculations
+  - Uses LIFO to reverse FIFO consumption when rebuilding transactions
 
 ### Changed
 - `map_8949_rows_to_field_data()` now accepts `year` parameter for correct field naming
@@ -29,8 +38,8 @@ _Nothing yet_
 ### Technical Details
 - 2024 Form 8949: `Table_Line1`, fields `f1_3` (not zero-padded)
 - 2025 Form 8949: `Table_Line1_Part1`/`Part2`, fields `f1_03` (zero-padded for row 1)
-- 2024 Schedule D: Short-term uses `f1_07` (zero-padded)
-- 2025 Schedule D: Short-term uses `f1_7` (NOT zero-padded)
+- Schedule D Line 3 (Row3): Short-term from Box C/I (self-tracked, no 1099)
+- Schedule D Line 10 (Row10): Long-term from Box F/L (self-tracked, no 1099)
 
 ---
 

@@ -29,7 +29,7 @@ git log -3 --oneline  # See recent commits
 
 | Branch | Purpose | Status |
 |--------|---------|--------|
-| `feature/2025-forms` | 2025 IRS form support (v0.3.0) | **ACTIVE** - Use this for 2025 form work |
+| `feature/2025-forms` | 2025 IRS form support (v0.3.0) | **COMPLETE** - Ready to merge to develop |
 
 ### Feature Branch Rules
 
