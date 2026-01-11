@@ -16,9 +16,6 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _BACKEND_DIR = os.path.dirname(_THIS_DIR)
 _ASSETS_DIR = os.path.join(_BACKEND_DIR, "assets", "irs_templates")
 
-PATH_FORM_8949 = os.path.join(_ASSETS_DIR, "Form_8949_Fillable_2024.pdf")
-PATH_SCHEDULE_D = os.path.join(_ASSETS_DIR, "Schedule_D_Fillable_2024.pdf")
-
 # Database & internal imports
 from backend.database import get_db
 from backend.services.reports.reporting_core import generate_report_data
@@ -66,10 +63,16 @@ def get_irs_reports(
     Generates a combined PDF for Form 8949 and Schedule D,
     using pdftk to remove XFA and flatten at each step.
     Then merges all partial PDFs into a final flattened file.
+
+    Supports multiple tax years - templates are selected based on the year parameter.
     """
     # 0) Pre-flight checks
     _verify_pdftk_installed()
-    _verify_templates_exist()
+    _verify_templates_exist(year)
+
+    # Get year-specific template paths
+    path_form_8949 = get_template_path(year, "f8949.pdf")
+    path_schedule_d = get_template_path(year, "f1040sd.pdf")
 
     try:
         # 1) Gather rows for Form 8949 + schedule totals
@@ -85,7 +88,7 @@ def get_irs_reports(
         for page_idx, i in enumerate(range(0, len(short_rows), 14), start=1):
             chunk = short_rows[i : i + 14]
             field_data = map_8949_rows_to_field_data(chunk, page=page_idx)
-            pdf_bytes = fill_pdf_with_pdftk(PATH_FORM_8949, field_data)
+            pdf_bytes = fill_pdf_with_pdftk(path_form_8949, field_data)
             partial_pdfs.append(pdf_bytes)
 
         # 3) Fill long-term chunks (continue page numbering)
@@ -93,10 +96,11 @@ def get_irs_reports(
         for page_idx, i in enumerate(range(0, len(long_rows), 14), start=long_start_page):
             chunk = long_rows[i : i + 14]
             field_data = map_8949_rows_to_field_data(chunk, page=page_idx)
-            pdf_bytes = fill_pdf_with_pdftk(PATH_FORM_8949, field_data)
+            pdf_bytes = fill_pdf_with_pdftk(path_form_8949, field_data)
             partial_pdfs.append(pdf_bytes)
 
         # 4) Fill Schedule D totals
+        # NOTE: Field mappings are currently 2024 format. Phase 3 will add year-specific mappings.
         schedule_d_fields = {
             # Short-term (line 1b)
             "topmostSubform[0].Page1[0].Table_PartI[0].Row1b[0].f1_07[0]": str(report_data["schedule_d"]["short_term"]["proceeds"]),
@@ -110,7 +114,7 @@ def get_irs_reports(
             "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_29[0]": "",
             "topmostSubform[0].Page1[0].Table_PartII[0].Row8b[0].f1_30[0]": str(report_data["schedule_d"]["long_term"]["gain_loss"]),
         }
-        filled_sd_bytes = fill_pdf_with_pdftk(PATH_SCHEDULE_D, schedule_d_fields)
+        filled_sd_bytes = fill_pdf_with_pdftk(path_schedule_d, schedule_d_fields)
         partial_pdfs.append(filled_sd_bytes)
 
         # 5) Merge partial PDFs in memory with pypdf
@@ -181,6 +185,51 @@ def _merge_all_pdfs(pdf_list: List[bytes]) -> bytes:
     return merged_stream.getvalue()
 
 
+def get_supported_years() -> List[int]:
+    """
+    Return list of tax years with available IRS templates.
+    Scans the irs_templates directory for year folders containing required PDFs.
+    """
+    years = []
+    if not os.path.exists(_ASSETS_DIR):
+        return years
+
+    for item in os.listdir(_ASSETS_DIR):
+        item_path = os.path.join(_ASSETS_DIR, item)
+        if os.path.isdir(item_path) and item.isdigit():
+            # Check that required templates exist
+            has_8949 = os.path.exists(os.path.join(item_path, "f8949.pdf"))
+            has_schedule_d = os.path.exists(os.path.join(item_path, "f1040sd.pdf"))
+            if has_8949 and has_schedule_d:
+                years.append(int(item))
+
+    return sorted(years)
+
+
+def get_template_path(year: int, form_name: str) -> str:
+    """
+    Get the template path for a specific tax year.
+
+    Args:
+        year: Tax year (e.g., 2024, 2025)
+        form_name: Template filename (e.g., "f8949.pdf", "f1040sd.pdf")
+
+    Returns:
+        Absolute path to the template file
+
+    Raises:
+        HTTPException: If template doesn't exist for the requested year
+    """
+    template_path = os.path.join(_ASSETS_DIR, str(year), form_name)
+    if not os.path.exists(template_path):
+        supported = get_supported_years()
+        raise HTTPException(
+            status_code=400,
+            detail=f"No {form_name} template available for tax year {year}. Supported years: {supported}"
+        )
+    return template_path
+
+
 def _verify_pdftk_installed():
     """
     Verify pdftk is installed and accessible.
@@ -197,19 +246,14 @@ def _verify_pdftk_installed():
         )
 
 
-def _verify_templates_exist():
+def _verify_templates_exist(year: int):
     """
-    Verify IRS PDF templates exist.
+    Verify IRS PDF templates exist for the specified tax year.
     Raises HTTPException with helpful message if not found.
     """
-    missing = []
-    if not os.path.exists(PATH_FORM_8949):
-        missing.append(f"Form 8949: {PATH_FORM_8949}")
-    if not os.path.exists(PATH_SCHEDULE_D):
-        missing.append(f"Schedule D: {PATH_SCHEDULE_D}")
-
-    if missing:
+    supported = get_supported_years()
+    if year not in supported:
         raise HTTPException(
-            status_code=500,
-            detail=f"Missing IRS template PDFs: {', '.join(missing)}"
+            status_code=400,
+            detail=f"Tax year {year} not supported. Available years: {supported}"
         )
