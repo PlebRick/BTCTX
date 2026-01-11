@@ -40,7 +40,7 @@ BitcoinTX uses a **two-repository architecture** for StartOS deployment:
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  btctx-startos (StartOS Wrapper)                                │
-│  https://github.com/BitcoinTX-org/BTCTX-StartOS                 │
+│  https://github.com/PlebRick/BTCTX-StartOS                      │
 │                                                                 │
 │  Contains:                                                      │
 │  - manifest.ts (package metadata, volume definitions)           │
@@ -286,10 +286,23 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 | File | Purpose |
 |------|---------|
-| `startos/manifest.ts` | Package metadata, volume declarations |
+| `startos/manifest.ts` | Package metadata, volume declarations, architecture |
 | `startos/procedures/main.ts` | Container startup, ENV vars, health checks |
 | `startos/procedures/backups.ts` | Backup/restore configuration |
 | `startos/procedures/interfaces.ts` | Network ports and URLs |
+| `startos/procedures/versions/*.ts` | Version migration scripts |
+| `startos/procedures/actions/*.ts` | User actions (e.g., reset credentials) |
+
+### Wrapper Actions
+
+The wrapper includes useful StartOS actions:
+
+| Action | Purpose |
+|--------|---------|
+| `showDefaultCredentials` | Display the default admin/password credentials |
+| `resetCredentials` | Reset login to default (recovery if locked out) |
+
+The reset action directly modifies the SQLite database to restore default credentials using bcrypt hashing.
 
 ### Volume Declaration (manifest.ts)
 
@@ -388,6 +401,26 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 ---
 
+## Known Issues & TODO
+
+### Wrapper Architecture Declaration
+
+**Issue:** The wrapper's `manifest.ts` currently only declares `aarch64` support, but the Docker image supports both architectures.
+
+```typescript
+// CURRENT (wrapper only allows ARM64):
+arch: ['aarch64']
+
+// SHOULD BE (to match Docker image):
+arch: ['aarch64', 'x86_64']
+```
+
+**Impact:** The package won't install on x86_64 StartOS servers even though the Docker image would work.
+
+**Fix location:** `startos/manifest.ts` in the wrapper repo - update both `images.main.arch` and `hardwareRequirements.arch`.
+
+---
+
 ## Summary: Critical Rules
 
 1. **All persistent data MUST go in `/data/`** - anything else is lost on restart
@@ -410,4 +443,4 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 | Database path | `/data/btctx.db` |
 | Database env var | `DATABASE_FILE` |
 | Main repo | https://github.com/BitcoinTX-org/BTCTX-org |
-| Wrapper repo | https://github.com/BitcoinTX-org/BTCTX-StartOS |
+| Wrapper repo | https://github.com/PlebRick/BTCTX-StartOS |
