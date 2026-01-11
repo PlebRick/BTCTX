@@ -144,7 +144,7 @@ LotDisposal (FIFO consumption record)
 - **Data Volume:** `/data` (SQLite database)
 - **Architectures:** `linux/amd64`, `linux/arm64` (multi-arch)
 
-> **IMPORTANT:** See [docs/STARTOS_COMPATIBILITY.md](docs/STARTOS_COMPATIBILITY.md) for critical requirements that must be maintained for StartOS packaging compatibility.
+> **CRITICAL:** Before modifying ANY code that touches database paths, file storage, or environment variables, you MUST read [docs/STARTOS_COMPATIBILITY.md](docs/STARTOS_COMPATIBILITY.md). This document explains how data persistence works in Docker/StartOS containers and documents past bugs caused by hardcoded paths.
 
 ### Git State
 - **Primary Repo:** BitcoinTX-org/BTCTX (origin)
@@ -287,7 +287,7 @@ When starting a new session, the AI should:
 1. Read this file first (`CLAUDE.md` - auto-detected in root)
 2. Check `docs/CHANGELOG.md` for recent changes
 3. Check `docs/ROADMAP.md` for current goals
-4. **Before any Docker/Dockerfile changes:** Review `docs/STARTOS_COMPATIBILITY.md`
+4. **Before any database/storage/Docker changes:** Review `docs/STARTOS_COMPATIBILITY.md` - this is CRITICAL for understanding how data persistence works
 5. Run `git status` to see uncommitted changes
 6. Run `git log -5 --oneline` to see recent commits
 
