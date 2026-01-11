@@ -157,8 +157,12 @@ const Settings: React.FC = () => {
     try {
       formData.set("file", file);
       const res = await api.post("/backup/restore", formData);
-      setMessage(res.data.message || "Backup restored. Reloading...");
-      setTimeout(() => window.location.reload(), 2000);
+      setMessage(res.data.message || "Backup restored. Redirecting to login...");
+      // After restore, the session may be invalid (different user_id in restored DB)
+      // Redirect to login so user can authenticate with restored credentials
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 2000);
     } catch (err) {
       console.error("Restore failed:", err);
       setMessage("Failed to restore backup.");

@@ -1,6 +1,6 @@
 # backend/routers/backup.py
 
-from fastapi import APIRouter, Depends, UploadFile, Form, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, UploadFile, Form, HTTPException, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from backend.database import get_db
@@ -44,12 +44,14 @@ def download_encrypted_backup(
 # === POST /api/backup/restore ===
 @router.post("/restore")
 def restore_encrypted_backup(
+    request: Request,
     password: str = Form(...),
     file: UploadFile = Form(...),
     db: Session = Depends(get_db),
 ):
     """
     Restore the database from an encrypted backup file.
+    Clears the session after restore since the user_id may no longer be valid.
     """
     temp_path = None
     try:
@@ -58,7 +60,11 @@ def restore_encrypted_backup(
             temp_path = Path(temp_file.name)
 
         restore_backup(password, temp_path)
-        return {"message": "✅ Database successfully restored."}
+
+        # Clear session - the restored database may have different user IDs
+        request.session.clear()
+
+        return {"message": "✅ Database successfully restored. Please log in again."}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Restore failed: {str(e)}")
     finally:
