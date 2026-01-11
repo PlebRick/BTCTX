@@ -8,6 +8,15 @@
 
 ---
 
+## Completed Prep Work
+
+- [x] Downloaded 2025 Form 8949 and Schedule D from IRS.gov
+- [x] Reorganized templates into year-based folder structure
+- [x] Verified field name differences with pdftk analysis
+- [x] Confirmed 2025 forms are dated December 2025 (current year)
+
+---
+
 ## Executive Summary
 
 ### What Changed for 2025
@@ -73,37 +82,30 @@ See [docs/IRS_FORM_GENERATION.md](IRS_FORM_GENERATION.md) section "Year-Specific
 
 ## Phased Implementation Plan
 
-### Phase 1: Infrastructure Setup (Low Risk)
+### Phase 1: Infrastructure Setup (Low Risk) - COMPLETED
 
 **Goal:** Reorganize templates without changing any code logic
 
-**Tasks:**
-1. Create year-based folder structure:
-   ```
-   backend/assets/irs_templates/
-   ├── 2024/
-   │   ├── f8949.pdf
-   │   └── f1040sd.pdf
-   └── 2025/
-       ├── f8949.pdf
-       └── f1040sd.pdf
-   ```
+**Status:** ✅ DONE
 
-2. Download 2025 forms from IRS.gov:
-   - Form 8949: https://www.irs.gov/pub/irs-pdf/f8949.pdf
-   - Schedule D: https://www.irs.gov/pub/irs-pdf/f1040sd.pdf
+**Completed:**
+- Created year-based folder structure
+- Downloaded 2025 forms from IRS.gov
+- Moved 2024 templates to new structure
+- Verified field names with pdftk
 
-3. Move existing 2024 templates into `2024/` subfolder
+**Current structure:**
+```
+backend/assets/irs_templates/
+├── 2024/
+│   ├── f8949.pdf      (129KB)
+│   └── f1040sd.pdf    (97KB)
+└── 2025/
+    ├── f8949.pdf      (129KB)
+    └── f1040sd.pdf    (98KB)
+```
 
-4. Rename files to consistent naming:
-   - `Form_8949_Fillable_2024.pdf` → `2024/f8949.pdf`
-   - `Schedule_D_Fillable_2024.pdf` → `2024/f1040sd.pdf`
-
-**Testing:**
-- Verify existing tests still pass with path updates
-- No functional changes yet
-
-**Commit:** "Phase 1: Reorganize IRS templates into year-based folders"
+**Remaining:** Update code to use new paths (Phase 2)
 
 ---
 
