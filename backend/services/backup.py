@@ -10,7 +10,16 @@ from cryptography.exceptions import InvalidKey
 import secrets
 
 # === Constants ===
-DB_PATH = Path("backend/bitcoin_tracker.db")
+# Use the same DATABASE_FILE env var as database.py for consistency
+# This ensures backup/restore works correctly in Docker/StartOS where DB is at /data/btctx.db
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # backend/
+_PROJECT_ROOT = os.path.dirname(_BASE_DIR)
+_DATABASE_FILE_ENV = os.getenv("DATABASE_FILE", "backend/bitcoin_tracker.db")
+_DATABASE_FILE = (
+    _DATABASE_FILE_ENV if os.path.isabs(_DATABASE_FILE_ENV)
+    else os.path.join(_PROJECT_ROOT, _DATABASE_FILE_ENV)
+)
+DB_PATH = Path(_DATABASE_FILE)
 KEY_LENGTH = 32  # AES-256
 SALT_LENGTH = 16
 IV_LENGTH = 16

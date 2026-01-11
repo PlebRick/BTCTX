@@ -4,7 +4,10 @@ All notable changes to BitcoinTX are documented in this file.
 
 ## [Unreleased]
 
-_Nothing yet_
+### Fixed
+- **Backup/restore in Docker/StartOS**: Fixed `backup.py` to use `DATABASE_FILE` environment variable
+  - Previously used hardcoded path `backend/bitcoin_tracker.db` which didn't match Docker's `/data/btctx.db`
+  - Backup and restore now work correctly in containerized environments
 
 ---
 
