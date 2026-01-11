@@ -6,10 +6,24 @@ With StartOS packaging complete, focus shifts to testing and refining the applic
 
 ---
 
+## Next Up: v0.3.0 - 2025 IRS Form Support
+
+**Status:** Planning complete, ready for implementation
+**Details:** See [2025_FORM_UPDATE_PLAN.md](2025_FORM_UPDATE_PLAN.md)
+
+### Phases
+- [ ] Phase 1: Reorganize templates into year-based folders
+- [ ] Phase 2: Add dynamic template path selection
+- [ ] Phase 3: Implement year-specific field mappings
+- [ ] Phase 4: Enable and test 2025 form support
+- [ ] Phase 5: (Optional) Add 1099-DA checkbox support
+- [ ] Phase 6: Release v0.3.0
+
+---
+
 ## Future Enhancements
 
 ### High Priority
-- [ ] **2025 IRS form updates**: Update Form 8949/Schedule D templates when IRS releases 2025 versions
 - [ ] **CSV import**: Bulk import transactions from exchange exports
 - [ ] **Improved error handling**: Better user feedback for failed operations
 
@@ -30,6 +44,7 @@ With StartOS packaging complete, focus shifts to testing and refining the applic
 ## Completed
 
 ### January 2025
+- [x] **2025 IRS form update planning** - Research and documentation complete
 - [x] **StartOS packaging complete** - `.s9pk` tested and working
 - [x] Multi-arch Docker image (amd64/arm64) on Docker Hub
 - [x] Backdated transaction FIFO recalculation
