@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import axios from "axios";
 import api from "../api";
+import { useToast } from "../contexts/ToastContext";
 import "../styles/transactionForm.css";
 import { parseDecimal, formatUsd, parseTransaction } from "../utils/format";
 
@@ -187,6 +188,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
   transactionId,           // new prop
   onUpdateStatusChange,     // new prop
 }) => {
+  const toast = useToast();
+
   // Set up react-hook-form
   const {
     register,
@@ -237,9 +240,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
           reset(formData);
           setCurrentType(tx.type);
         })
-        .catch((err) => {
-          console.error("Failed to fetch transaction:", err);
-          alert("Failed to load transaction data.");
+        .catch(() => {
+          toast.error("Failed to load transaction data.");
         });
     } else {
       // If no transactionId => create mode
@@ -366,11 +368,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       let priceResponse;
       if (isBackdated) {
         const dateStr = txDate.toISOString().split("T")[0]; // e.g. "2025-03-28"
-        priceResponse = await axios.get(
-          `http://localhost:8000/api/bitcoin/price/history?date=${dateStr}`
-        );
+        priceResponse = await api.get(`/bitcoin/price/history?date=${dateStr}`);
       } else {
-        priceResponse = await axios.get("http://localhost:8000/api/bitcoin/price");
+        priceResponse = await api.get("/bitcoin/price");
       }
 
       const data = priceResponse.data;
@@ -383,9 +383,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       const newFmv = amountBtc * btcPrice;
 
       setValue("fmv_usd", Number(newFmv.toFixed(2)));
-    } catch (err) {
-      console.error("FMV refresh error:", err);
-      alert("Failed to refresh FMV. Check console for details.");
+    } catch {
+      toast.error("Failed to refresh FMV. Please try again.");
     }
   };
 
@@ -487,7 +486,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       if (transactionId) {
         // --- EDITING existing transaction ---
         await api.put(`/transactions/${transactionId}`, payload);
-        alert("Transaction updated successfully!");
+        toast.success("Transaction updated successfully!");
       } else {
         // --- CREATING new transaction ---
         const createPayload: ICreateTransactionPayload = {
@@ -502,12 +501,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
         if (rg !== 0) {
           const sign = rg >= 0 ? "+" : "";
-          alert(
-            `Transaction created successfully!\n` +
-              `Realized Gain: ${sign}${formatUsd(rg)}`
+          toast.success(
+            `Transaction created! Realized Gain: ${sign}${formatUsd(rg)}`
           );
         } else {
-          alert("Transaction created successfully!");
+          toast.success("Transaction created successfully!");
         }
       }
 
@@ -516,26 +514,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       setCurrentType("");
       onSubmitSuccess?.();
     } catch (error) {
+      const action = transactionId ? "update" : "create";
       if (axios.isAxiosError<ApiErrorResponse>(error)) {
         const detailMsg =
           error.response?.data?.detail || error.message || "Error";
-        alert(
-          `Failed to ${
-            transactionId ? "update" : "create"
-          } transaction: ${detailMsg}`
-        );
+        toast.error(`Failed to ${action} transaction: ${detailMsg}`);
       } else if (error instanceof Error) {
-        alert(
-          `Failed to ${
-            transactionId ? "update" : "create"
-          } transaction: ${error.message}`
-        );
+        toast.error(`Failed to ${action} transaction: ${error.message}`);
       } else {
-        alert(
-          `An unexpected error occurred while ${
-            transactionId ? "updating" : "creating"
-          } the transaction.`
-        );
+        toast.error(`An unexpected error occurred while ${action}ing the transaction.`);
       }
     } finally {
       setIsSubmitting(false);
@@ -551,12 +538,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     setIsSubmitting(true);
     try {
       await api.delete(`/transactions/${transactionId}`);
-      alert("Transaction deleted successfully!");
+      toast.success("Transaction deleted successfully!");
       reset();
       onSubmitSuccess?.();
-    } catch (error) {
-      alert("Failed to delete transaction. Check console for details.");
-      console.error("Delete error:", error);
+    } catch {
+      toast.error("Failed to delete transaction. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -673,7 +659,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   className="form-control"
                   {...register("costBasisUSD", { valueAsNumber: true })}
                 />
-                <small style={{ color: "#888", display: "block", marginTop: 4 }}>
+                <small className="form-hint">
                   If you paid a miner fee in BTC externally, add its USD value here.
                 </small>
               </div>
@@ -801,8 +787,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                     readOnly={isSpecialPurpose}
                   />
                   {purposeVal === "Spent" && proceedsUsdVal === 0 && (
-                    <div style={{ color: "red", marginTop: "5px" }}>
-                      <strong>Warning:</strong> You selected “Spent” but “Proceeds (USD)” is 0.
+                    <div className="form-warning">
+                      <strong>Warning:</strong> You selected "Spent" but "Proceeds (USD)" is 0.
                     </div>
                   )}
                 </div>
@@ -811,7 +797,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                 {isSpecialPurpose && (
                   <div className="form-group">
                     <label>FMV (USD):</label>
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <div className="form-input-row">
                       <input
                         type="number"
                         step="0.01"
@@ -822,12 +808,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                         type="button"
                         onClick={handleRefreshFmv}
                         className="refresh-button"
-                        style={{ minWidth: "100px" }}
                       >
                         Refresh
                       </button>
                     </div>
-                    <small style={{ color: "#888", display: "block", marginTop: 4 }}>
+                    <small className="form-hint">
                       Estimated fair market value at the time of gift/donation/lost.
                     </small>
                   </div>
@@ -953,7 +938,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
                   readOnly
                 />
                 {feeInUsdDisplay > 0 && (
-                  <small style={{ color: "#999" }}>
+                  <small className="approx-value">
                     (~ ${feeInUsdDisplay} USD)
                   </small>
                 )}
@@ -1084,7 +1069,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
               {errors.grossProceedsUSD && (
                 <span className="error-text">Gross proceeds is required</span>
               )}
-              <small style={{ color: "#888", display: "block", marginTop: 4 }}>
+              <small className="form-hint">
                 The backend will subtract fees to calculate net proceeds.
               </small>
             </div>
@@ -1119,7 +1104,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
     >
       {/* Optional spinner if isSubmitting */}
       {isSubmitting && (
-        <div style={{ textAlign: "center", marginBottom: "20px" }}>
+        <div className="spinner-container">
           <div className="spinner"></div>
           <p>Processing transaction...</p>
         </div>
@@ -1167,7 +1152,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         <button
           id="trigger-form-delete"
           type="button"
-          style={{ display: "none" }}
+          className="hidden-trigger"
           onClick={handleDeleteClick}
         />
       )}

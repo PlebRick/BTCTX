@@ -1,17 +1,8 @@
-:root {
-  --bg-color: #121212;
-  --card-bg: #1c1c1c;
-  --text-color: #ffffff;
-  --text-dim: #cfcfcf;
-  --highlight-color: #d9a75f;
-  --bitcoin-orange: #f7931a;
-  --accent-red: #ff453a;
-  --accent-green: #32d74b;
-}
+/* Design tokens imported from theme.css */
 
 .dashboard {
-  background-color: var(--bg-color);
-  color: var(--text-color);
+  background-color: var(--color-bg);
+  color: var(--color-text);
   padding: 2rem;
   min-height: 100vh;
 }
@@ -33,7 +24,7 @@
   flex: 1 1 0;           /* equal basis for all cards */
   min-width: 360px;      /* bigger minimum than before */
   max-width: 650px;      /* bigger maximum than before */
-  background-color: var(--card-bg);
+  background-color: var(--color-panel);
   padding: 1.5rem;
   border-radius: 12px;
   display: flex;
@@ -45,7 +36,7 @@
 /* Card Titles */
 .card h3 {
   font-size: 1.25rem;
-  color: var(--highlight-color);
+  color: var(--color-accent);
   margin-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 0.5rem;
@@ -55,7 +46,7 @@
 /* Subheadings (Fees, etc.) */
 .card h4 {
   font-size: 1.1rem;
-  color: var(--text-color);
+  color: var(--color-text);
   margin: 1rem 0 0.5rem;
   font-weight: 500;
 }
@@ -68,13 +59,13 @@
   align-items: baseline;
   font-size: 1rem;
   line-height: 1.5;
-  color: var(--text-color);
+  color: var(--color-text);
   font-weight: 400;
 }
 
 .card p strong {
   font-weight: 600;
-  color: var(--text-dim);
+  color: var(--color-text-secondary);
 }
 
 /* Horizontal divider lines */
@@ -86,10 +77,10 @@
 
 /* Gains/loss text colors */
 .text-gain {
-  color: var(--accent-green);
+  color: var(--color-success);
 }
 .text-loss {
-  color: var(--accent-red);
+  color: var(--color-error);
 }
 
 /* Current Bitcoin Price card */
@@ -111,7 +102,7 @@
 .btc-price-value {
   font-size: 3rem;
   font-weight: 700;
-  color: var(--bitcoin-orange);
+  color: var(--color-bitcoin);
 }
 
 /* Gift note on its own row */
@@ -122,6 +113,98 @@
 /* For "Income & Fees" italic text (like BTC amounts or note) */
 .income-fees-container p em {
   font-size: 0.9rem;
-  color: var(--text-dim);
+  color: var(--color-text-secondary);
   font-style: italic;
+}
+
+/* Error state */
+.dashboard-error {
+  color: var(--color-error);
+  padding: var(--space-8);
+}
+
+.dashboard-error h2 {
+  margin-bottom: var(--space-4);
+}
+
+/* Loading state */
+.dashboard-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+}
+
+/* ===============================
+   Responsive Design
+=============================== */
+
+/* Medium screens (< 1024px) */
+@media (max-width: 1024px) {
+  .card {
+    min-width: 280px;
+    max-width: 100%;
+  }
+}
+
+/* Small screens (< 768px) */
+@media (max-width: 768px) {
+  .dashboard {
+    padding: var(--space-4);
+  }
+
+  .top-row,
+  .bottom-row {
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .card {
+    min-width: 100%;
+    max-width: 100%;
+  }
+
+  .btc-price-value {
+    font-size: 2rem;
+  }
+
+  .card h3 {
+    font-size: 1.1rem;
+  }
+
+  .card p {
+    font-size: 0.9rem;
+  }
+}
+
+/* Extra small screens (< 480px) */
+@media (max-width: 480px) {
+  .dashboard {
+    padding: var(--space-3);
+  }
+
+  .top-row,
+  .bottom-row {
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .card {
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .btc-price-value {
+    font-size: 1.75rem;
+  }
+
+  .card p {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+
+  .card p span {
+    font-weight: 500;
+  }
 }

@@ -39,8 +39,8 @@ const Dashboard: React.FC = () => {
           setCurrentBtcPrice(res.data.USD);
         }
       })
-      .catch((err) => {
-        console.error("Error fetching live BTC price:", err);
+      .catch(() => {
+        // Price fetch failed silently - will show as null
       })
       .finally(() => {
         setIsPriceLoading(false);
@@ -54,8 +54,8 @@ const Dashboard: React.FC = () => {
       .then((res) => {
         setAverageBtcCostBasis(res.data.averageCostBasis);
       })
-      .catch((err) => {
-        console.error("Error fetching average cost basis:", err);
+      .catch(() => {
+        // Cost basis fetch failed silently
       });
   }, []);
 
@@ -71,8 +71,7 @@ const Dashboard: React.FC = () => {
         setBalances(data as AccountBalance[]);
       })
       .catch((err) => {
-        console.error("Error fetching balances:", err);
-        setFetchError(String(err));
+        setFetchError(err instanceof Error ? err.message : "Failed to load balances");
       });
   }, []);
 
@@ -89,8 +88,7 @@ const Dashboard: React.FC = () => {
     balances.forEach((acc) => {
       const numericBalance = parseDecimal(acc.balance);
       if (Number.isNaN(numericBalance)) {
-        console.warn("NaN balance for account:", acc);
-        return;
+        return; // Skip invalid balances
       }
       // Skip fee accounts
       if (acc.name === "BTC Fees" || acc.name === "USD Fees") {
@@ -129,15 +127,14 @@ const Dashboard: React.FC = () => {
         setGainsAndLosses(parsed);
       })
       .catch((err) => {
-        console.error("Error fetching gains & losses:", err);
-        setFetchError(String(err));
+        setFetchError(err instanceof Error ? err.message : "Failed to load gains/losses");
       });
   }, []);
 
   // ------------------ 7) ERROR / LOADING HANDLING ------------------
   if (fetchError) {
     return (
-      <div style={{ color: "red", margin: "2rem" }}>
+      <div className="dashboard-error">
         <h2>Error Loading Data</h2>
         <p>{fetchError}</p>
       </div>

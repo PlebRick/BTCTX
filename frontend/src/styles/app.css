@@ -1,30 +1,10 @@
 /* ================================
-   app.css 
-   Global layout, sidebar, header, 
+   app.css
+   Global layout, sidebar, header,
    converter & calculator styling
+
+   Design tokens imported from theme.css
 ================================= */
-
-/* 1) Global CSS Variables & Base Styles */
-:root {
-  /* 
-    Use these for easy theming:
-  */
-  --color-bg: #121212;            /* Main page background */
-  --color-panel: #1c1c1c;         /* Sidebar (panel) background */
-  --color-header: #121212;        /* Header background */
-  --color-text: #ffffff;          /* Main text color */
-  --color-text-dim: #cfcfcf;      /* Dimmed text for secondary content */
-  --color-accent: #d9a75f;        /* Gold accent */
-  --color-accent-hover: #e0b76b;  /* Hover state for accent */
-
-  /* Additional variables */
-  --bitcoin-orange: #f7931a;           /* Another accent if needed */
-  --bitcoin-orange-hover: #e5830f;     /* Hover for the orange */
-
-  /* Easily adjustable sidebar width & base font size */
-  --sidebar-width: 300px;
-  --base-font-size: 16px;
-}
 
 /* Base font sizing & body defaults */
 body {
@@ -32,9 +12,9 @@ body {
   padding: 0;
   background-color: var(--color-bg);
   color: var(--color-text);
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: var(--base-font-size);
-  line-height: 1.4;
+  font-family: var(--font-family);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
 }
 
 /* Ensure form elements inherit the font family */
@@ -147,7 +127,7 @@ option {
   gap: 1.5rem;
 }
 .header-nav-item {
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
   text-decoration: none;
   padding: 0.5rem 0.75rem;
   font-size: 1rem;
@@ -219,7 +199,7 @@ option {
 .auth-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid var(--color-text-dim);
+  border: 4px solid var(--color-text-secondary);
   border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
@@ -228,5 +208,84 @@ option {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* ===============================
+   7) Responsive Design
+=============================== */
+
+/* Medium screens and below (< 1024px) - collapse sidebar */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 80px;
+    overflow: hidden;
+  }
+
+  .sidebar-title {
+    display: none;
+  }
+
+  .sidebar-logo {
+    margin-right: 0;
+  }
+
+  .sidebar-tools {
+    padding: 0.5rem;
+  }
+
+  .converter,
+  .calculator {
+    display: none;
+  }
+}
+
+/* Small screens (< 768px) - hide sidebar completely */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .header {
+    flex-wrap: wrap;
+    height: auto;
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .header-nav {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    width: 100%;
+    justify-content: center;
+  }
+
+  .header-nav-item {
+    font-size: var(--text-sm);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .main-content {
+    padding: var(--space-3);
+  }
+}
+
+/* Extra small screens (< 480px) */
+@media (max-width: 480px) {
+  .header-nav {
+    gap: var(--space-1);
+  }
+
+  .header-nav-item {
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .main-content {
+    padding: var(--space-2);
   }
 }

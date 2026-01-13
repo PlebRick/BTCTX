@@ -1,13 +1,4 @@
-:root {
-  --sidebar-width: 360px;
-  --color-panel: #1c1c1c;
-  --color-text: #fff;
-  --color-text-dim: #cfcfcf;
-  --color-accent: #d9a75f;
-  --color-accent-hover: #e0b76b;
-  --danger-color: #ff453a;
-  --danger-hover: #d72c1c;
-}
+/* Design tokens imported from theme.css */
 
 .settings-container {
   margin: 2rem 0 2rem 2rem;
@@ -38,7 +29,7 @@
   font-weight: 600;
   margin-top: 0;
   margin-bottom: 1rem;
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
 }
 
 .settings-option {
@@ -66,7 +57,7 @@
 
 .settings-option-subtitle {
   font-size: 0.9rem;
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
   margin: 0.25rem 0 0;
 }
 
@@ -98,12 +89,12 @@
 }
 
 .settings-button.danger {
-  background: var(--danger-color);
+  background: var(--color-error);
   color: #fff;
 }
 
 .settings-button.danger:hover {
-  background: var(--danger-hover);
+  background: var(--color-error-hover);
 }
 
 .settings-message {
@@ -194,7 +185,7 @@ input[type="file"]::file-selector-button:hover {
 
 .settings-note {
   font-size: 0.9rem;
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
   margin-top: 0.5rem;
   padding-left: 0.25rem;
 }
@@ -249,11 +240,11 @@ input[type="file"]::file-selector-button:hover {
 
 .import-preview-stats {
   font-size: 0.9rem;
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
 }
 
 .import-error-count {
-  color: var(--danger-color);
+  color: var(--color-error);
 }
 
 .import-warning-count {
@@ -270,7 +261,7 @@ input[type="file"]::file-selector-button:hover {
 
 .import-errors {
   background: rgba(255, 69, 58, 0.15);
-  border: 1px solid var(--danger-color);
+  border: 1px solid var(--color-error);
 }
 
 .import-warnings {
@@ -313,7 +304,7 @@ input[type="file"]::file-selector-button:hover {
 .import-preview-table th {
   background: rgba(255, 255, 255, 0.05);
   font-weight: 600;
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
@@ -322,12 +313,12 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .import-preview-table td:first-child {
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
 }
 
 .import-preview-more {
   font-size: 0.85rem;
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
   text-align: center;
   margin: 0.5rem 0 0;
 }
@@ -346,4 +337,115 @@ input[type="file"]::file-selector-button:hover {
 .import-confirm {
   width: auto;
   min-width: 150px;
+}
+
+/* ===============================
+   Responsive Design
+=============================== */
+
+/* Medium screens (< 1024px) */
+@media (max-width: 1024px) {
+  .settings-container {
+    margin: var(--space-4);
+    max-width: 100%;
+  }
+}
+
+/* Small screens (< 768px) */
+@media (max-width: 768px) {
+  .settings-container {
+    margin: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .settings-option {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .settings-button {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .credential-update-form {
+    max-width: 100%;
+  }
+
+  .restore-input-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .restore-input-row input[type="file"],
+  .restore-input-row input[type="password"],
+  .restore-input-row .settings-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .import-controls {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .import-controls .settings-button {
+    width: 100%;
+  }
+
+  .import-input-row {
+    flex-direction: column;
+  }
+
+  .csv-file-input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .import-actions {
+    flex-direction: column;
+  }
+
+  .import-actions .settings-button {
+    width: 100%;
+  }
+}
+
+/* Extra small screens (< 480px) */
+@media (max-width: 480px) {
+  .settings-container {
+    margin: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .settings-title {
+    font-size: 1.25rem;
+    margin-bottom: var(--space-4);
+  }
+
+  .settings-section {
+    padding: var(--space-3);
+  }
+
+  .settings-section h3 {
+    font-size: 1rem;
+  }
+
+  .settings-option-title {
+    font-size: 0.9rem;
+  }
+
+  .settings-option-subtitle {
+    font-size: 0.8rem;
+  }
+
+  .import-preview-table {
+    font-size: 0.75rem;
+  }
+
+  .import-preview-table th,
+  .import-preview-table td {
+    padding: var(--space-2);
+  }
 }

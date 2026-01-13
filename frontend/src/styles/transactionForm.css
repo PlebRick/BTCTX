@@ -109,3 +109,64 @@
   background-color: #a52a2a; /* Even darker red */
   transform: scale(0.98); /* Slightly shrink */
 }
+
+/* Form helper/hint text */
+.form-hint {
+  color: var(--color-text-secondary, #888);
+  display: block;
+  margin-top: var(--space-1, 4px);
+  font-size: 0.85rem;
+}
+
+/* Warning text (e.g., proceeds is 0) */
+.form-warning {
+  color: var(--color-error, #e74c3c);
+  margin-top: var(--space-2, 5px);
+  font-weight: 500;
+}
+
+/* Flex row for input + button (e.g., FMV refresh) */
+.form-input-row {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+  align-items: stretch;
+}
+
+/* Refresh button styling */
+.refresh-button {
+  min-width: 100px;
+  background-color: var(--color-gray-700, #333);
+  color: var(--color-text, #fff);
+  border: 1px solid var(--color-gray-500, #666);
+  border-radius: var(--radius-sm, 4px);
+  padding: var(--space-2, 0.5rem);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.refresh-button:hover {
+  background-color: var(--color-accent);
+  color: #000;
+}
+
+/* Approximate value display (e.g., ~$USD) */
+.approx-value {
+  color: var(--color-text-secondary, #999);
+  font-size: 0.85rem;
+}
+
+/* Spinner container for processing state */
+.spinner-container {
+  text-align: center;
+  margin-bottom: var(--space-5, 20px);
+}
+
+.spinner-container p {
+  margin-top: var(--space-2, 8px);
+  color: var(--color-text-secondary);
+}
+
+/* Hidden trigger button */
+.hidden-trigger {
+  display: none;
+}

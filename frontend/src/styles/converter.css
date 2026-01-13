@@ -85,7 +85,7 @@
 .converter-row label,
 .date-price-row label {
   margin-bottom: 0.3rem; /* Increased from 0.25rem */
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;     /* Increased from 0.75rem */
 }
 
@@ -131,7 +131,7 @@
 /* Label styling */
 .date-price-row label {
   margin-bottom: 0;       /* No margin since it’s on the same row as input */
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 

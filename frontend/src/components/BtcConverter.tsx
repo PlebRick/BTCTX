@@ -2,13 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import api from "../api";
 import "../styles/converter.css";
 
-interface LiveBtcPriceResponse {
-  USD: number;
-}
-
-interface HistoricalBtcPriceResponse {
-  USD: number;
-}
+// Types LiveBtcPriceResponse is defined in types/global.d.ts
 
 type Mode = "manual" | "auto" | "date";
 type Field = "USD" | "BTC" | "SATS" | null;
@@ -50,8 +44,7 @@ const BtcConverter: React.FC = () => {
         } else {
           setBtcPrice(0);
         }
-      } catch (err) {
-        console.error("Failed to fetch live BTC price:", err);
+      } catch {
         setBtcPrice(0);
       }
     };
@@ -69,7 +62,7 @@ const BtcConverter: React.FC = () => {
 
     const fetchHistoricalPrice = async () => {
       try {
-        const res = await api.get<HistoricalBtcPriceResponse>(
+        const res = await api.get<LiveBtcPriceResponse>(
           `/bitcoin/price/history?date=${selectedDate}`
         );
         if (res.data && typeof res.data.USD === "number") {
@@ -77,8 +70,7 @@ const BtcConverter: React.FC = () => {
         } else {
           setBtcPrice(0);
         }
-      } catch (err) {
-        console.error("Failed to fetch historical BTC price:", err);
+      } catch {
         setBtcPrice(0);
       }
     };
@@ -97,8 +89,7 @@ const BtcConverter: React.FC = () => {
       } else {
         setBtcPrice(0);
       }
-    } catch (err) {
-      console.error("Failed to fetch manual BTC price:", err);
+    } catch {
       setBtcPrice(0);
     }
   };

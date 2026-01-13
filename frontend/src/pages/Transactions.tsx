@@ -135,7 +135,6 @@ const Transactions: React.FC = () => {
         err instanceof Error
           ? `Failed to load transactions: ${err.message}`
           : "Failed to load transactions: Unknown error";
-      console.error(errorMsg, err);
       setFetchError(errorMsg);
       setTransactions(null);
     } finally {
@@ -261,7 +260,7 @@ const Transactions: React.FC = () => {
         <>
           <div className="transactions-list">
             {isRefreshing && (
-              <div style={{ textAlign: "center", marginBottom: "20px" }}>
+              <div className="refreshing-container">
                 <div className="spinner"></div>
                 <p>Refreshing transactions...</p>
               </div>
@@ -318,11 +317,8 @@ const Transactions: React.FC = () => {
             ))}
           </div>
 
-          {/* 
-            PAGINATION CONTROLS 
-            + a small "Items per page" dropdown
-          */}
-          <div style={{ marginTop: "1rem" }}>
+          {/* Pagination controls */}
+          <div className="pagination-wrapper">
             <div className="pagination-container">
               <button
                 className="pagination-button"
@@ -332,7 +328,7 @@ const Transactions: React.FC = () => {
                 « Prev
               </button>
 
-              <span style={{ margin: "0 1rem" }}>
+              <span className="pagination-info">
                 Page {page} of {totalPages}
               </span>
 
@@ -346,30 +342,15 @@ const Transactions: React.FC = () => {
             </div>
 
             {/* Items per page dropdown */}
-            <div
-              style={{
-                marginTop: "1rem",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.5rem",
-              }}
-            >
-              <label htmlFor="pageSize" style={{ fontWeight: 500 }}>
+            <div className="page-size-container">
+              <label htmlFor="pageSize" className="page-size-label">
                 Items per page:
               </label>
               <select
                 id="pageSize"
                 value={pageSize}
                 onChange={handlePageSizeChange}
-                style={{
-                  backgroundColor: "#333",
-                  color: "#fff",
-                  border: "1px solid #666",
-                  borderRadius: "4px",
-                  padding: "0.3rem 0.5rem",
-                  cursor: "pointer",
-                }}
+                className="page-size-select"
               >
                 <option value="10">10</option>
                 <option value="25">25</option>

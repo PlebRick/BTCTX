@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { downloadPdfWithAxios } from "../api";
+import { useToast } from "../contexts/ToastContext";
 import "../styles/reports.css"; // Our spinner CSS is also in here
 
 // Hardcoded base URL for your FastAPI server:
@@ -38,15 +39,17 @@ const Reports: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
 
+  const toast = useToast();
+
   const handleExport = async () => {
     // Basic validation
     if (!taxYear) {
-      alert("Please enter a valid year (e.g. 2024).");
+      toast.warning("Please enter a valid year (e.g. 2024).");
       return;
     }
     const reportDef = REPORTS.find((r) => r.key === selectedReport);
     if (!reportDef) {
-      alert("Invalid report selection.");
+      toast.error("Invalid report selection.");
       return;
     }
 
@@ -83,9 +86,8 @@ const Reports: React.FC = () => {
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
 
-    } catch (error) {
-      console.error("Error generating report:", error);
-      alert("Failed to generate the report. Check console for details.");
+    } catch {
+      toast.error("Failed to generate the report. Please try again.");
     } finally {
       setIsLoading(false);
     }

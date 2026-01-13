@@ -20,7 +20,7 @@
 /* Description styling - larger text with more space */
 .reports-description {
   font-size: 1.25rem; /* Increased from 1rem */
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
   margin-bottom: 1.5rem; /* Increased from 1rem */
   line-height: 1.5;
 }
@@ -194,28 +194,87 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Responsive adjustments */
-@media (max-width: 600px) {
+/* ===============================
+   Responsive Design
+=============================== */
+
+/* Medium screens (< 1024px) */
+@media (max-width: 1024px) {
   .reports-container {
-    margin: 1rem;
-    padding: 1.5rem; /* Slightly increased for smaller screens */
+    margin: var(--space-4);
+    max-width: 100%;
+  }
+}
+
+/* Small screens (< 768px) */
+@media (max-width: 768px) {
+  .reports-container {
+    margin: var(--space-3);
+    padding: var(--space-5);
+  }
+
+  .reports-title {
+    font-size: 1.5rem;
+    margin-bottom: var(--space-5);
+  }
+
+  .reports-description {
+    font-size: 1rem;
   }
 
   .input-group {
-    grid-template-columns: 1fr; /* Stack inputs */
-    gap: 16px;
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  .input-group label {
+    font-size: 1rem;
+  }
+
+  .report-year-input,
+  .report-format-input {
+    width: 100%;
+    font-size: 1rem;
+  }
+
+  .report-radio label {
+    font-size: 1rem;
+  }
+}
+
+/* Extra small screens (< 480px) */
+@media (max-width: 480px) {
+  .reports-container {
+    margin: var(--space-2);
+    padding: var(--space-4);
+  }
+
+  .reports-title {
+    font-size: 1.25rem;
+    margin-bottom: var(--space-4);
+  }
+
+  .reports-description {
+    font-size: 0.9rem;
+    margin-bottom: var(--space-4);
+  }
+
+  .reports-section {
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
   }
 
   .report-actions {
-    justify-content: center; /* Center button */
+    justify-content: center;
   }
 
   .report-button {
-    width: 100%; /* Full width on small screens */
+    width: 100%;
+    padding: var(--space-4) var(--space-5);
   }
 
   .downloading-overlay {
-    bottom: 1rem;
-    left: 1rem;
+    bottom: var(--space-4);
+    left: var(--space-4);
   }
 }

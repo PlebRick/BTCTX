@@ -1,0 +1,204 @@
+/* ============================================
+   theme.css - Centralized Design System
+   All design tokens in one place
+============================================ */
+
+:root {
+  /* ==========================================
+     COLORS
+  ========================================== */
+
+  /* Backgrounds */
+  --color-bg: #121212;
+  --color-bg-elevated: #1a1a1a;
+  --color-panel: #1c1c1c;
+  --color-surface: #242424;
+  --color-surface-hover: #2a2a2a;
+  --color-surface-active: #3a3a3a;
+
+  /* Text */
+  --color-text: #ffffff;
+  --color-text-secondary: #cfcfcf;
+  --color-text-muted: #888888;
+
+  /* Accent - Gold */
+  --color-accent: #d9a75f;
+  --color-accent-hover: #e0b76b;
+  --color-accent-muted: rgba(217, 167, 95, 0.3);
+
+  /* Bitcoin Orange */
+  --color-bitcoin: #f7931a;
+  --color-bitcoin-hover: #e5830f;
+
+  /* Status Colors */
+  --color-success: #32d74b;
+  --color-success-muted: #0b9981;
+  --color-error: #ff453a;
+  --color-error-hover: #d72c1c;
+  --color-error-muted: #b33b44;
+  --color-warning: #ff9f0a;
+  --color-warning-muted: #ffb84d;
+
+  /* Grays (for borders, dividers, etc.) */
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #e0e0e0;
+  --color-gray-300: #d4d4d4;
+  --color-gray-400: #a0a0a0;
+  --color-gray-500: #666666;
+  --color-gray-600: #4a4a4a;
+  --color-gray-700: #444444;
+  --color-gray-800: #333333;
+  --color-gray-900: #1a1a1a;
+
+  /* Borders */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.1);
+  --color-border-input: #444444;
+
+  /* ==========================================
+     SPACING SCALE
+  ========================================== */
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+
+  /* ==========================================
+     BORDER RADIUS
+  ========================================== */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 9999px;
+
+  /* ==========================================
+     SHADOWS
+  ========================================== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-focus: 0 0 0 3px var(--color-accent-muted);
+  --shadow-glow: 0 0 6px var(--color-accent-muted);
+
+  /* ==========================================
+     TYPOGRAPHY
+  ========================================== */
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Font Sizes */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.25rem;    /* 20px */
+  --text-2xl: 1.5rem;    /* 24px */
+  --text-3xl: 2rem;      /* 32px */
+  --text-4xl: 2.5rem;    /* 40px */
+
+  /* Font Weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Line Heights */
+  --leading-tight: 1.25;
+  --leading-normal: 1.4;
+  --leading-relaxed: 1.5;
+  --leading-loose: 1.75;
+
+  /* ==========================================
+     TRANSITIONS
+  ========================================== */
+  --transition-fast: 0.1s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  /* ==========================================
+     LAYOUT
+  ========================================== */
+  --sidebar-width: 300px;
+  --header-height: 64px;
+
+  /* ==========================================
+     BREAKPOINTS (for reference in JS)
+     Use @media queries with these values
+  ========================================== */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+
+  /* ==========================================
+     Z-INDEX SCALE
+  ========================================== */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+}
+
+/* ============================================
+   FOCUS STYLES - Global accessibility
+============================================ */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* For inputs, use box-shadow instead for better appearance */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-glow);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   UTILITY CLASSES
+============================================ */
+
+/* Text colors */
+.text-success { color: var(--color-success); }
+.text-error { color: var(--color-error); }
+.text-warning { color: var(--color-warning); }
+.text-muted { color: var(--color-text-muted); }
+.text-accent { color: var(--color-accent); }
+
+/* Background colors */
+.bg-success { background-color: var(--color-success); }
+.bg-error { background-color: var(--color-error); }
+.bg-warning { background-color: var(--color-warning); }
+
+/* Visually hidden (for screen readers) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

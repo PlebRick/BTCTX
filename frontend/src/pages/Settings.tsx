@@ -4,9 +4,7 @@ import React, { useState } from "react";
 import api from "../api";
 import "../styles/settings.css";
 
-interface ApiErrorResponse {
-  detail?: string;
-}
+// ApiErrorResponse is defined in types/global.d.ts
 
 interface CSVRowPreview {
   row_number: number;
@@ -66,8 +64,7 @@ const Settings: React.FC = () => {
       const res = await api.get("/users/");
       const users = res.data as { id: number; username: string }[];
       return users.length > 0 ? users[0].id : null;
-    } catch (err) {
-      console.error("Failed to fetch user:", err);
+    } catch {
       return null;
     }
   };
@@ -76,8 +73,7 @@ const Settings: React.FC = () => {
     try {
       await api.post("/logout", {}, { withCredentials: true });
       window.location.href = "/login";
-    } catch (err) {
-      console.error("Logout failed:", err);
+    } catch {
       setMessage("Failed to log out. Please try again.");
     }
   };
@@ -125,8 +121,7 @@ const Settings: React.FC = () => {
       setMessage("Credentials updated successfully.");
       setNewUsername("");
       setNewPassword("");
-    } catch (error) {
-      console.error("Error resetting credentials:", error);
+    } catch {
       setMessage("Failed to reset credentials.");
     } finally {
       setLoading(false);
@@ -142,7 +137,6 @@ const Settings: React.FC = () => {
       await api.delete<ApiErrorResponse>("/transactions/delete_all");
       setMessage("All transactions deleted.");
     } catch (error) {
-      console.error("Error deleting transactions:", error);
       setMessage(error instanceof Error ? error.message : "Failed to delete transactions.");
     } finally {
       setLoading(false);
@@ -176,8 +170,7 @@ const Settings: React.FC = () => {
       link.remove();
 
       setMessage("Backup downloaded.");
-    } catch (err) {
-      console.error("Backup download failed:", err);
+    } catch {
       setMessage("Failed to download backup.");
     } finally {
       setLoading(false);
@@ -208,8 +201,7 @@ const Settings: React.FC = () => {
       setTimeout(() => {
         window.location.href = "/login";
       }, 2000);
-    } catch (err) {
-      console.error("Restore failed:", err);
+    } catch {
       setMessage("Failed to restore backup.");
     } finally {
       setLoading(false);
@@ -231,8 +223,7 @@ const Settings: React.FC = () => {
       link.click();
       link.remove();
       setMessage("Template downloaded.");
-    } catch (err) {
-      console.error("Template download failed:", err);
+    } catch {
       setMessage("Failed to download template.");
     } finally {
       setLoading(false);
@@ -253,8 +244,7 @@ const Settings: React.FC = () => {
       link.click();
       link.remove();
       setMessage("Instructions downloaded.");
-    } catch (err) {
-      console.error("Instructions download failed:", err);
+    } catch {
       setMessage("Failed to download instructions.");
     } finally {
       setLoading(false);
@@ -276,8 +266,7 @@ const Settings: React.FC = () => {
       link.click();
       link.remove();
       setMessage("CSV export downloaded.");
-    } catch (err) {
-      console.error("CSV export failed:", err);
+    } catch {
       setMessage("Failed to export CSV.");
     } finally {
       setLoading(false);
@@ -289,8 +278,7 @@ const Settings: React.FC = () => {
       const res = await api.get<DatabaseStatusResponse>("/import/status");
       setDbStatus(res.data);
       return res.data;
-    } catch (err) {
-      console.error("Status check failed:", err);
+    } catch {
       setMessage("Failed to check database status.");
       return null;
     }
@@ -335,7 +323,6 @@ const Settings: React.FC = () => {
       setShowPreview(true);
       setMessage("");
     } catch (err: unknown) {
-      console.error("Preview failed:", err);
       const axiosErr = err as { response?: { data?: { detail?: string } } };
       setMessage(axiosErr.response?.data?.detail || "Failed to preview CSV.");
     } finally {
@@ -374,7 +361,6 @@ const Settings: React.FC = () => {
       const fileInput = document.getElementById("csv-file-input") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
     } catch (err: unknown) {
-      console.error("Import failed:", err);
       const axiosErr = err as { response?: { data?: { detail?: string } } };
       setMessage(axiosErr.response?.data?.detail || "Failed to import CSV.");
     } finally {

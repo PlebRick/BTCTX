@@ -1,27 +1,7 @@
-/* login.css */
+/* login.css - Design tokens imported from theme.css */
 
-/* 
-  1) CSS Variables (Theme Colors)
-  Feel free to customize these for the entire app's color palette. 
-*/
-:root {
-  --color-bg: #121212;       /* Main background */
-  --color-panel: #1c1c1c;    /* Card/Panel background */
-  --color-header: #121212;   /* Header background or references */
-  --color-text: #ffffff;     /* Primary text color */
-  --color-text-dim: #cfcfcf; /* Dimmed text for secondary content */
-
-  /* Accent colors */
-  --color-accent: #d9a75f;
-  --color-accent-hover: #e0b76b;
-
-  /* Bitcoin orange for primary call-to-action (Log In button) */
-  --color-bitcoin-orange: #f7931a;
-  --color-bitcoin-orange-hover: #e5830f; /* Slightly darker on hover */
-}
-
-/* 
-  2) Overall Container
+/*
+  Overall Container
   - 3-stop vertical gradient to minimize visible banding
   - Center content with flex
 */
@@ -149,7 +129,7 @@
   font-size: 1.1rem;
   font-weight: 600;
   color: #1a1a1a; /* Dark text for contrast */
-  background-color: var(--color-bitcoin-orange);
+  background-color: var(--color-bitcoin);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -158,7 +138,7 @@
 }
 
 .accent-btn.login-btn:hover {
-  background-color: var(--color-bitcoin-orange-hover);
+  background-color: var(--color-bitcoin-hover);
   transform: translateY(-1px); /* Subtle lift effect */
 }
 
@@ -179,7 +159,7 @@
 }
 
 .create-account-text {
-  color: var(--color-text-dim);
+  color: var(--color-text-secondary);
 }
 
 .create-account-link {
@@ -273,4 +253,79 @@
   font-weight: 500;
   margin-bottom: 1rem;
   text-align: center;
+}
+
+.login-error-msg {
+  color: var(--color-error);
+  font-weight: 500;
+  margin-top: var(--space-4);
+  text-align: center;
+}
+
+/* ===============================
+   Responsive Design
+=============================== */
+
+/* Small screens (< 768px) */
+@media (max-width: 768px) {
+  .login-container {
+    padding: var(--space-4);
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: 400px;
+    padding: var(--space-6);
+  }
+
+  .login-title {
+    font-size: 2rem;
+  }
+}
+
+/* Extra small screens (< 480px) */
+@media (max-width: 480px) {
+  .login-container {
+    padding: var(--space-3);
+    justify-content: flex-start;
+    padding-top: var(--space-12);
+  }
+
+  .login-header {
+    flex-direction: column;
+    text-align: center;
+    margin-bottom: var(--space-5);
+  }
+
+  .login-logo {
+    margin-right: 0;
+    margin-bottom: var(--space-3);
+    width: 60px;
+    height: 60px;
+  }
+
+  .login-title {
+    font-size: 1.5rem;
+  }
+
+  .login-card {
+    padding: var(--space-5);
+    border-radius: var(--radius-md);
+  }
+
+  .login-card-title {
+    font-size: 1.4rem;
+    margin-bottom: var(--space-4);
+  }
+
+  .login-create-account {
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: center;
+  }
+
+  .accent-btn.login-btn {
+    padding: var(--space-4);
+  }
 }

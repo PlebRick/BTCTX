@@ -1,8 +1,7 @@
-import React, { useState } from "react";
-import axios from "axios";
-import { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from '../api';
+import { extractErrorMessage } from '../hooks/useApiCall';
 import "../styles/login.css";
 
 const LoginPage: React.FC = () => {
@@ -29,16 +28,11 @@ const LoginPage: React.FC = () => {
     setErrorMsg("");
 
     try {
-      const response = await axios.post(
-        "/api/login",
-        { username, password },
-        { withCredentials: true }
-      );
-      console.log(response.data);
+      await api.post("/login", { username, password });
       navigate("/dashboard");
     } catch (error) {
-      console.error("Login error:", error);
-      setErrorMsg("Login failed. Please check your username/password.");
+      const message = extractErrorMessage(error);
+      setErrorMsg(message || "Login failed. Please check your username/password.");
     } finally {
       setIsSubmitting(false);
     }

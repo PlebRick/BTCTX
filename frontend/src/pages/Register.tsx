@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
+import { useToast } from '../contexts/ToastContext';
 import '../styles/login.css';
 
 const RegisterPage: React.FC = () => {
@@ -17,6 +18,7 @@ const RegisterPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
+  const toast = useToast();
 
   // On mount, fetch the current user and check if the account is still default.
   useEffect(() => {
@@ -31,8 +33,7 @@ const RegisterPage: React.FC = () => {
           // No user found: assume default for safety.
           setIsDefault(true);
         }
-      } catch (err) {
-        console.error("Failed to fetch user:", err);
+      } catch {
         // In case of error, assume registration is not allowed.
         setIsDefault(false);
       }
@@ -95,10 +96,9 @@ const RegisterPage: React.FC = () => {
       // Delete all transactions to "reset" the account.
       await api.delete("/transactions/delete_all");
 
-      alert("Registration successful! Your credentials have been updated and all transactions have been deleted.");
+      toast.success("Registration successful! Your credentials have been updated.");
       navigate('/login');
-    } catch (error) {
-      console.error("Registration error:", error);
+    } catch {
       setErrorMsg("Failed to register. Please try again.");
     } finally {
       setIsSubmitting(false);
