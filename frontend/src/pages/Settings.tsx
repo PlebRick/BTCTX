@@ -239,6 +239,51 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleDownloadInstructions = async () => {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const res = await api.get("/import/instructions", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "BitcoinTX_CSV_Import_Guide.pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setMessage("Instructions downloaded.");
+    } catch (err) {
+      console.error("Instructions download failed:", err);
+      setMessage("Failed to download instructions.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const res = await api.get("/backup/csv", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      const date = new Date().toISOString().split("T")[0];
+      link.setAttribute("download", `btctx_transactions_${date}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setMessage("CSV export downloaded.");
+    } catch (err) {
+      console.error("CSV export failed:", err);
+      setMessage("Failed to export CSV.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCheckStatus = async () => {
     try {
       const res = await api.get<DatabaseStatusResponse>("/import/status");
@@ -439,6 +484,9 @@ const Settings: React.FC = () => {
             <button onClick={handleDownloadTemplate} disabled={loading} className="settings-button">
               {loading ? "..." : "Template"}
             </button>
+            <button onClick={handleDownloadInstructions} disabled={loading} className="settings-button">
+              {loading ? "..." : "Instructions"}
+            </button>
           </div>
         </div>
 
@@ -582,6 +630,18 @@ const Settings: React.FC = () => {
       {/* ✅ Backup & Restore */}
       <div className="settings-section">
         <h3>Backup & Restore</h3>
+
+        <div className="settings-option">
+          <div className="option-info">
+            <span className="settings-option-title">Export as CSV</span>
+            <p className="settings-option-subtitle">
+              Export all transactions as a CSV file (unencrypted, editable).
+            </p>
+          </div>
+          <button onClick={handleExportCsv} disabled={loading} className="settings-button">
+            {loading ? "Processing..." : "Export CSV"}
+          </button>
+        </div>
 
         <div className="settings-option">
           <div className="option-info">

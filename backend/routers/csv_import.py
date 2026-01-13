@@ -7,8 +7,10 @@ Provides template download, status check, preview, and execute endpoints.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -60,6 +62,32 @@ async def download_template(request: Request):
         headers={
             "Content-Disposition": "attachment; filename=btctx_import_template.csv"
         }
+    )
+
+
+@router.get("/instructions", response_class=FileResponse)
+async def download_instructions(request: Request):
+    """
+    Download the CSV import instructions PDF.
+
+    Returns:
+        PDF file with Content-Disposition header for download
+    """
+    _require_auth(request)
+
+    # Get path to instructions PDF
+    pdf_path = Path(__file__).parent.parent / "assets" / "csv_import_instructions.pdf"
+
+    if not pdf_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Instructions PDF not found. Please contact support."
+        )
+
+    return FileResponse(
+        path=str(pdf_path),
+        media_type="application/pdf",
+        filename="BitcoinTX_CSV_Import_Guide.pdf",
     )
 
 

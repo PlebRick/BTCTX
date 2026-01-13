@@ -101,10 +101,19 @@ def build_form_8949_and_schedule_d(
     start_date = datetime(year, 1, 1, tzinfo=timezone.utc)
     end_date = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
 
+    # Non-taxable disposal purposes that should NOT appear on Form 8949
+    # Gifts, donations, and lost assets are reported separately, not as capital gains/losses
+    NON_TAXABLE_PURPOSES = ('Gift', 'Donation', 'Lost')
+
     disposals = (
         db.query(LotDisposal)
           .join(LotDisposal.transaction)
           .filter(Transaction.timestamp >= start_date, Transaction.timestamp < end_date)
+          .filter(
+              # Exclude non-taxable disposals (gifts, donations, lost assets)
+              # These have a purpose field set; taxable disposals (Sell, Spent, Transfer fees) don't
+              (Transaction.purpose.is_(None)) | (~Transaction.purpose.in_(NON_TAXABLE_PURPOSES))
+          )
           .all()
     )
 

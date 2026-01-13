@@ -3,7 +3,7 @@
 > This file provides context for AI assistants (Claude, etc.) working on this project.
 > It should be updated after significant changes to maintain continuity across sessions.
 
-**Last Updated:** 2025-01-12
+**Last Updated:** 2026-01-12
 
 ---
 
@@ -216,8 +216,8 @@ git push plebrick master --tags  # Sync backup at releases
 ## Known Issues & Future Work
 
 ### Deferred Items
-- [ ] Edge cases in FIFO calculations
-- [ ] Review PDF calculations for accuracy
+- [x] ~~Edge cases in FIFO calculations~~ (covered by pre-commit tests)
+- [x] ~~Review PDF calculations for accuracy~~ (verified, fixed Form 8949 non-taxable exclusion)
 - [ ] 2025 IRS form template updates (when released)
 
 ### Planned Features
@@ -228,6 +228,10 @@ git push plebrick master --tags  # Sync backup at releases
 - [x] CSV template import feature (v0.4.0)
 - [x] Atomic bulk import with rollback
 - [x] Fixed async event loop conflict in price fetching
+- [x] CSV export for roundtrip backup
+- [x] Pre-commit test suite (17 tests covering Docker/StartOS, FIFO, reports, CSV)
+- [x] Fixed Form 8949 to exclude Gift/Donation/Lost disposals
+- [x] Fixed proceeds_usd degradation bug in FIFO recalculation
 
 ---
 
@@ -260,6 +264,34 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 > See [docs/STARTOS_COMPATIBILITY.md](docs/STARTOS_COMPATIBILITY.md) for full multi-arch build requirements.
 
+### Pre-Commit Testing (IMPORTANT)
+
+**Run the pre-commit test suite before every commit**, especially when modifying backend code:
+
+```bash
+# Full test suite (starts backend if needed)
+./scripts/pre-commit.sh
+
+# Quick mode (skip long-running tests)
+./scripts/pre-commit.sh --quick
+
+# Static checks only (no backend needed)
+python3 backend/tests/pre_commit_tests.py --no-api
+```
+
+**What it tests (17 checks):**
+- Docker/StartOS compatibility (no hardcoded paths, DATABASE_FILE env var, Python 3.9)
+- Transaction/FIFO integrity (scorched earth recalculation, backdated transactions)
+- Report generation (Form 8949, Schedule D, non-taxable exclusions)
+- CSV import/export roundtrip
+
+**Critical files that REQUIRE pre-commit tests after changes:**
+- `backend/services/transaction.py` - FIFO logic, lot disposal
+- `backend/services/reports/form_8949.py` - Tax form generation
+- `backend/database.py` - Database paths
+- `backend/services/backup.py` - Backup/restore paths
+- Any file touching file paths or environment variables
+
 ### Testing Reports
 ```bash
 # Complete tax report
@@ -291,7 +323,8 @@ When starting a new session, the AI should:
 6. Run `git log -5 --oneline` to see recent commits
 
 When ending a session:
-1. Update this file with any significant changes
-2. Add entries to CHANGELOG.md
-3. Update ROADMAP.md if goals changed
-4. Commit changes if appropriate
+1. **Run pre-commit tests:** `./scripts/pre-commit.sh` (or `--no-api` for quick check)
+2. Update this file with any significant changes
+3. Add entries to CHANGELOG.md
+4. Update ROADMAP.md if goals changed
+5. Commit changes if appropriate

@@ -574,13 +574,19 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
         return
 
     # 1) Safely parse proceeds. Default to 0 if None/invalid
-    raw_proceeds = tx_data.get("proceeds_usd")
-    if raw_proceeds is None:
-        raw_proceeds = "0"
-    try:
-        total_proceeds = float(raw_proceeds)
-    except (ValueError, TypeError):
-        total_proceeds = 0.0
+    # IMPORTANT: Use tx.proceeds_usd as the authoritative value if available,
+    # since build_ledger_entries_for_transaction already calculated it correctly
+    # from gross_proceeds_usd. This prevents degradation during recalculation.
+    if tx.proceeds_usd is not None:
+        total_proceeds = float(tx.proceeds_usd)
+    else:
+        raw_proceeds = tx_data.get("proceeds_usd")
+        if raw_proceeds is None:
+            raw_proceeds = "0"
+        try:
+            total_proceeds = float(raw_proceeds)
+        except (ValueError, TypeError):
+            total_proceeds = 0.0
 
     # 2) Check purpose for forced 0 or "Spent" logic
     purpose_lower = (tx.purpose or "").lower()
