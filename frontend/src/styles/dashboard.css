@@ -47,10 +47,7 @@
   border-color: rgba(229, 180, 90, 0.15);
 }
 
-/* BTC Price card - hero element with accent border */
-.card.btc-price-container {
-  border-left: 3px solid var(--color-bitcoin);
-}
+/* BTC Price card - no special border, lets watermark provide brand presence */
 
 /* Card Titles */
 .card h3 {
@@ -124,13 +121,13 @@
   overflow: hidden;        /* contain watermark */
 }
 
-/* Bitcoin watermark behind the price */
+/* Bitcoin watermark - ambient brand texture (luxury paper feel) */
 .btc-watermark {
   position: absolute;
-  width: 180px;
-  height: 180px;
+  width: 85%;
+  height: 85%;
   color: var(--color-bitcoin);
-  opacity: 0.08;
+  opacity: 0.05;
   pointer-events: none;
   z-index: 0;
 }
