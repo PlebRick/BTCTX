@@ -5,40 +5,38 @@ All notable changes to BitcoinTX are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Frontend Design System Refactor**: Major code quality and architecture improvements
+  - Custom hooks: `useAccounts`, `useApiCall`, `useBtcPrice` for reusable logic
+  - Toast notification system with `ToastContext` for user feedback
+  - Error boundaries (`ErrorBoundary.tsx`) for graceful error handling
+  - Centralized theme system (`theme.css`) with CSS variables
+  - Barrel exports via `hooks/index.ts`
 - **CSV Export**: Export all transactions as a CSV file matching the import template format
   - Creates clean roundtrip: Export → Edit → Re-import
   - File naming: `btctx_transactions_YYYY-MM-DD.csv`
   - New endpoint: `GET /api/backup/csv`
 - **CSV Import Instructions PDF**: Downloadable PDF guide for CSV import feature
-  - Comprehensive field reference with valid values
-  - Account rules by transaction type
-  - Example rows for each transaction type
-  - Troubleshooting guide
   - New endpoint: `GET /api/import/instructions`
-- **Frontend buttons in Settings**:
-  - "Instructions" button next to CSV import template download
-  - "Export CSV" button in Backup & Restore section
-- **Pre-Commit Test Suite**: Comprehensive test battery for catching regressions
-  - Docker/StartOS compatibility checks (hardcoded paths, env vars, Python 3.9)
-  - Transaction/FIFO integrity tests (scorched earth, backdated recalculation)
-  - Report generation tests (Form 8949, Schedule D, Complete Tax Report)
-  - CSV import/export roundtrip validation
+- **Pre-Commit Test Suite**: 17 tests for catching regressions
   - Run with: `./scripts/pre-commit.sh` or `python backend/tests/pre_commit_tests.py`
 
 ### Fixed
-- **Form 8949 non-taxable exclusion**: Gift, Donation, and Lost disposals now correctly excluded from IRS Form 8949
-  - Added `NON_TAXABLE_PURPOSES` filter in `form_8949.py`
-  - These disposal types should not appear on tax forms per IRS guidelines
+- **Form 8949 non-taxable exclusion**: Gift, Donation, and Lost disposals now correctly excluded
 - **Proceeds degradation fix**: Fixed bug where `proceeds_usd` could degrade during recalculation
-  - `maybe_dispose_lots_fifo` now uses authoritative `tx.proceeds_usd` instead of stale `tx_data`
-- **CSV export roundtrip**: Export now correctly outputs user-entered values only
-  - `cost_basis_usd` exported only for Buy/Deposit transactions
-  - `gross_proceeds_usd` used for Sell/Withdrawal (not FIFO-calculated values)
 
 ### Files Added
-- `backend/scripts/generate_csv_instructions_pdf.py` - ReportLab script to generate instructions PDF
-- `backend/assets/csv_import_instructions.pdf` - Static PDF with import instructions
-- `backend/tests/pre_commit_tests.py` - Comprehensive pre-commit test suite
+- `frontend/src/hooks/useAccounts.ts` - Account fetching and caching hook
+- `frontend/src/hooks/useApiCall.ts` - Generic API call hook with loading/error states
+- `frontend/src/hooks/useBtcPrice.ts` - BTC price fetching hook
+- `frontend/src/hooks/index.ts` - Barrel exports for hooks
+- `frontend/src/components/ErrorBoundary.tsx` - React error boundary component
+- `frontend/src/components/Toast.tsx` - Toast notification component
+- `frontend/src/components/ToastContainer.tsx` - Toast container component
+- `frontend/src/contexts/ToastContext.tsx` - Toast context provider
+- `frontend/src/styles/theme.css` - Centralized CSS variables and theming
+- `frontend/src/styles/toast.css` - Toast notification styles
+- `frontend/src/styles/errorBoundary.css` - Error boundary styles
+- `backend/tests/pre_commit_tests.py` - Pre-commit test suite
 - `scripts/pre-commit.sh` - Shell script wrapper for pre-commit tests
 
 ---

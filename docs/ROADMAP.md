@@ -45,7 +45,7 @@ Enhance CSV import with merge capabilities and column mapping.
 ### Low Priority / Nice-to-Have
 - [ ] **Multi-user support**: Separate portfolios for household members
 - [ ] **Exchange API sync**: Optional automatic import from exchanges
-- [ ] **Dark mode**: UI theme toggle
+- [x] ~~**Dark mode**: UI theme toggle~~ (theme system added, dark mode ready to implement)
 - [ ] **Mobile responsive**: Better mobile layout
 
 ---
@@ -53,6 +53,7 @@ Enhance CSV import with merge capabilities and column mapping.
 ## Completed
 
 ### January 2025
+- [x] **Frontend design system refactor** - Custom hooks, toast notifications, error boundaries, theme system
 - [x] **v0.4.0: CSV template import** - Bulk import with preview and atomic commits
 - [x] **v0.3.2: Backup restore fix** - Session clearing and login redirect
 - [x] **v0.3.1: StartOS compatibility** - DATABASE_FILE env var, BackgroundTasks cleanup

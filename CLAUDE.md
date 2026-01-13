@@ -3,7 +3,7 @@
 > This file provides context for AI assistants (Claude, etc.) working on this project.
 > It should be updated after significant changes to maintain continuity across sessions.
 
-**Last Updated:** 2026-01-12
+**Last Updated:** 2025-01-13
 
 ---
 
@@ -27,28 +27,27 @@ git log -3 --oneline  # See recent commits
 
 ### Active Feature Branches
 
-| Branch | Purpose | Status |
-|--------|---------|--------|
-| `feature/2025-forms` | 2025 IRS form support (v0.3.0) | **MERGED** - Released as v0.3.2 |
+None currently. All feature branches have been merged and deleted.
 
 ### Feature Branch Rules
 
-1. **For 2025 form work:** Always use `feature/2025-forms`
+1. **Create feature branch for major work:**
    ```bash
-   git checkout feature/2025-forms
-   git pull origin feature/2025-forms
+   git checkout develop
+   git checkout -b feature/my-feature
    ```
 
 2. **When feature is complete and tested:**
    ```bash
    git checkout develop
-   git merge feature/2025-forms
-   # Then normal flow to master
+   git merge feature/my-feature
+   git branch -d feature/my-feature  # Delete local
+   git push origin --delete feature/my-feature  # Delete remote
    ```
 
 3. **Keep feature branch updated with develop:**
    ```bash
-   git checkout feature/2025-forms
+   git checkout feature/my-feature
    git merge develop  # Pull in any bug fixes from develop
    ```
 
@@ -224,14 +223,16 @@ git push plebrick master --tags  # Sync backup at releases
 - [ ] Multi-user support (optional)
 - [ ] CSV import merge with existing data (Phase 2)
 
-### Completed This Session
+### Completed Recently
+- [x] Frontend design system refactor (Jan 2025)
+  - Custom hooks: `useAccounts`, `useApiCall`, `useBtcPrice`
+  - Toast notification system with context
+  - Error boundaries for graceful error handling
+  - Centralized theme system (`theme.css`)
 - [x] CSV template import feature (v0.4.0)
 - [x] Atomic bulk import with rollback
-- [x] Fixed async event loop conflict in price fetching
-- [x] CSV export for roundtrip backup
-- [x] Pre-commit test suite (17 tests covering Docker/StartOS, FIFO, reports, CSV)
+- [x] Pre-commit test suite (17 tests)
 - [x] Fixed Form 8949 to exclude Gift/Donation/Lost disposals
-- [x] Fixed proceeds_usd degradation bug in FIFO recalculation
 
 ---
 
