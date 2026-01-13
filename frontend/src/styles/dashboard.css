@@ -120,12 +120,27 @@
   justify-content: center;
   align-items: center;
   flex: 1;                 /* fill remaining vertical space */
+  position: relative;      /* for watermark positioning */
+  overflow: hidden;        /* contain watermark */
+}
+
+/* Bitcoin watermark behind the price */
+.btc-watermark {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  color: var(--color-bitcoin);
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .btc-price-value {
   font-size: 3rem;
   font-weight: 700;
   color: var(--color-bitcoin);
+  position: relative;      /* above watermark */
+  z-index: 1;
 }
 
 /* Gift note on its own row */
