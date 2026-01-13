@@ -4,7 +4,7 @@
 .transaction-panel-overlay {
   position: fixed;
   top: 0;
-  left: 360px; /* the width of your sidebar */
+  left: var(--sidebar-width); /* uses CSS variable from theme.css */
   right: 0;
   bottom: 0;
   background-color: rgba(0,0,0,0.5);

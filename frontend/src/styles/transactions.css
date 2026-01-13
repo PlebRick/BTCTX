@@ -12,6 +12,12 @@
   background-color: transparent;
   color: var(--color-text);
   padding: 1rem;
+  /* Subtle gold gradient at top for atmosphere */
+  background-image: radial-gradient(
+    circle at 50% 0%,
+    rgba(229, 180, 90, 0.03) 0%,
+    transparent 50%
+  );
 }
 
 /* Header (Add Transaction + sort dropdown) */
@@ -26,15 +32,25 @@
   background-color: var(--color-accent);
   color: #000;
   border: none;
-  border-radius: 4px;
-  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 1rem;
   font-size: 1rem;
   cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s;
+  font-weight: 600;
+  transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+  /* Button depth */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 .add-transaction-btn:hover {
   background-color: var(--color-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.add-transaction-btn:active {
+  transform: translateY(0);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Sort dropdown styling (if used) */
@@ -83,8 +99,10 @@
 
 /* Date heading (e.g. "Mar 15, 2025") */
 .date-heading {
+  font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--color-text-dim);
   margin-bottom: 0.5rem;
 }

@@ -21,10 +21,11 @@
   --color-text-secondary: #cfcfcf;
   --color-text-muted: #888888;
 
-  /* Accent - Gold */
-  --color-accent: #d9a75f;
-  --color-accent-hover: #e0b76b;
-  --color-accent-muted: rgba(217, 167, 95, 0.3);
+  /* Accent - Gold (richer, more vibrant) */
+  --color-accent: #e5b45a;
+  --color-accent-hover: #edc06a;
+  --color-accent-muted: rgba(229, 180, 90, 0.3);
+  --color-accent-glow: rgba(229, 180, 90, 0.4);
 
   /* Bitcoin Orange */
   --color-bitcoin: #f7931a;
@@ -93,6 +94,7 @@
      TYPOGRAPHY
   ========================================== */
   --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif;
 
   /* Font Sizes */
   --text-xs: 0.75rem;    /* 12px */
@@ -157,7 +159,7 @@
 
 *:focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 /* For inputs, use box-shadow instead for better appearance */
@@ -171,7 +173,7 @@ textarea:focus-visible {
 
 button:focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 /* ============================================
@@ -201,4 +203,14 @@ button:focus-visible {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ============================================
+   CENTRALIZED ANIMATIONS
+============================================ */
+
+/* Spin animation - used by loading spinners */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

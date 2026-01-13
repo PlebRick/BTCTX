@@ -5,6 +5,12 @@
   color: var(--color-text);
   padding: 2rem;
   min-height: 100vh;
+  /* Subtle gold gradient at top for atmosphere */
+  background-image: radial-gradient(
+    circle at 50% 0%,
+    rgba(229, 180, 90, 0.03) 0%,
+    transparent 50%
+  );
 }
 
 /* Each row of cards can wrap if the screen is too narrow */
@@ -26,29 +32,46 @@
   max-width: 650px;      /* bigger maximum than before */
   background-color: var(--color-panel);
   padding: 1.5rem;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  border: 1px solid transparent;
+}
+
+/* Card hover effect - subtle gold accent border */
+.card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+              0 0 0 1px rgba(229, 180, 90, 0.1);
+  border-color: rgba(229, 180, 90, 0.15);
+}
+
+/* BTC Price card - hero element with accent border */
+.card.btc-price-container {
+  border-left: 3px solid var(--color-bitcoin);
 }
 
 /* Card Titles */
 .card h3 {
+  font-family: var(--font-display);
   font-size: 1.25rem;
   color: var(--color-accent);
   margin-bottom: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 0.5rem;
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 /* Subheadings (Fees, etc.) */
 .card h4 {
+  font-family: var(--font-display);
   font-size: 1.1rem;
   color: var(--color-text);
   margin: 1rem 0 0.5rem;
   font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 /* Standard text within cards */
