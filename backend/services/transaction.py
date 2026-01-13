@@ -58,7 +58,7 @@ def get_transaction_by_id(db: Session, transaction_id: int):
     return db.query(Transaction).filter(Transaction.id == transaction_id).first()
 
 
-def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
+def create_transaction_record(tx_data: dict, db: Session, auto_commit: bool = True) -> Transaction:
     """
     Creates a new Transaction in the hybrid multi-line ledger system.
 
@@ -72,6 +72,11 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
       7) If Deposit/Buy => create BTC lot if to_acct=BTC
       8) If Withdrawal/Sell => do FIFO disposal if from_acct=BTC
       9) If disposal => compute realized gains summary
+
+    Args:
+        tx_data: Transaction data dictionary
+        db: Database session
+        auto_commit: If True (default), commits after creating. Set to False for bulk operations.
     """
     # 1) Ensure BTC Fees account
     ensure_fee_account_exists(db)
@@ -150,8 +155,9 @@ def create_transaction_record(tx_data: dict, db: Session) -> Transaction:
         )
         recalculate_all_transactions(db)
 
-    db.commit()
-    db.refresh(new_tx)
+    if auto_commit:
+        db.commit()
+        db.refresh(new_tx)
     return new_tx
 
 
@@ -706,31 +712,44 @@ def get_btc_price(timestamp: datetime, db: Session) -> Decimal:
     If historical fails, fallback to live price.
     """
     import asyncio
+    import concurrent.futures
     from backend.services.bitcoin import get_historical_price, get_current_price
 
     timestamp_str = timestamp.strftime("%Y-%m-%d")
 
-    try:
-        # Try to get historical price
+    def _fetch_historical():
+        """Run async price fetch in a new thread with its own event loop."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            price_data = loop.run_until_complete(get_historical_price(timestamp_str))
-            if "USD" in price_data:
-                return Decimal(str(price_data["USD"]))
+            return loop.run_until_complete(get_historical_price(timestamp_str))
         finally:
             loop.close()
+
+    def _fetch_current():
+        """Run async price fetch in a new thread with its own event loop."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(get_current_price())
+        finally:
+            loop.close()
+
+    try:
+        # Run in a thread pool to avoid event loop conflicts
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(_fetch_historical)
+            price_data = future.result(timeout=30)
+            if "USD" in price_data:
+                return Decimal(str(price_data["USD"]))
     except Exception as e:
         # Fallback to live price
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                live_price_data = loop.run_until_complete(get_current_price())
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(_fetch_current)
+                live_price_data = future.result(timeout=30)
                 if "USD" in live_price_data:
                     return Decimal(str(live_price_data["USD"]))
-            finally:
-                loop.close()
         except Exception:
             raise HTTPException(
                 status_code=500,

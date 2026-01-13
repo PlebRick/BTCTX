@@ -8,12 +8,57 @@ interface ApiErrorResponse {
   detail?: string;
 }
 
+interface CSVRowPreview {
+  row_number: number;
+  date: string;
+  type: string;
+  amount: string;
+  from_account: string;
+  to_account: string;
+  cost_basis_usd?: string;
+  proceeds_usd?: string;
+  fee_amount?: string;
+  fee_currency?: string;
+  source?: string;
+  purpose?: string;
+  notes?: string;
+}
+
+interface CSVParseError {
+  row_number: number;
+  column?: string;
+  message: string;
+  severity: string;
+}
+
+interface CSVPreviewResponse {
+  success: boolean;
+  total_rows: number;
+  valid_rows: number;
+  transactions: CSVRowPreview[];
+  errors: CSVParseError[];
+  warnings: CSVParseError[];
+  can_import: boolean;
+}
+
+interface DatabaseStatusResponse {
+  is_empty: boolean;
+  transaction_count: number;
+  message: string;
+}
+
 const Settings: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
+
+  // CSV Import state
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = useState<CSVPreviewResponse | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [dbStatus, setDbStatus] = useState<DatabaseStatusResponse | null>(null);
 
   // Reused for most actions
   const getUserId = async (): Promise<number | null> => {
@@ -171,6 +216,146 @@ const Settings: React.FC = () => {
     }
   };
 
+  // CSV Import handlers
+  const handleDownloadTemplate = async () => {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const res = await api.get("/import/template", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "btctx_import_template.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setMessage("Template downloaded.");
+    } catch (err) {
+      console.error("Template download failed:", err);
+      setMessage("Failed to download template.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckStatus = async () => {
+    try {
+      const res = await api.get<DatabaseStatusResponse>("/import/status");
+      setDbStatus(res.data);
+      return res.data;
+    } catch (err) {
+      console.error("Status check failed:", err);
+      setMessage("Failed to check database status.");
+      return null;
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setCsvFile(file);
+    setCsvPreview(null);
+    setShowPreview(false);
+    setDbStatus(null);
+  };
+
+  const handlePreviewImport = async () => {
+    if (!csvFile) {
+      setMessage("Please select a CSV file first.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    // Check status first
+    const status = await handleCheckStatus();
+    if (!status) {
+      setLoading(false);
+      return;
+    }
+
+    if (!status.is_empty) {
+      setMessage(status.message);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", csvFile);
+
+      const res = await api.post<CSVPreviewResponse>("/import/preview", formData);
+      setCsvPreview(res.data);
+      setShowPreview(true);
+      setMessage("");
+    } catch (err: unknown) {
+      console.error("Preview failed:", err);
+      const axiosErr = err as { response?: { data?: { detail?: string } } };
+      setMessage(axiosErr.response?.data?.detail || "Failed to preview CSV.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExecuteImport = async () => {
+    if (!csvFile) {
+      setMessage("Please select a CSV file first.");
+      return;
+    }
+
+    if (!csvPreview?.can_import) {
+      setMessage("Cannot import: there are errors in the CSV file.");
+      return;
+    }
+
+    if (!window.confirm(`Import ${csvPreview.valid_rows} transaction(s)? This will populate your empty database.`)) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", csvFile);
+
+      const res = await api.post("/import/execute", formData);
+      setMessage(res.data.message || "Import completed successfully.");
+      setCsvPreview(null);
+      setShowPreview(false);
+      setCsvFile(null);
+      // Reset file input
+      const fileInput = document.getElementById("csv-file-input") as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+    } catch (err: unknown) {
+      console.error("Import failed:", err);
+      const axiosErr = err as { response?: { data?: { detail?: string } } };
+      setMessage(axiosErr.response?.data?.detail || "Failed to import CSV.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelPreview = () => {
+    setShowPreview(false);
+    setCsvPreview(null);
+    setCsvFile(null);
+    setDbStatus(null);
+    setMessage("");
+    const fileInput = document.getElementById("csv-file-input") as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleString();
+    } catch {
+      return dateStr;
+    }
+  };
+
   return (
     <div className="settings-container">
       <h2 className="settings-title">Settings</h2>
@@ -241,6 +426,152 @@ const Settings: React.FC = () => {
             {loading ? "Processing..." : "Delete"}
           </button>
         </div>
+
+        {/* CSV Import */}
+        <div className="settings-option import-section">
+          <div className="option-info">
+            <span className="settings-option-title">Import Transactions (CSV)</span>
+            <p className="settings-option-subtitle">
+              Import transactions from a CSV file. Requires an empty database.
+            </p>
+          </div>
+          <div className="import-controls">
+            <button onClick={handleDownloadTemplate} disabled={loading} className="settings-button">
+              {loading ? "..." : "Template"}
+            </button>
+          </div>
+        </div>
+
+        {/* CSV File Upload */}
+        <div className="settings-option import-upload">
+          <div className="option-info">
+            <div className="import-input-row">
+              <input
+                type="file"
+                id="csv-file-input"
+                accept=".csv"
+                onChange={handleFileSelect}
+                className="csv-file-input"
+              />
+              <button
+                onClick={handlePreviewImport}
+                disabled={loading || !csvFile}
+                className="settings-button"
+              >
+                {loading ? "Processing..." : "Preview"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* CSV Preview Table */}
+        {showPreview && csvPreview && (
+          <div className="import-preview-container">
+            <div className="import-preview-header">
+              <h4>Import Preview</h4>
+              <span className="import-preview-stats">
+                {csvPreview.valid_rows} valid / {csvPreview.total_rows} total rows
+                {csvPreview.errors.length > 0 && (
+                  <span className="import-error-count"> | {csvPreview.errors.length} error(s)</span>
+                )}
+                {csvPreview.warnings.length > 0 && (
+                  <span className="import-warning-count"> | {csvPreview.warnings.length} warning(s)</span>
+                )}
+              </span>
+            </div>
+
+            {/* Errors */}
+            {csvPreview.errors.length > 0 && (
+              <div className="import-errors">
+                <strong>Errors (must fix before import):</strong>
+                <ul>
+                  {csvPreview.errors.slice(0, 10).map((err, idx) => (
+                    <li key={idx} className="import-error-item">
+                      Row {err.row_number}{err.column ? ` (${err.column})` : ""}: {err.message}
+                    </li>
+                  ))}
+                  {csvPreview.errors.length > 10 && (
+                    <li>...and {csvPreview.errors.length - 10} more errors</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            {/* Warnings */}
+            {csvPreview.warnings.length > 0 && (
+              <div className="import-warnings">
+                <strong>Warnings (import will proceed):</strong>
+                <ul>
+                  {csvPreview.warnings.slice(0, 5).map((warn, idx) => (
+                    <li key={idx} className="import-warning-item">
+                      Row {warn.row_number}{warn.column ? ` (${warn.column})` : ""}: {warn.message}
+                    </li>
+                  ))}
+                  {csvPreview.warnings.length > 5 && (
+                    <li>...and {csvPreview.warnings.length - 5} more warnings</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            {/* Preview Table */}
+            {csvPreview.transactions.length > 0 && (
+              <div className="import-preview-table-container">
+                <table className="import-preview-table">
+                  <thead>
+                    <tr>
+                      <th>Row</th>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>From</th>
+                      <th>To</th>
+                      <th>Cost Basis</th>
+                      <th>Proceeds</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvPreview.transactions.slice(0, 50).map((tx) => (
+                      <tr key={tx.row_number}>
+                        <td>{tx.row_number}</td>
+                        <td>{formatDate(tx.date)}</td>
+                        <td>{tx.type}</td>
+                        <td>{tx.amount} BTC</td>
+                        <td>{tx.from_account}</td>
+                        <td>{tx.to_account}</td>
+                        <td>{tx.cost_basis_usd ? `$${tx.cost_basis_usd}` : "-"}</td>
+                        <td>{tx.proceeds_usd ? `$${tx.proceeds_usd}` : "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {csvPreview.transactions.length > 50 && (
+                  <p className="import-preview-more">
+                    ...and {csvPreview.transactions.length - 50} more transactions
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="import-actions">
+              <button
+                onClick={handleExecuteImport}
+                disabled={loading || !csvPreview.can_import}
+                className="settings-button import-confirm"
+              >
+                {loading ? "Importing..." : `Import ${csvPreview.valid_rows} Transactions`}
+              </button>
+              <button
+                onClick={handleCancelPreview}
+                disabled={loading}
+                className="settings-button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ✳️ Reset Account Removed */}
         <div className="settings-note">

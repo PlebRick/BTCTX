@@ -198,3 +198,152 @@ input[type="file"]::file-selector-button:hover {
   margin-top: 0.5rem;
   padding-left: 0.25rem;
 }
+
+/* CSV Import Styles */
+.import-section {
+  flex-wrap: wrap;
+}
+
+.import-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.import-upload {
+  padding-top: 0;
+}
+
+.import-input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.csv-file-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.import-preview-container {
+  background: #1c1c1c;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.import-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.import-preview-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.import-preview-stats {
+  font-size: 0.9rem;
+  color: var(--color-text-dim);
+}
+
+.import-error-count {
+  color: var(--danger-color);
+}
+
+.import-warning-count {
+  color: #ff9f0a;
+}
+
+.import-errors,
+.import-warnings {
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.import-errors {
+  background: rgba(255, 69, 58, 0.15);
+  border: 1px solid var(--danger-color);
+}
+
+.import-warnings {
+  background: rgba(255, 159, 10, 0.15);
+  border: 1px solid #ff9f0a;
+}
+
+.import-errors ul,
+.import-warnings ul {
+  margin: 0.5rem 0 0 1rem;
+  padding: 0;
+}
+
+.import-error-item {
+  color: #ff6961;
+}
+
+.import-warning-item {
+  color: #ffb84d;
+}
+
+.import-preview-table-container {
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.import-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.import-preview-table th,
+.import-preview-table td {
+  padding: 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.import-preview-table th {
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.import-preview-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.import-preview-table td:first-child {
+  color: var(--color-text-dim);
+}
+
+.import-preview-more {
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+  text-align: center;
+  margin: 0.5rem 0 0;
+}
+
+.import-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.import-actions .settings-button {
+  margin-left: 0;
+}
+
+.import-confirm {
+  width: auto;
+  min-width: 150px;
+}

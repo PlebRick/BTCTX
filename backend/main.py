@@ -95,7 +95,7 @@ def startup_event():
 # Routers (Transaction, User, Account, Calculation, Bitcoin, Reports, Debug)
 # ---------------------------------------------------------
 # (Mandatory) Routers (Transaction, User, Account, Calculation, Bitcoin, Reports)
-from backend.routers import transaction, user, account, calculation, bitcoin, reports, backup
+from backend.routers import transaction, user, account, calculation, bitcoin, reports, backup, csv_import
 
 # Mandatory routers
 app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
@@ -105,6 +105,7 @@ app.include_router(calculation.router, prefix="/api/calculations", tags=["calcul
 app.include_router(bitcoin.router, prefix="/api/bitcoin", tags=["Bitcoin"])
 app.include_router(reports.reports_router, prefix="/api/reports", tags=["reports"])
 app.include_router(backup.router, prefix="/api/backup", tags=["backup"])
+app.include_router(csv_import.router, prefix="/api/import", tags=["import"])
 
 # (Optional) Debug Router
 try:
