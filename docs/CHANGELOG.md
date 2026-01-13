@@ -4,12 +4,38 @@ All notable changes to BitcoinTX are documented in this file.
 
 ## [Unreleased]
 
+_No unreleased changes._
+
+---
+
+## [v0.4.0] - 2025-01-12
+
 ### Added
-- **CSV import plan**: Comprehensive multi-phase plan for bulk transaction import
-  - Phase 1 (v0.4.0): Koinly CSV import, empty database only
-  - Phase 2 (v0.5.0): Native format + column mapping UI
-  - Phase 3 (future): Merge with existing data
-  - See `docs/CSV_IMPORT_PLAN.md` for full details
+- **CSV Template Import**: Bulk transaction import from CSV files
+  - Download CSV template with exact column structure
+  - Preview parsed transactions before importing
+  - Full validation with error/warning display
+  - Atomic import (all-or-nothing) with rollback on failure
+  - Requires empty database (Phase 1 - no merge complexity)
+
+### Endpoints
+- `GET /api/import/template` - Download blank CSV template
+- `GET /api/import/status` - Check if database is empty
+- `POST /api/import/preview` - Parse and preview CSV (no DB writes)
+- `POST /api/import/execute` - Execute atomic import
+
+### Files Added
+- `backend/schemas/csv_import.py` - Pydantic request/response models
+- `backend/services/csv_import.py` - Parsing, validation, and import logic
+- `backend/routers/csv_import.py` - API endpoints
+
+### Fixed
+- **Atomic imports**: Added `auto_commit` parameter to `create_transaction_record()`
+  - Bulk imports now use `auto_commit=False` to defer commit until all succeed
+  - Prevents partial imports on validation failures
+- **Async event loop conflict**: Fixed `get_btc_price()` during CSV import
+  - Used `ThreadPoolExecutor` to run async price fetches in separate threads
+  - Fixes "Cannot run the event loop while another loop is running" error
 
 ---
 

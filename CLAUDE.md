@@ -3,7 +3,7 @@
 > This file provides context for AI assistants (Claude, etc.) working on this project.
 > It should be updated after significant changes to maintain continuity across sessions.
 
-**Last Updated:** 2025-01-10
+**Last Updated:** 2025-01-12
 
 ---
 
@@ -183,9 +183,9 @@ git push plebrick master --tags  # Sync backup at releases
 ```
 
 ### Current Version
-- **Latest Tag:** `v0.3.2` (2025-01-10)
-- **Status:** Stable release with 2025 IRS form support and backup/restore fixes
-- **Docker Image:** `b1ackswan/btctx:v0.3.2` (also `latest`)
+- **Latest Tag:** `v0.4.0` (2025-01-12)
+- **Status:** Stable release with CSV template import feature
+- **Docker Image:** `b1ackswan/btctx:v0.4.0` (also `latest`)
 - **Target Release:** `v1.0.0`
 
 ---
@@ -221,15 +221,13 @@ git push plebrick master --tags  # Sync backup at releases
 - [ ] 2025 IRS form template updates (when released)
 
 ### Planned Features
-- [ ] CSV import for bulk transactions
 - [ ] Multi-user support (optional)
+- [ ] CSV import merge with existing data (Phase 2)
 
 ### Completed This Session
-- [x] StartOS packaging (tested `.s9pk` working)
-- [x] Backdated transaction FIFO recalculation
-- [x] Lost BTC capital loss tax treatment
-- [x] Insufficient BTC validation
-- [x] UI responsiveness improvements
+- [x] CSV template import feature (v0.4.0)
+- [x] Atomic bulk import with rollback
+- [x] Fixed async event loop conflict in price fetching
 
 ---
 

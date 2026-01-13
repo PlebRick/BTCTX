@@ -1,47 +1,39 @@
 # Roadmap
 
-## Current Status: v0.3.2 - Stable Release ✅
+## Current Status: v0.4.0 - CSV Import Complete ✅
 
-Multi-year IRS form support is implemented. Users can generate Form 8949 and Schedule D for both 2024 and 2025 tax years.
-
-**Details:** See [2025_FORM_UPDATE_PLAN.md](2025_FORM_UPDATE_PLAN.md)
-
-### v0.3.2 Fix
-- Fixed "Not Found" error after backup restore (session clearing + login redirect)
-
-### v0.3.1 Fixes
-- StartOS compatibility: DATABASE_FILE env var support in backup/restore
-- Fixed race condition in backup file download using BackgroundTasks
-- Comprehensive StartOS container documentation
-
----
-
-## Next Up: v0.4.0 - CSV Import
-
-Enable users to import transactions from CSV files (Koinly exports, exchange exports, personal spreadsheets).
+Template-based CSV import is implemented. Users can download a CSV template, fill it with their data, preview, and import atomically.
 
 **Details:** See [CSV_IMPORT_PLAN.md](CSV_IMPORT_PLAN.md)
 
-### Phase 1 (v0.4.0)
-- [ ] Koinly CSV import only
-- [ ] Empty database requirement (prevents accidental data corruption)
-- [ ] Preview before commit
-- [ ] Full validation and rollback safety
+### v0.4.0 Features
+- Download CSV template with exact column structure
+- Preview parsed transactions with error/warning display
+- Atomic import (all-or-nothing) with rollback on failure
+- Requires empty database (Phase 1)
 
-### Phase 2 (v0.5.0)
-- [ ] BitcoinTX native CSV format
+### Previous Releases
+- v0.3.2: Backup restore session fix
+- v0.3.1: StartOS compatibility fixes
+- v0.3.0: Multi-year IRS form support (2024/2025)
+
+---
+
+## Next Up: v0.5.0 - CSV Import Phase 2
+
+Enhance CSV import with merge capabilities and column mapping.
+
+### Phase 2 Goals
+- [ ] Merge with existing data (requires duplicate detection)
 - [ ] Column mapping UI for arbitrary CSVs
-- [ ] Saved mapping presets
-
-### Phase 3 (Future)
-- [ ] Merge with existing data (complex - requires duplicate detection)
+- [ ] Saved mapping presets for different exchange formats
 
 ---
 
 ## Future Enhancements
 
 ### High Priority
-- [ ] **CSV import**: See [CSV_IMPORT_PLAN.md](CSV_IMPORT_PLAN.md) - Target v0.4.0
+- [ ] **CSV import merge**: Phase 2 - merge with existing data
 - [ ] **Improved error handling**: Better user feedback for failed operations
 
 ### Medium Priority
@@ -61,6 +53,7 @@ Enable users to import transactions from CSV files (Koinly exports, exchange exp
 ## Completed
 
 ### January 2025
+- [x] **v0.4.0: CSV template import** - Bulk import with preview and atomic commits
 - [x] **v0.3.2: Backup restore fix** - Session clearing and login redirect
 - [x] **v0.3.1: StartOS compatibility** - DATABASE_FILE env var, BackgroundTasks cleanup
 - [x] **v0.3.0: 2025 IRS form support** - Multi-year form generation working
