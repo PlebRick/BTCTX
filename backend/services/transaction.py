@@ -23,7 +23,7 @@ with your new pdftk-based system for filling/flattening IRS forms.
 import logging
 import requests
 from datetime import datetime, timezone
-from decimal import Decimal, ROUND_HALF_DOWN
+from decimal import Decimal, ROUND_HALF_DOWN, InvalidOperation
 from typing import Optional
 from collections import defaultdict
 
@@ -567,9 +567,9 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     if not from_acct or from_acct.currency != "BTC":
         return
 
-    btc_outflow = float(tx.amount or 0)
+    btc_outflow = Decimal(tx.amount or 0)
     if (tx.fee_currency or "").upper() == "BTC":
-        btc_outflow += float(tx.fee_amount or 0)
+        btc_outflow += Decimal(tx.fee_amount or 0)
     if btc_outflow <= 0:
         return
 
@@ -578,29 +578,30 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     # since build_ledger_entries_for_transaction already calculated it correctly
     # from gross_proceeds_usd. This prevents degradation during recalculation.
     if tx.proceeds_usd is not None:
-        total_proceeds = float(tx.proceeds_usd)
+        total_proceeds = Decimal(tx.proceeds_usd)
     else:
         raw_proceeds = tx_data.get("proceeds_usd")
         if raw_proceeds is None:
-            raw_proceeds = "0"
-        try:
-            total_proceeds = float(raw_proceeds)
-        except (ValueError, TypeError):
-            total_proceeds = 0.0
+            total_proceeds = Decimal("0")
+        else:
+            try:
+                total_proceeds = Decimal(str(raw_proceeds))
+            except (ValueError, TypeError, InvalidOperation):
+                total_proceeds = Decimal("0")
 
     # 2) Check purpose for forced 0 or "Spent" logic
     purpose_lower = (tx.purpose or "").lower()
     if tx.type == "Withdrawal" and purpose_lower in ("gift", "donation", "lost"):
-        total_proceeds = 0.0
+        total_proceeds = Decimal("0")
     elif tx.type == "Withdrawal" and purpose_lower == "spent":
-        fee_btc = float(tx.fee_amount or 0)
+        fee_btc = Decimal(tx.fee_amount or 0)
         fee_cur = (tx.fee_currency or "").upper()
         if fee_btc > 0 and fee_cur == "BTC" and btc_outflow > 0 and total_proceeds > 0:
             implied_price = total_proceeds / btc_outflow
             fee_in_usd = fee_btc * implied_price
             net_proceeds = total_proceeds - fee_in_usd
             if net_proceeds < 0:
-                net_proceeds = 0.0
+                net_proceeds = Decimal("0")
             total_proceeds = net_proceeds
 
     # 3) FIFO disposal across lots
@@ -619,18 +620,18 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
         if lot.remaining_btc <= 0:
             continue
 
-        can_use = min(float(lot.remaining_btc), remaining_outflow)
+        can_use = min(lot.remaining_btc, remaining_outflow)
         cost_per_btc = (
-            Decimal(lot.cost_basis_usd) / Decimal(lot.total_btc)
+            lot.cost_basis_usd / lot.total_btc
             if lot.total_btc
             else Decimal("0")
         )
-        disposal_basis = (cost_per_btc * Decimal(can_use)).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
+        disposal_basis = (cost_per_btc * can_use).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
 
         partial_proceeds = Decimal("0")
         if total_outflow > 0:
-            ratio = Decimal(can_use) / Decimal(total_outflow)
-            partial_proceeds = (ratio * Decimal(total_proceeds)).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
+            ratio = can_use / total_outflow
+            partial_proceeds = (ratio * total_proceeds).quantize(Decimal("0.01"), rounding=ROUND_HALF_DOWN)
 
         disposal_gain = partial_proceeds - disposal_basis
         # If Gift/Donation => override gain to 0 (no taxable event for giver)
@@ -649,7 +650,7 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
         disp = LotDisposal(
             lot_id=lot.id,
             transaction_id=tx.id,
-            disposed_btc=Decimal(can_use),
+            disposed_btc=can_use,
             disposal_basis_usd=disposal_basis,
             proceeds_usd_for_that_portion=partial_proceeds,
             realized_gain_usd=disposal_gain,
@@ -657,11 +658,11 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
         )
         db.add(disp)
 
-        lot.remaining_btc -= Decimal(can_use)
+        lot.remaining_btc -= can_use
         remaining_outflow -= can_use
 
     # Validate that we had enough BTC to complete the disposal
-    if remaining_outflow > 0.000000001:  # Small epsilon for floating point
+    if remaining_outflow > Decimal("0.00000001"):  # 1 satoshi tolerance for rounding
         raise HTTPException(
             status_code=400,
             detail=f"Not enough BTC to {tx.type.lower()} {btc_outflow:.8f} BTC"
