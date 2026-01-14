@@ -28,7 +28,7 @@ from typing import Optional
 from collections import defaultdict
 
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from backend.models.transaction import (Transaction, LedgerEntry, BitcoinLot, LotDisposal)
 from backend.models.account import Account
@@ -677,7 +677,12 @@ def compute_sell_summary_from_disposals(tx: Transaction, db: Session):
     tx.cost_basis_usd, tx.proceeds_usd, tx.realized_gain_usd, holding_period
     based on the earliest acquisition date among those partial-lot disposals.
     """
-    disposals = db.query(LotDisposal).filter(LotDisposal.transaction_id == tx.id).all()
+    disposals = (
+        db.query(LotDisposal)
+        .options(joinedload(LotDisposal.lot))
+        .filter(LotDisposal.transaction_id == tx.id)
+        .all()
+    )
     if not disposals:
         return
 
@@ -691,7 +696,7 @@ def compute_sell_summary_from_disposals(tx: Transaction, db: Session):
         total_gain += (disp.realized_gain_usd or Decimal("0"))
         total_proceeds += (disp.proceeds_usd_for_that_portion or Decimal("0"))
 
-        lot = db.query(BitcoinLot).get(disp.lot_id)
+        lot = disp.lot  # Eager loaded, no additional query
         if lot and (earliest_date is None or lot.acquired_date < earliest_date):
             earliest_date = lot.acquired_date
 
