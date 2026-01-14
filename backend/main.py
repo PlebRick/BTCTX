@@ -12,9 +12,13 @@ Key Roles:
 """
 
 import os
+import logging
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+logger = logging.getLogger(__name__)
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import FileResponse
@@ -42,6 +46,27 @@ raw_origins = os.getenv("CORS_ALLOW_ORIGINS", default_origins)
 ALLOWED_ORIGINS = [origin.strip() for origin in raw_origins.split(",")]
 
 # ---------------------------------------------------------
+# Database import (needed before lifespan)
+# ---------------------------------------------------------
+from backend.database import create_tables, get_db
+
+# ---------------------------------------------------------
+# Lifespan context manager for startup/shutdown
+# ---------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for startup/shutdown events.
+    Ensures tables are created when FastAPI starts.
+    """
+    # Startup
+    logger.info("Running create_tables() at startup...")
+    create_tables()
+    logger.info("Database tables created or verified.")
+    yield
+    # Shutdown (nothing needed currently)
+
+# ---------------------------------------------------------
 # Initialize the FastAPI application
 # ---------------------------------------------------------
 app = FastAPI(
@@ -51,8 +76,9 @@ app = FastAPI(
         "double-entry system and FIFO cost basis. Session-based auth."
     ),
     version="1.0",
-    debug=True,
-    redirect_slashes=True
+    debug=os.getenv("DEBUG", "false").lower() == "true",
+    redirect_slashes=True,
+    lifespan=lifespan
 )
 
 # ---------------------------------------------------------
@@ -75,21 +101,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ---------------------------------------------------------
-# Database: Create Tables at Startup
-# ---------------------------------------------------------
-from backend.database import create_tables, get_db
-
-@app.on_event("startup")
-def startup_event():
-    """
-    Ensures tables are created (if not already) when FastAPI starts.
-    This won't delete or overwrite existing data; it's idempotent.
-    """
-    print("Running create_tables() at startup...")
-    create_tables()
-    print("Database tables created or verified.")
 
 # ---------------------------------------------------------
 # Routers (Transaction, User, Account, Calculation, Bitcoin, Reports, Debug)
