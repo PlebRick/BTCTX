@@ -33,7 +33,7 @@ def get_one_lot(lot_id: int, db: Session = Depends(get_db)):
     """
     Returns a single BitcoinLot with its disposal info.
     """
-    lot = db.query(BitcoinLot).get(lot_id)
+    lot = db.get(BitcoinLot, lot_id)
     if not lot:
         raise HTTPException(status_code=404, detail="Lot not found.")
     

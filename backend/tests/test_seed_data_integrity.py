@@ -39,7 +39,7 @@ def test_bitcoin_lots_created():
     btc_deposits_or_buys = []
     for tx in txs:
         if tx.type in ("Deposit", "Buy"):
-            to_acct = db.query(Account).get(tx.to_account_id)
+            to_acct = db.get(Account, tx.to_account_id)
             if to_acct and to_acct.currency == "BTC":
                 btc_deposits_or_buys.append(tx.id)
 

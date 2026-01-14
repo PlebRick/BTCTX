@@ -126,7 +126,7 @@ def create_transaction_record(tx_data: dict, db: Session, auto_commit: bool = Tr
         maybe_dispose_lots_fifo(new_tx, tx_data, db)
         compute_sell_summary_from_disposals(new_tx, db)
     elif new_tx.type == "Transfer":
-        from_acct = db.query(Account).get(new_tx.from_account_id)
+        from_acct = db.get(Account, new_tx.from_account_id)
         # If from_acct is BTC, ensure fee_amount/currency are set
         if from_acct and from_acct.currency == "BTC":
             if new_tx.fee_amount is None or new_tx.fee_amount <= 0:
@@ -331,8 +331,8 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
     proceeds_raw = tx_data.get("proceeds_usd") or "0"
     proceeds_usd = Decimal(proceeds_raw)
 
-    from_acct = db.query(Account).get(from_acct_id) if from_acct_id else None
-    to_acct = db.query(Account).get(to_acct_id) if to_acct_id else None
+    from_acct = db.get(Account, from_acct_id) if from_acct_id else None
+    to_acct = db.get(Account, to_acct_id) if to_acct_id else None
 
     # -------------------------------------------------------------------------
     # 1) Transfer with BTC fee
@@ -529,7 +529,7 @@ def maybe_create_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     If Deposit/Buy => create a new BitcoinLot if 'to_acct' is BTC.
     If fee is USD for a Buy, add it to cost basis automatically.
     """
-    to_acct = db.query(Account).get(tx.to_account_id)
+    to_acct = db.get(Account, tx.to_account_id)
     if not to_acct or to_acct.currency != "BTC":
         return
 
@@ -563,7 +563,7 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
     - If purpose=Spent => user-supplied proceeds + BTC fee offset
     - Otherwise, if proceeds_usd is None or invalid, default to 0
     """
-    from_acct = db.query(Account).get(tx.from_account_id)
+    from_acct = db.get(Account, tx.from_account_id)
     if not from_acct or from_acct.currency != "BTC":
         return
 
@@ -774,8 +774,8 @@ def maybe_transfer_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     Splits source lots for an internal BTC transfer from one BTC account to another,
     disposing the fee portion and carrying forward the remainder as a new partial-lot.
     """
-    from_acct = db.query(Account).get(tx.from_account_id)
-    to_acct = db.query(Account).get(tx.to_account_id)
+    from_acct = db.get(Account, tx.from_account_id)
+    to_acct = db.get(Account, tx.to_account_id)
     if not from_acct or not to_acct:
         return
     if from_acct.currency != "BTC" or to_acct.currency != "BTC":
@@ -1030,7 +1030,7 @@ def _enforce_fee_rules(tx_data: dict, db: Session):
     if tx_type == "Transfer":
         if not from_id or from_id == 99:
             return
-        from_acct = db.query(Account).get(from_id)
+        from_acct = db.get(Account, from_id)
         if from_acct and from_acct.currency == "BTC" and fee_cur != "BTC":
             raise HTTPException(
                 status_code=400,
@@ -1079,8 +1079,8 @@ def _enforce_transaction_type_rules(tx_data: dict, db: Session):
     elif tx_type == "Transfer":
         if not from_id or from_id == 99 or not to_id or to_id == 99:
             raise HTTPException(400, "Transfer => both from/to must be internal.")
-        db_from = db.query(Account).get(from_id)
-        db_to = db.query(Account).get(to_id)
+        db_from = db.get(Account, from_id)
+        db_to = db.get(Account, to_id)
         if db_from and db_to and db_from.currency != db_to.currency:
             raise HTTPException(400, "Transfer => same currency required.")
 
