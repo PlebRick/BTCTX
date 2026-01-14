@@ -140,6 +140,21 @@
   z-index: 1;
 }
 
+/* Block height footer - bottom left of card */
+.btc-block-height {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  margin-top: auto;        /* push to bottom */
+  padding-top: 1rem;
+}
+
+.block-height-icon {
+  font-size: 1rem;
+}
+
 /* Gift note on its own row */
 .gifts-note {
   justify-content: flex-end; /* right align the note if you prefer */

@@ -32,10 +32,20 @@ async def get_btc_price_time_series(
     days: int = Query(7, ge=1, le=365, description="Number of days (1 to 365)")
 ):
     """
-    Returns daily BTC prices for the last `days` days in USD, 
+    Returns daily BTC prices for the last `days` days in USD,
     suitable for line charts (time-series).
-    
+
     The services/bitcoin.py should have get_time_series(days)
     that fetches from CoinGecko (fallback to Kraken, etc.).
     """
     return await bitcoin.get_time_series(days)
+
+
+@router.get("/blockheight", summary="Get current Bitcoin block height")
+async def get_current_block_height():
+    """
+    Endpoint to retrieve the current Bitcoin block height.
+    Uses Blockchain.info as primary, with Blockstream and Mempool.space as fallbacks.
+    Raises HTTP 502 if all providers fail.
+    """
+    return await bitcoin.get_block_height()

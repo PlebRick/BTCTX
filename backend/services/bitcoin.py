@@ -274,3 +274,52 @@ async def get_time_series(days: int = 7):
         status_code=502,
         detail="Unable to retrieve multi-day BTC data from CoinGecko or fallback."
     )
+
+
+# ---------------------------------------------------------------------
+# 4) Current Block Height
+# ---------------------------------------------------------------------
+BLOCKCHAIN_INFO_HEIGHT_URL = "https://blockchain.info/q/getblockcount"
+BLOCKSTREAM_HEIGHT_URL = "https://blockstream.info/api/blocks/tip/height"
+MEMPOOL_HEIGHT_URL = "https://mempool.space/api/blocks/tip/height"
+
+
+async def get_block_height():
+    """
+    Fetch the current Bitcoin block height from multiple sources,
+    using Blockchain.info as primary, then Blockstream, then Mempool.space.
+    Raises HTTP 502 if all fail.
+    """
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        # 1. Try Blockchain.info
+        try:
+            resp = await client.get(BLOCKCHAIN_INFO_HEIGHT_URL)
+            if resp.status_code == 200:
+                height = int(resp.text.strip())
+                return {"height": height}
+        except Exception:
+            pass
+
+        # 2. Try Blockstream.info
+        try:
+            resp = await client.get(BLOCKSTREAM_HEIGHT_URL)
+            if resp.status_code == 200:
+                height = int(resp.text.strip())
+                return {"height": height}
+        except Exception:
+            pass
+
+        # 3. Try Mempool.space
+        try:
+            resp = await client.get(MEMPOOL_HEIGHT_URL)
+            if resp.status_code == 200:
+                height = int(resp.text.strip())
+                return {"height": height}
+        except Exception:
+            pass
+
+    # If all APIs failed, raise an HTTP 502 Bad Gateway
+    raise HTTPException(
+        status_code=502,
+        detail="Unable to retrieve Bitcoin block height from any API source."
+    )

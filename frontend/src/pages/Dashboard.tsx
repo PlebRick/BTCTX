@@ -24,10 +24,11 @@ const Dashboard: React.FC = () => {
   const [averageBtcCostBasis, setAverageBtcCostBasis] = useState<number | null>(null);
   const [gainsAndLosses, setGainsAndLosses] = useState<GainsAndLosses | null>(null);
 
-  // BTC Price & error states
+  // BTC Price, Block Height & error states
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [currentBtcPrice, setCurrentBtcPrice] = useState<number | null>(null);
   const [isPriceLoading, setIsPriceLoading] = useState(true);
+  const [blockHeight, setBlockHeight] = useState<number | null>(null);
 
   // ------------------ 2) FETCH LIVE BTC PRICE ------------------
   useEffect(() => {
@@ -44,6 +45,20 @@ const Dashboard: React.FC = () => {
       })
       .finally(() => {
         setIsPriceLoading(false);
+      });
+  }, []);
+
+  // ------------------ 2b) FETCH BLOCK HEIGHT ------------------
+  useEffect(() => {
+    api
+      .get("/bitcoin/blockheight")
+      .then((res) => {
+        if (res.data && res.data.height) {
+          setBlockHeight(res.data.height);
+        }
+      })
+      .catch(() => {
+        // Block height fetch failed silently - will show as null
       });
   }, []);
 
@@ -247,6 +262,14 @@ const Dashboard: React.FC = () => {
               <span className="btc-price-value">Error</span>
             )}
           </div>
+
+          {/* Block height footer */}
+          {blockHeight !== null && (
+            <div className="btc-block-height">
+              <span className="block-height-icon">⛏</span>
+              <span>Block Height: {blockHeight.toLocaleString()}</span>
+            </div>
+          )}
         </div>
       </div>
 
