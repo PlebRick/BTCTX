@@ -243,9 +243,9 @@ class LedgerEntry(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # Link to the Transaction header
-    transaction_id = Column(Integer, ForeignKey("transactions.id"), nullable=False)
+    transaction_id = Column(Integer, ForeignKey("transactions.id"), nullable=False, index=True)
     # Which account is this line referencing
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False, index=True)
 
     amount = Column(
         Numeric(18, 8),
@@ -301,6 +301,7 @@ class BitcoinLot(Base):
         Integer,
         ForeignKey("transactions.id"),
         nullable=False,
+        index=True,
         doc="Points to the Transaction where the user acquired this BTC."
     )
 
@@ -368,6 +369,7 @@ class LotDisposal(Base):
         Integer,
         ForeignKey("bitcoin_lots.id"),
         nullable=False,
+        index=True,
         doc="ID of the BitcoinLot from which we are removing BTC."
     )
 
@@ -375,6 +377,7 @@ class LotDisposal(Base):
         Integer,
         ForeignKey("transactions.id"),
         nullable=False,
+        index=True,
         doc="Which transaction is disposing these BTC."
     )
 
