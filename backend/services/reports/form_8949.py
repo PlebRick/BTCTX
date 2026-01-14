@@ -14,7 +14,6 @@ from backend.models import LotDisposal
 from backend.models.transaction import Transaction
 from backend.services.reports.pdftk_filler import fill_pdf_with_pdftk
 from backend.services.reports.pdf_utils import flatten_pdf_with_pdftk
-from pypdf import PdfReader, PdfWriter
 
 # Set up logging for audit trail
 logging.basicConfig(level=logging.INFO)
