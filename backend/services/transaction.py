@@ -609,10 +609,15 @@ def maybe_dispose_lots_fifo(tx: Transaction, tx_data: dict, db: Session):
                 net_proceeds = Decimal("0")
             total_proceeds = net_proceeds
 
-    # 3) FIFO disposal across lots
+    # 3) FIFO disposal across lots (account-specific)
+    # Only consume lots from the account we're selling/withdrawing from
     lots = (
         db.query(BitcoinLot)
-        .filter(BitcoinLot.remaining_btc > 0)
+        .join(Transaction, Transaction.id == BitcoinLot.created_txn_id)
+        .filter(
+            BitcoinLot.remaining_btc > 0,
+            Transaction.to_account_id == tx.from_account_id
+        )
         .order_by(BitcoinLot.acquired_date.asc())
         .all()
     )

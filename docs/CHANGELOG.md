@@ -23,6 +23,7 @@ All notable changes to BitcoinTX are documented in this file.
 ### Fixed
 - **Form 8949 non-taxable exclusion**: Gift, Donation, and Lost disposals now correctly excluded
 - **Proceeds degradation fix**: Fixed bug where `proceeds_usd` could degrade during recalculation
+- **FIFO lot disposal now account-specific**: Fixed bug where selling/withdrawing BTC would consume lots from all accounts globally instead of only from the source account. This ensures correct cost basis tracking when BTC is held across multiple accounts.
 
 ### Files Added
 - `frontend/src/hooks/useAccounts.ts` - Account fetching and caching hook
