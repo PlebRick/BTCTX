@@ -24,6 +24,11 @@ All notable changes to BitcoinTX are documented in this file.
 - **Form 8949 non-taxable exclusion**: Gift, Donation, and Lost disposals now correctly excluded
 - **Proceeds degradation fix**: Fixed bug where `proceeds_usd` could degrade during recalculation
 - **FIFO lot disposal now account-specific**: Fixed bug where selling/withdrawing BTC would consume lots from all accounts globally instead of only from the source account. This ensures correct cost basis tracking when BTC is held across multiple accounts.
+- **SPA routing in Docker**: Fixed browser refresh returning 404 on client-side routes
+  - Added custom exception handler to serve `index.html` for non-API 404s
+  - React Router now handles `/dashboard`, `/transactions`, `/settings`, etc. on page refresh
+  - API routes still return proper JSON errors
+  - File: `backend/main.py`
 
 ### Files Added
 - `frontend/src/hooks/useAccounts.ts` - Account fetching and caching hook

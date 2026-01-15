@@ -201,7 +201,14 @@ git push plebrick master --tags  # Sync backup at releases
    - All 84 tests now pass
    - Files: `test_backend.py`, `test_main.py`, `test_seed_data_integrity.py`
 
-3. **UI Fixes**
+3. **SPA Routing Fix (Docker)**
+   - Fixed browser refresh returning 404 JSON on client-side routes (`/dashboard`, `/transactions`, etc.)
+   - Root cause: `StaticFiles(html=True)` does NOT provide SPA fallback for arbitrary paths
+   - Solution: Added `spa_fallback_handler` exception handler to serve `index.html` for non-API 404s
+   - API routes still return proper JSON errors (`{"detail":"Not Found"}`)
+   - File: `backend/main.py`
+
+4. **UI Fixes**
    - Fixed Toast close button not rendering (Unicode escape issue)
    - Updated application logo (`logo.svg`, `icon.svg`)
    - Removed unused `bitcoin-logo.png`

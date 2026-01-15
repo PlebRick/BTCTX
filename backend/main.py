@@ -29,6 +29,11 @@ from pydantic import BaseModel
 load_dotenv()
 
 # ---------------------------------------------------------
+# Frontend dist path (needed early for SPA fallback handler)
+# ---------------------------------------------------------
+frontend_dist = os.path.join(os.path.dirname(__file__), "../frontend/dist")
+
+# ---------------------------------------------------------
 # Session Configuration
 # ---------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")  # Fallback if not set
@@ -101,6 +106,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------
+# SPA Fallback Exception Handler
+# ---------------------------------------------------------
+from starlette.responses import JSONResponse
+
+@app.exception_handler(StarletteHTTPException)
+async def spa_fallback_handler(request: Request, exc: StarletteHTTPException):
+    """
+    Handle 404 errors for SPA routing.
+
+    When a user navigates directly to a client-side route (e.g., /dashboard),
+    StaticFiles raises a 404 because no such file exists. This handler
+    catches those 404s and serves index.html, allowing React Router to
+    handle the route on the client side.
+
+    API routes (/api/*) are excluded - they should return proper JSON errors.
+    """
+    if exc.status_code == 404 and not request.url.path.startswith("/api/"):
+        index_path = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path, media_type="text/html")
+
+    # For API routes or non-404 errors, return JSON response
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail or "Error"}
+    )
 
 # ---------------------------------------------------------
 # Routers (Transaction, User, Account, Calculation, Bitcoin, Reports, Debug)
@@ -210,12 +243,9 @@ def logout(request: Request, response: Response):
 # ---------------------------------------------------------
 from fastapi.staticfiles import StaticFiles
 
-# 1) Get absolute path to the compiled frontend dist folder
-frontend_dist = os.path.join(os.path.dirname(__file__), "../frontend/dist")
-
-# 2) Mount the entire dist/ at root ("/"), enabling SPA fallback with html=True
-#    - This means if a path doesn't match a file in dist/, FastAPI serves index.html.
-#    - This automatically covers your JS, CSS, images, and client-side routes.
+# Mount static files from dist/ at root ("/")
+# Note: html=True serves index.html for root and directories only.
+# The SPA fallback for client-side routes is handled by spa_fallback_handler above.
 app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
 # ---------------------------------------------------------
