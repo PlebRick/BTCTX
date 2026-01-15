@@ -2065,13 +2065,17 @@ def test_complex_scenario():
     assert_equal(round_btc(exch_btc), 0.1999, "Exchange BTC final balance")
     assert_equal(round_btc(wallet_btc), 0.26, "Wallet BTC final balance")
 
-    # Sell should have used FIFO (buy1 first)
+    # Sell should have used FIFO (oldest lots in Exchange BTC first)
     sell_detail = get_transaction(sell_tx["id"])
-    # Cost basis from buy1: (20000 + 20) = 20020, but the sell also includes
-    # the transfer fee disposal which affects cost allocation slightly
-    # Accept small rounding variance (within $2)
+    # After the transfer, Buy1 lot only has 0.1999 BTC remaining in Exchange BTC
+    # (0.3 BTC moved to Wallet + 0.0001 BTC fee disposed)
+    # So the 0.5 BTC sell uses:
+    #   - 0.1999 BTC from Buy1 @ $20,020/0.5 per BTC = $8,004
+    #   - 0.3001 BTC from Buy2 @ $25,025/0.5 per BTC = $15,020
+    #   - Total cost basis: ~$23,024
     actual_basis = float(sell_detail.get("cost_basis_usd", 0))
-    assert_true(abs(actual_basis - 20020.0) < 2.0, f"Sell cost basis ~$20,020 (got ${actual_basis})")
+    expected_basis = (0.1999 / 0.5) * 20020 + (0.3001 / 0.5) * 25025  # ~23024
+    assert_true(abs(actual_basis - expected_basis) < 2.0, f"Sell cost basis ~${expected_basis:.0f} (got ${actual_basis})")
 
     # Gain: 34950 (net proceeds) - cost_basis
     actual_gain = float(sell_detail.get("realized_gain_usd", 0))
