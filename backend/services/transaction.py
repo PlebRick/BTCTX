@@ -1063,11 +1063,11 @@ def _enforce_fee_rules(tx_data: dict, db: Session):
 def _enforce_transaction_type_rules(tx_data: dict, db: Session):
     """
     Enforce correct usage of from/to for each transaction type:
-      - Deposit => from=99 => to=internal
-      - Withdrawal => from=internal => to=99
+      - Deposit => from=External => to=any internal account (BTC or USD)
+      - Withdrawal => from=any internal account => to=External
       - Transfer => from/to internal & same currency
-      - Buy => from=3 => to=4
-      - Sell => from=4 => to=3
+      - Buy => from=Exchange USD => to=Exchange BTC
+      - Sell => from=Exchange BTC => to=Exchange USD
       - Otherwise => error
     """
     tx_type = tx_data.get("type")
@@ -1076,19 +1076,21 @@ def _enforce_transaction_type_rules(tx_data: dict, db: Session):
 
     if tx_type == "Deposit":
         if from_id != ACCOUNT_EXTERNAL:
-            raise HTTPException(400, "Deposit => from must be external account.")
+            raise HTTPException(400, "Deposit => from must be External.")
         if not to_id or to_id == ACCOUNT_EXTERNAL:
-            raise HTTPException(400, "Deposit => to must be internal account.")
+            raise HTTPException(400, "Deposit => to must be an internal account.")
 
     elif tx_type == "Withdrawal":
-        if to_id != ACCOUNT_EXTERNAL:
-            raise HTTPException(400, "Withdrawal => to must be external account.")
         if not from_id or from_id == ACCOUNT_EXTERNAL:
-            raise HTTPException(400, "Withdrawal => from must be internal account.")
+            raise HTTPException(400, "Withdrawal => from must be an internal account.")
+        if to_id != ACCOUNT_EXTERNAL:
+            raise HTTPException(400, "Withdrawal => to must be External.")
 
     elif tx_type == "Transfer":
         if not from_id or from_id == ACCOUNT_EXTERNAL or not to_id or to_id == ACCOUNT_EXTERNAL:
             raise HTTPException(400, "Transfer => both from/to must be internal.")
+        if from_id == to_id:
+            raise HTTPException(400, "Transfer => from and to must be different accounts.")
         db_from = db.get(Account, from_id)
         db_to = db.get(Account, to_id)
         if db_from and db_to and db_from.currency != db_to.currency:

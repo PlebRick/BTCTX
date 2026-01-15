@@ -154,8 +154,10 @@ def export_transactions_csv(
 
         # proceeds_usd: For Sell/Withdrawal, use gross_proceeds_usd (user-entered)
         # The proceeds_usd field is calculated (after fees), gross_proceeds_usd is the input
+        # Fallback to proceeds_usd if gross_proceeds_usd is None (for older transactions)
         if txn_type in ("sell", "withdrawal"):
-            proceeds = fmt_decimal(txn.gross_proceeds_usd, 2)
+            proceeds_value = txn.gross_proceeds_usd if txn.gross_proceeds_usd is not None else txn.proceeds_usd
+            proceeds = fmt_decimal(proceeds_value, 2)
         else:
             proceeds = ""
 

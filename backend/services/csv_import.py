@@ -440,6 +440,7 @@ def _validate_accounts_for_type(
     errors = []
 
     if tx_type == "Deposit":
+        # Deposit: External → any internal account (BTC or USD)
         if from_id != ACCOUNT_EXTERNAL:
             errors.append(CSVParseError(
                 row_number=row_number,
@@ -447,20 +448,21 @@ def _validate_accounts_for_type(
                 message="Deposit must have from_account = 'External'.",
                 severity="error"
             ))
-        if to_id not in (ACCOUNT_WALLET, ACCOUNT_EXCHANGE_BTC):
+        if to_id == ACCOUNT_EXTERNAL:
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="to_account",
-                message="Deposit must have to_account = 'Wallet' or 'Exchange BTC'.",
+                message="Deposit must have to_account as an internal account (not 'External').",
                 severity="error"
             ))
 
     elif tx_type == "Withdrawal":
-        if from_id not in (ACCOUNT_WALLET, ACCOUNT_EXCHANGE_BTC):
+        # Withdrawal: any internal account → External
+        if from_id == ACCOUNT_EXTERNAL:
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="from_account",
-                message="Withdrawal must have from_account = 'Wallet' or 'Exchange BTC'.",
+                message="Withdrawal must have from_account as an internal account (not 'External').",
                 severity="error"
             ))
         if to_id != ACCOUNT_EXTERNAL:
@@ -472,19 +474,19 @@ def _validate_accounts_for_type(
             ))
 
     elif tx_type == "Transfer":
-        # Both must be internal BTC accounts
-        if from_id not in (ACCOUNT_WALLET, ACCOUNT_EXCHANGE_BTC):
+        # Transfer: between internal accounts of same currency
+        if from_id == ACCOUNT_EXTERNAL:
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="from_account",
-                message="Transfer must have from_account = 'Wallet' or 'Exchange BTC'.",
+                message="Transfer must have from_account as an internal account (not 'External').",
                 severity="error"
             ))
-        if to_id not in (ACCOUNT_WALLET, ACCOUNT_EXCHANGE_BTC):
+        if to_id == ACCOUNT_EXTERNAL:
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="to_account",
-                message="Transfer must have to_account = 'Wallet' or 'Exchange BTC'.",
+                message="Transfer must have to_account as an internal account (not 'External').",
                 severity="error"
             ))
         if from_id == to_id:
