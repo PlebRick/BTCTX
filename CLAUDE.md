@@ -3,7 +3,7 @@
 > This file provides context for AI assistants (Claude, etc.) working on this project.
 > It should be updated after significant changes to maintain continuity across sessions.
 
-**Last Updated:** 2025-01-14
+**Last Updated:** 2025-01-15
 
 ---
 
@@ -182,14 +182,33 @@ git push plebrick master --tags  # Sync backup at releases
 ```
 
 ### Current Version
-- **Latest Tag:** `v0.4.0` (2025-01-12)
-- **Status:** Stable release with CSV template import feature
-- **Docker Image:** `b1ackswan/btctx:v0.4.0` (also `latest`)
+- **Latest Tag:** `v0.5.1` (2025-01-15)
+- **Status:** Stable release with FIFO account-specific fix, test fixes, logo updates
+- **Docker Image:** `b1ackswan/btctx:v0.5.1` (also `latest`)
 - **Target Release:** `v1.0.0`
 
 ---
 
 ## Recent Changes (Jan 2025)
+
+### Session: 2025-01-15
+1. **FIFO Lot Disposal Fix**
+   - Made FIFO disposal account-specific (was consuming lots from all accounts globally)
+   - File: `backend/services/transaction.py`
+
+2. **Test Fixes**
+   - Fixed 5 stale tests to match current codebase
+   - All 84 tests now pass
+   - Files: `test_backend.py`, `test_main.py`, `test_seed_data_integrity.py`
+
+3. **UI Fixes**
+   - Fixed Toast close button not rendering (Unicode escape issue)
+   - Updated application logo (`logo.svg`, `icon.svg`)
+   - Removed unused `bitcoin-logo.png`
+
+4. **Release v0.5.1**
+   - Tagged and pushed to both repos (origin, plebrick)
+   - Built and pushed multi-arch Docker image
 
 ### Session: 2025-01-10
 1. **Python 3.9 Compatibility**
