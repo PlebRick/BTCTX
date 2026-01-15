@@ -41,6 +41,131 @@ All notable changes to BitcoinTX are documented in this file.
 
 ---
 
+## [v0.5.0] - 2025-01-14 - Backend Refactoring & Test Suite
+
+### Major Backend Refactoring
+
+#### Code Modernization
+- **Removed passlib dependency**: Direct bcrypt usage for password hashing
+  - `User.set_password()` and `User.verify_password()` now use bcrypt directly
+  - Added 72-byte password limit validation (bcrypt requirement)
+  - Eliminates passlib deprecation warnings
+- **Replaced deprecated `Query.get()`**: Updated to `Session.get()` pattern
+  - 10 occurrences in `transaction.py`
+  - 1 occurrence in `debug.py`
+  - 1 occurrence in `test_seed_data_integrity.py`
+- **Replaced `@app.on_event` deprecation**: Migrated to FastAPI lifespan context manager
+- **Removed duplicate import**: Fixed `from_orm` duplicate in `form_8949.py`
+
+#### Performance Improvements
+- **Added `joinedload` eager loading**: Optimized `compute_sell_summary_from_disposals()`
+  - Prevents N+1 queries when loading `LotDisposal.lot` relationships
+- **Added database indexes on foreign keys**:
+  - `LedgerEntry.transaction_id`, `LedgerEntry.account_id`
+  - `BitcoinLot.created_txn_id`
+  - `LotDisposal.lot_id`, `LotDisposal.transaction_id`
+
+#### Code Organization
+- **Created `backend/constants.py`**: Centralized account ID constants
+  - `ACCOUNT_BANK`, `ACCOUNT_WALLET`, `ACCOUNT_EXCHANGE_USD`, `ACCOUNT_EXCHANGE_BTC`
+  - `ACCOUNT_BTC_FEES`, `ACCOUNT_USD_FEES`, `ACCOUNT_EXTERNAL`
+  - Replaced magic numbers throughout codebase
+- **Deleted dead files**:
+  - `backend/create_account_db.py` (unused)
+  - `backend/create_db.py` (replaced with inline command)
+- **Updated Makefile**: `create-db` target now uses inline Python command
+
+### CSV Import/Export Fixes
+- **Fixed CSV export `proceeds_usd`**: Now falls back to `proceeds_usd` when `gross_proceeds_usd` is None
+- **Relaxed CSV import validation**: Now matches transaction service rules
+  - Deposit: External → any internal account (BTC or USD)
+  - Withdrawal: any internal account → External
+  - Transfer: between internal accounts of same currency
+
+### Testing
+
+#### Comprehensive Test Suite (`backend/tests/test_everything.py`)
+78 automated tests covering:
+- Database seeding with 65 test transactions
+- All API endpoints (accounts, transactions, calculations, debug)
+- All report generation (Complete Tax Report, IRS Forms, Transaction History)
+- CSV export/import roundtrip verification
+- FIFO integrity (lots, disposals, account balance matching)
+- Gains/losses calculations and income tracking
+- All transaction types, withdrawal purposes, deposit sources
+- Holding period verification (short-term vs long-term)
+
+Run with: `python3 backend/tests/test_everything.py`
+
+#### Authentication Test Suite (`backend/tests/test_password_migration.py`)
+Comprehensive auth tests:
+- Password hashing and verification
+- 72-byte bcrypt limit enforcement
+- Unicode and special character passwords
+- Login/logout endpoint tests
+- Session persistence tests
+- Protected endpoint authentication
+- Backward compatibility with existing hashes
+
+Run with: `pytest backend/tests/test_password_migration.py -v`
+
+#### Updated Seed Data (`backend/tests/transaction_seed_data.json`)
+- 65 transactions across 2023-2025
+- All 5 deposit sources: MyBTC, Gift, Income, Interest, Reward
+- All 4 withdrawal purposes: Spent, Gift, Donation, Lost
+- Short-term and long-term gains coverage
+- USD and BTC deposits to various accounts
+
+### Dependency Updates
+
+| Package | Old Version | New Version |
+|---------|-------------|-------------|
+| pydantic | 2.10.6 | 2.12.5 |
+| uvicorn | 0.34.0 | 0.40.0 |
+| sqlalchemy | 2.0.37 | 2.0.45 |
+| httpx | 0.24.1 | 0.28.1 |
+| requests | 2.28.1 | 2.32.0 |
+| python-multipart | 0.0.6 | 0.0.20 |
+| python-dateutil | 2.8.2 | 2.9.0 |
+| itsdangerous | 2.1.2 | 2.2.0 |
+| reportlab | 3.6.12 | 4.4.7 |
+| pytest | 8.1.1 | 8.3.5 |
+
+### Removed Dependencies
+- `passlib` - replaced with direct bcrypt
+- `typer` - unused
+- `python-jose` - unused
+- `pandas` - unused
+- `weasyprint` - unused
+- `pdfkit` - unused
+- `jinja2` - unused (beyond FastAPI's built-in)
+- `pycryptodome` - unused
+
+### Files Added
+- `backend/constants.py` - Centralized account ID constants
+- `backend/tests/test_everything.py` - Comprehensive test suite (78 tests)
+- `backend/tests/test_password_migration.py` - Authentication tests
+
+### Files Modified
+- `backend/models/user.py` - Direct bcrypt, 72-byte limit
+- `backend/models/transaction.py` - FK indexes
+- `backend/database.py` - Direct bcrypt for default user
+- `backend/main.py` - Lifespan context manager
+- `backend/services/transaction.py` - Query.get(), joinedload, constants
+- `backend/routers/backup.py` - proceeds_usd fallback, constants
+- `backend/routers/debug.py` - Query.get()
+- `backend/services/csv_import.py` - Relaxed validation, constants
+- `backend/services/reports/form_8949.py` - Removed duplicate import
+- `backend/tests/register_default_user.py` - Direct bcrypt
+- `backend/requirements.txt` - Updated all versions
+- `Makefile` - Updated create-db target
+
+### Files Deleted
+- `backend/create_account_db.py`
+- `backend/create_db.py`
+
+---
+
 ## [v0.4.0] - 2025-01-12
 
 ### Added
