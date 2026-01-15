@@ -1,36 +1,30 @@
-bcrypt==4.3.0
+# Core framework
 fastapi==0.115.8
 pydantic==2.10.6
-python-dotenv==1.0.1
-sqlalchemy==2.0.37
-starlette==0.45.3
-typer==0.15.1
 uvicorn==0.34.0
-python-jose==3.3.0
-passlib==1.7.4
-python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.37
+
+# Authentication
+bcrypt==5.0.0
+
+# HTTP & networking
 httpx==0.24.1
-itsdangerous==2.1.2
 requests>=2.28.1
+python-multipart==0.0.6
+
+# Utilities
+python-dotenv==1.0.1
 python-dateutil==2.8.2
+itsdangerous==2.1.2
+
+# Encryption (for backups)
 cryptography==44.0.2
-pycryptodome>=3.22,<4.0
 
-# For advanced CSV manipulation, grouping, etc.
-pandas==2.0.3
-
-# For PDF form filling (e.g., official 8949 or Schedule D)
-pypdf==5.4.0  # or latest stable version
-
-# For programmatic PDF creation from Python
+# PDF generation & manipulation
+pypdf==5.4.0
 reportlab==3.6.12
 
-# If you want HTML→PDF conversions, pick one or both:
-weasyprint==57.1
-pdfkit==1.0.0
-
-# For HTML templating (useful if generating HTML then converting to PDF)
-jinja2==3.1.2
-
-# For testing
-pytest==8.1.1  # or the latest stable version you prefer
+# Testing
+pytest==8.1.1
