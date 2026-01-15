@@ -47,7 +47,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
         onClick={handleDismiss}
         aria-label="Dismiss notification"
       >
-        \u00D7
+        {'\u00D7'}
       </button>
     </div>
   );
