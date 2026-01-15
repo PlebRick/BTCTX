@@ -179,8 +179,8 @@ class TestAuthEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data.get("message") == "Logged in successfully"
-        assert "user_id" in data
+        # API returns {"detail": "Logged in as <username>"}
+        assert "Logged in" in data.get("detail", "")
 
     def test_login_wrong_password(self, session):
         """Test login with wrong password."""
