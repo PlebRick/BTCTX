@@ -40,7 +40,9 @@ Track deprecations here. Fix before they become errors in future versions.
 
 | Warning | File | Line | Status | Notes |
 |---------|------|------|--------|-------|
-| `declarative_base()` moved to `sqlalchemy.orm` | `backend/database.py` | 71 | **TODO** | Change `from sqlalchemy.ext.declarative import declarative_base` to `from sqlalchemy.orm import declarative_base` |
+| ~~`declarative_base()` moved to `sqlalchemy.orm`~~ | `backend/database.py` | 26 | ✅ Fixed | Changed to `from sqlalchemy.orm import declarative_base` |
+
+*No current deprecation warnings.*
 
 ### How to Find New Deprecations
 

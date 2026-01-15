@@ -23,8 +23,7 @@ import logging
 import datetime
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.types import TypeDecorator, String
 from sqlalchemy.exc import IntegrityError
 import bcrypt
