@@ -13,10 +13,11 @@ def test_hello_world():
     assert 1 + 1 == 2
 
 def test_user_model():
-    user = User(name="Test User")
-    assert user.name == "Test User"
+    user = User(username="testuser", password_hash="dummy_hash")
+    assert user.username == "testuser"
 
 def test_read_main():
-    response = client.get("/")
+    # Root serves the React frontend (HTML), test an API endpoint instead
+    response = client.get("/api/accounts/")
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello World"}
+    assert isinstance(response.json(), list)

@@ -10,8 +10,8 @@ from backend.database import Base, engine
 print("All backend imports are working!")
 
 def test_user_model():
-    user = User(name="Test User")
-    assert user.name == "Test User"
+    user = User(username="testuser", password_hash="dummy_hash")
+    assert user.username == "testuser"
 
 def test_account_model():
     account = Account(name="Test Account")
