@@ -1,7 +1,6 @@
+import bcrypt
 from backend.database import SessionLocal
 from backend.models.user import User
-from backend.services.user import create_user
-from passlib.hash import bcrypt
 
 db = SessionLocal()
 
@@ -13,7 +12,7 @@ def ensure_default_user():
 
     user = User(
         username="default",
-        password_hash=bcrypt.hash("btctxdev")
+        password_hash=bcrypt.hashpw(b"btctxdev", bcrypt.gensalt()).decode('utf-8')
     )
     db.add(user)
     db.commit()

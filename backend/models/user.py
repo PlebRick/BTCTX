@@ -11,14 +11,11 @@ from __future__ import annotations
 from typing import List, TYPE_CHECKING
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship, Mapped, mapped_column
-from passlib.context import CryptContext
+import bcrypt
 from backend.database import Base
 
 if TYPE_CHECKING:
     from backend.models.account import Account
-
-# Setup passlib for password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class User(Base):
     """
@@ -49,16 +46,23 @@ class User(Base):
 
     def set_password(self, password: str) -> None:
         """
-        Hash and store the user's password using passlib (bcrypt).
+        Hash and store the user's password using bcrypt.
         The field 'password_hash' holds the result.
         """
-        self.password_hash = pwd_context.hash(password)
+        password_bytes = password.encode('utf-8')
+        # bcrypt 5.0+ requires explicit check (was silently truncated before)
+        if len(password_bytes) > 72:
+            raise ValueError("Password cannot exceed 72 bytes")
+        self.password_hash = bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode('utf-8')
 
     def verify_password(self, password: str) -> bool:
         """
         Verify a plain-text password against the stored hash.
         """
-        return pwd_context.verify(password, self.password_hash)
+        return bcrypt.checkpw(
+            password.encode('utf-8'),
+            self.password_hash.encode('utf-8')
+        )
 
     def __repr__(self) -> str:
         """

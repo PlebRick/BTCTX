@@ -14,7 +14,7 @@ Key Features:
 - Automatically inserts default user: admin / password (bcrypt-hashed)
 
 Security Notes:
-- Password hashed with bcrypt via passlib
+- Password hashed with bcrypt directly
 - Works cleanly across dev, test, CI, Docker
 """
 
@@ -27,7 +27,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.types import TypeDecorator, String
 from sqlalchemy.exc import IntegrityError
-from passlib.context import CryptContext
+import bcrypt
 
 # ------------------------------------------------------------------
 # 0) Logging Setup
@@ -107,8 +107,6 @@ def get_db():
 # ------------------------------------------------------------------
 # 5) Table Initialization + User + Account Seeding
 # ------------------------------------------------------------------
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 def create_tables():
     """
     Always creates all database tables and inserts:
@@ -134,7 +132,7 @@ def create_tables():
             logger.info("No user found. Inserting default user: admin")
             user = User(
                 username="admin",
-                password_hash=pwd_context.hash("password"),
+                password_hash=bcrypt.hashpw(b"password", bcrypt.gensalt()).decode('utf-8'),
             )
             db.add(user)
             db.flush()  # get user.id without commit yet
