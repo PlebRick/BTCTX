@@ -38,7 +38,7 @@ seed: create-db seed-tx
 
 # 🛠️ Run create_tables() (tables, admin user, accounts)
 create-db: ensure-write
-	python backend/create_db.py
+	python -c "from backend.database import create_tables; create_tables()"
 
 # 📥 Load predefined test transactions
 seed-tx: ensure-write
