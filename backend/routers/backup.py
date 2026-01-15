@@ -17,18 +17,9 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.models.transaction import Transaction
 from backend.services.backup import make_backup, restore_backup
+from backend.constants import ACCOUNT_ID_TO_NAME
 
 router = APIRouter()
-
-
-# Reverse mapping: account ID -> display name (for CSV export)
-ACCOUNT_ID_TO_NAME = {
-    1: "Bank",
-    2: "Wallet",
-    3: "Exchange USD",
-    4: "Exchange BTC",
-    99: "External",
-}
 
 # CSV columns matching the import template
 CSV_COLUMNS = [

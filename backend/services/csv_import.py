@@ -19,16 +19,13 @@ from sqlalchemy.orm import Session
 from backend.models.transaction import Transaction
 from backend.services.transaction import create_transaction_record
 from backend.schemas.csv_import import CSVRowPreview, CSVParseError
-
-
-# Account name to ID mapping
-ACCOUNT_NAME_TO_ID: Dict[str, int] = {
-    "bank": 1,
-    "wallet": 2,
-    "exchange usd": 3,
-    "exchange btc": 4,
-    "external": 99,
-}
+from backend.constants import (
+    ACCOUNT_NAME_TO_ID,
+    ACCOUNT_WALLET,
+    ACCOUNT_EXCHANGE_USD,
+    ACCOUNT_EXCHANGE_BTC,
+    ACCOUNT_EXTERNAL,
+)
 
 # Valid transaction types (case-insensitive matching)
 VALID_TYPES = {"deposit", "withdrawal", "transfer", "buy", "sell"}
@@ -443,14 +440,14 @@ def _validate_accounts_for_type(
     errors = []
 
     if tx_type == "Deposit":
-        if from_id != 99:
+        if from_id != ACCOUNT_EXTERNAL:
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="from_account",
                 message="Deposit must have from_account = 'External'.",
                 severity="error"
             ))
-        if to_id not in (2, 4):  # Wallet or Exchange BTC
+        if to_id not in (ACCOUNT_WALLET, ACCOUNT_EXCHANGE_BTC):
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="to_account",
@@ -459,14 +456,14 @@ def _validate_accounts_for_type(
             ))
 
     elif tx_type == "Withdrawal":
-        if from_id not in (2, 4):  # Wallet or Exchange BTC
+        if from_id not in (ACCOUNT_WALLET, ACCOUNT_EXCHANGE_BTC):
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="from_account",
                 message="Withdrawal must have from_account = 'Wallet' or 'Exchange BTC'.",
                 severity="error"
             ))
-        if to_id != 99:
+        if to_id != ACCOUNT_EXTERNAL:
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="to_account",
@@ -476,14 +473,14 @@ def _validate_accounts_for_type(
 
     elif tx_type == "Transfer":
         # Both must be internal BTC accounts
-        if from_id not in (2, 4):
+        if from_id not in (ACCOUNT_WALLET, ACCOUNT_EXCHANGE_BTC):
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="from_account",
                 message="Transfer must have from_account = 'Wallet' or 'Exchange BTC'.",
                 severity="error"
             ))
-        if to_id not in (2, 4):
+        if to_id not in (ACCOUNT_WALLET, ACCOUNT_EXCHANGE_BTC):
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="to_account",
@@ -499,14 +496,14 @@ def _validate_accounts_for_type(
             ))
 
     elif tx_type == "Buy":
-        if from_id != 3:  # Exchange USD
+        if from_id != ACCOUNT_EXCHANGE_USD:
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="from_account",
                 message="Buy must have from_account = 'Exchange USD'.",
                 severity="error"
             ))
-        if to_id != 4:  # Exchange BTC
+        if to_id != ACCOUNT_EXCHANGE_BTC:
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="to_account",
@@ -515,14 +512,14 @@ def _validate_accounts_for_type(
             ))
 
     elif tx_type == "Sell":
-        if from_id != 4:  # Exchange BTC
+        if from_id != ACCOUNT_EXCHANGE_BTC:
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="from_account",
                 message="Sell must have from_account = 'Exchange BTC'.",
                 severity="error"
             ))
-        if to_id != 3:  # Exchange USD
+        if to_id != ACCOUNT_EXCHANGE_USD:
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="to_account",

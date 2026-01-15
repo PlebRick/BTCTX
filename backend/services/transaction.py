@@ -33,6 +33,11 @@ from sqlalchemy.orm import Session, joinedload
 from backend.models.transaction import (Transaction, LedgerEntry, BitcoinLot, LotDisposal)
 from backend.models.account import Account
 from backend.schemas.transaction import TransactionCreate
+from backend.constants import (
+    ACCOUNT_EXCHANGE_USD,
+    ACCOUNT_EXCHANGE_BTC,
+    ACCOUNT_EXTERNAL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -997,15 +1002,15 @@ def _maybe_verify_balance_for_internal(tx: Transaction, db: Session):
 def _verify_double_entry_balance_for_internal(tx: Transaction, db: Session):
     """
     Ensure that ledger entries net to 0 by currency for internal transactions.
-    Skip checks if from=99 or to=99 (external).
+    Skip checks if from or to is external account.
     """
-    if tx.from_account_id == 99 or tx.to_account_id == 99:
+    if tx.from_account_id == ACCOUNT_EXTERNAL or tx.to_account_id == ACCOUNT_EXTERNAL:
         return
 
     entries = db.query(LedgerEntry).filter(LedgerEntry.transaction_id == tx.id).all()
     sums_by_currency = defaultdict(Decimal)
     for entry in entries:
-        if entry.account_id != 99:
+        if entry.account_id != ACCOUNT_EXTERNAL:
             sums_by_currency[entry.currency] += entry.amount
 
     for currency, total in sums_by_currency.items():
@@ -1033,7 +1038,7 @@ def _enforce_fee_rules(tx_data: dict, db: Session):
         return
 
     if tx_type == "Transfer":
-        if not from_id or from_id == 99:
+        if not from_id or from_id == ACCOUNT_EXTERNAL:
             return
         from_acct = db.get(Account, from_id)
         if from_acct and from_acct.currency == "BTC" and fee_cur != "BTC":
@@ -1070,19 +1075,19 @@ def _enforce_transaction_type_rules(tx_data: dict, db: Session):
     to_id = tx_data.get("to_account_id")
 
     if tx_type == "Deposit":
-        if from_id != 99:
-            raise HTTPException(400, "Deposit => from=99 (external).")
-        if not to_id or to_id == 99:
-            raise HTTPException(400, "Deposit => to=internal account.")
+        if from_id != ACCOUNT_EXTERNAL:
+            raise HTTPException(400, "Deposit => from must be external account.")
+        if not to_id or to_id == ACCOUNT_EXTERNAL:
+            raise HTTPException(400, "Deposit => to must be internal account.")
 
     elif tx_type == "Withdrawal":
-        if to_id != 99:
-            raise HTTPException(400, "Withdrawal => to=99 (external).")
-        if not from_id or from_id == 99:
-            raise HTTPException(400, "Withdrawal => from=internal.")
+        if to_id != ACCOUNT_EXTERNAL:
+            raise HTTPException(400, "Withdrawal => to must be external account.")
+        if not from_id or from_id == ACCOUNT_EXTERNAL:
+            raise HTTPException(400, "Withdrawal => from must be internal account.")
 
     elif tx_type == "Transfer":
-        if not from_id or from_id == 99 or not to_id or to_id == 99:
+        if not from_id or from_id == ACCOUNT_EXTERNAL or not to_id or to_id == ACCOUNT_EXTERNAL:
             raise HTTPException(400, "Transfer => both from/to must be internal.")
         db_from = db.get(Account, from_id)
         db_to = db.get(Account, to_id)
@@ -1090,16 +1095,16 @@ def _enforce_transaction_type_rules(tx_data: dict, db: Session):
             raise HTTPException(400, "Transfer => same currency required.")
 
     elif tx_type == "Buy":
-        if from_id != 3:
-            raise HTTPException(400, "Buy => from=3 (Exchange USD).")
-        if to_id != 4:
-            raise HTTPException(400, "Buy => to=4 (Exchange BTC).")
+        if from_id != ACCOUNT_EXCHANGE_USD:
+            raise HTTPException(400, "Buy => from must be Exchange USD.")
+        if to_id != ACCOUNT_EXCHANGE_BTC:
+            raise HTTPException(400, "Buy => to must be Exchange BTC.")
 
     elif tx_type == "Sell":
-        if from_id != 4:
-            raise HTTPException(400, "Sell => from=4 (Exchange BTC).")
-        if to_id != 3:
-            raise HTTPException(400, "Sell => to=3 (Exchange USD).")
+        if from_id != ACCOUNT_EXCHANGE_BTC:
+            raise HTTPException(400, "Sell => from must be Exchange BTC.")
+        if to_id != ACCOUNT_EXCHANGE_USD:
+            raise HTTPException(400, "Sell => to must be Exchange USD.")
 
     else:
         raise HTTPException(400, f"Unknown transaction type: {tx_type}")
