@@ -3,7 +3,7 @@
 > This file provides context for AI assistants (Claude, etc.) working on this project.
 > It should be updated after significant changes to maintain continuity across sessions.
 
-**Last Updated:** 2025-01-13
+**Last Updated:** 2025-01-14
 
 ---
 
@@ -320,12 +320,14 @@ When starting a new session, the AI should:
 2. Check `docs/CHANGELOG.md` for recent changes
 3. Check `docs/ROADMAP.md` for current goals
 4. **Before any database/storage/Docker changes:** Review `docs/STARTOS_COMPATIBILITY.md` - this is CRITICAL for understanding how data persistence works
-5. Run `git status` to see uncommitted changes
-6. Run `git log -5 --oneline` to see recent commits
+5. **Before updating dependencies:** Review `docs/MAINTENANCE.md` for safe update procedures and known issues
+6. Run `git status` to see uncommitted changes
+7. Run `git log -5 --oneline` to see recent commits
 
 When ending a session:
 1. **Run pre-commit tests:** `./scripts/pre-commit.sh` (or `--no-api` for quick check)
 2. Update this file with any significant changes
 3. Add entries to CHANGELOG.md
 4. Update ROADMAP.md if goals changed
-5. Commit changes if appropriate
+5. If dependencies were updated, update `docs/MAINTENANCE.md` with any new deprecation warnings
+6. Commit changes if appropriate
