@@ -2,7 +2,7 @@
 
 All notable changes to BitcoinTX are documented in this file.
 
-## [Unreleased]
+## [v0.5.3] - 2025-01-17 - Comprehensive Test Suite & Desktop Fixes
 
 ### Added
 - **Comprehensive Test Suite**: `backend/tests/test_stress_and_forms.py` with 46 new pytest tests
