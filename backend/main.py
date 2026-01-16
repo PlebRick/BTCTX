@@ -30,8 +30,12 @@ load_dotenv()
 
 # ---------------------------------------------------------
 # Frontend dist path (needed early for SPA fallback handler)
+# Supports BTCTX_FRONTEND_DIST env var for desktop app bundling
 # ---------------------------------------------------------
-frontend_dist = os.path.join(os.path.dirname(__file__), "../frontend/dist")
+frontend_dist = os.environ.get(
+    "BTCTX_FRONTEND_DIST",
+    os.path.join(os.path.dirname(__file__), "../frontend/dist")
+)
 
 # ---------------------------------------------------------
 # Session Configuration
