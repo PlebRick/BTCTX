@@ -71,6 +71,10 @@
 .toggle-btn:hover {
   background: #4a4a4a;
 }
+.toggle-btn:active {
+  background: #555;
+  transform: scale(0.98);
+}
 
 .manual-price-row,
 .converter-row,

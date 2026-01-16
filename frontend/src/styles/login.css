@@ -55,7 +55,8 @@
   - Rounded corners, strong shadow for emphasis
 */
 .login-card {
-  width: 400px;
+  width: 100%;
+  max-width: 400px;
   background-color: var(--color-panel);
   border-radius: 10px;
   padding: 2.5rem;

@@ -110,6 +110,10 @@ option {
 .buttons button:hover {
   background: #4a4a4a;
 }
+.buttons button:active {
+  background: #555;
+  transform: scale(0.98);
+}
 
 /* ===============================
    4) Header (Top)
@@ -139,6 +143,11 @@ option {
 .header-nav-item:hover {
   color: var(--color-text);
   background-color: #2a2a2a;
+}
+.header-nav-item:active {
+  color: var(--color-text);
+  background-color: #333;
+  transform: scale(0.98);
 }
 .header-nav-item.active {
   color: var(--color-accent);
@@ -197,6 +206,11 @@ option {
 .logout-link:hover {
   color: white;
   background-color: #a3212e;
+}
+.logout-link:active {
+  color: white;
+  background-color: #c42636;
+  transform: scale(0.98);
 }
 
 .auth-spinner-container {
@@ -265,15 +279,25 @@ option {
   }
 
   .header-nav {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: var(--space-2);
     width: 100%;
-    justify-content: center;
   }
 
   .header-nav-item {
     font-size: var(--text-sm);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-3);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* Logout spans full width on its own row */
+  .header-nav-item.logout-link {
+    grid-column: 1 / -1;
   }
 
   .main-content {
@@ -284,12 +308,14 @@ option {
 /* Extra small screens (< 480px) */
 @media (max-width: 480px) {
   .header-nav {
+    grid-template-columns: repeat(2, 1fr);
     gap: var(--space-1);
   }
 
   .header-nav-item {
     font-size: var(--text-xs);
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-2);
+    min-height: 44px;
   }
 
   .main-content {

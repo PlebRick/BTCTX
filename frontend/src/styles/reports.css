@@ -107,6 +107,10 @@
 .report-radio input[type="radio"]:hover {
   transform: scale(1.1); /* Slight enlargement on hover for interactivity */
 }
+.report-radio input[type="radio"]:active {
+  transform: scale(0.95);
+  background-color: #4a4a4a;
+}
 
 .report-radio input[type="radio"]:checked {
   background-color: var(--color-accent); /* Gold accent */
@@ -276,6 +280,21 @@
     border-radius: var(--radius-md);
   }
 
+  .report-year-input,
+  .report-format-input {
+    min-height: 44px;
+  }
+
+  .report-radio {
+    min-height: 44px;
+    padding: var(--space-2) 0;
+  }
+
+  .report-radio input[type="radio"] {
+    width: 28px;
+    height: 28px;
+  }
+
   .report-actions {
     justify-content: center;
   }
@@ -283,6 +302,7 @@
   .report-button {
     width: 100%;
     padding: var(--space-4) var(--space-5);
+    min-height: 44px;
   }
 
   .downloading-overlay {

@@ -214,3 +214,18 @@ button:focus-visible {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* ============================================
+   MOBILE FONT SIZE ADJUSTMENTS
+============================================ */
+
+@media (max-width: 480px) {
+  :root {
+    --text-base: 0.9375rem;  /* 15px instead of 16px */
+    --text-lg: 1rem;          /* 16px instead of 18px */
+    --text-xl: 1.125rem;      /* 18px instead of 20px */
+    --text-2xl: 1.25rem;      /* 20px instead of 24px */
+    --text-3xl: 1.5rem;       /* 24px instead of 32px */
+    --text-4xl: 2rem;         /* 32px instead of 40px */
+  }
+}

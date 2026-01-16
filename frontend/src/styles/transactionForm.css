@@ -181,3 +181,43 @@
 .hidden-trigger {
   display: none;
 }
+
+/* ===============================
+   Responsive Design
+=============================== */
+
+@media (max-width: 768px) {
+  .form-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-control {
+    min-height: 44px;
+    padding: var(--space-3);
+  }
+
+  .form-input-row {
+    flex-direction: column;
+  }
+
+  .refresh-button {
+    min-height: 44px;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .transaction-form {
+    gap: var(--space-3);
+  }
+
+  .form-group label {
+    font-size: var(--text-sm);
+  }
+
+  .submit-button,
+  .delete-button {
+    min-height: 48px;
+    padding: var(--space-4);
+  }
+}

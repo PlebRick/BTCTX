@@ -454,6 +454,21 @@ input[type="file"]::file-selector-button:hover {
     font-size: 0.8rem;
   }
 
+  /* Touch targets */
+  .settings-button {
+    min-height: 44px;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .credential-input {
+    min-height: 44px;
+    padding: var(--space-3);
+  }
+
+  input[type="file"] {
+    min-height: 44px;
+  }
+
   .import-preview-table {
     font-size: 0.75rem;
   }
