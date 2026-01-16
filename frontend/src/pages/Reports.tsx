@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { downloadPdfWithAxios } from "../api";
 import { useToast } from "../contexts/ToastContext";
+import { downloadFile, isDesktopApp } from "../utils/desktopDownload";
 import "../styles/reports.css"; // Our spinner CSS is also in here
 
 // Hardcoded base URL for your FastAPI server:
@@ -73,18 +74,21 @@ const Reports: React.FC = () => {
 
       // 2) Build a filename
       const safeLabel = reportDef.label.replace(/\s+/g, "");
-      const fileExt = finalFormat.toLowerCase();
+      const fileExt = finalFormat.toLowerCase() as "pdf" | "csv";
       const fileName = `${safeLabel}_${taxYear}.${fileExt}`;
 
-      // 3) Create a temporary link to force download
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+      // 3) Download using desktop-aware utility
+      const result = await downloadFile(blob, fileName, fileExt);
+
+      if (result.success) {
+        // Show success message with path in desktop mode
+        if (isDesktopApp() && result.path) {
+          toast.success(`Saved to: ${result.path}`);
+        }
+      } else if (result.error && result.error !== "Save cancelled") {
+        // Only show error if not a user cancellation
+        toast.error(`Save failed: ${result.error}`);
+      }
 
     } catch {
       toast.error("Failed to generate the report. Please try again.");

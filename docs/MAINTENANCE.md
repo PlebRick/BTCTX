@@ -3,7 +3,7 @@
 > This document provides procedures for maintaining BitcoinTX dependencies and addressing deprecations.
 > **Primary audience:** AI assistants (Claude) and developers performing maintenance tasks.
 
-**Last Reviewed:** 2025-01-14
+**Last Reviewed:** 2025-01-17
 
 ---
 
@@ -41,8 +41,13 @@ Track deprecations here. Fix before they become errors in future versions.
 | Warning | File | Line | Status | Notes |
 |---------|------|------|--------|-------|
 | ~~`declarative_base()` moved to `sqlalchemy.orm`~~ | `backend/database.py` | 26 | ✅ Fixed | Changed to `from sqlalchemy.orm import declarative_base` |
+| `class Config:` deprecated | `backend/schemas/*.py` | Various | ⏳ TODO | Use `model_config = ConfigDict(...)` instead |
+| `@validator` deprecated | `backend/schemas/account.py` | 24, 46 | ⏳ TODO | Use `@field_validator` instead |
+| `orm_mode` renamed | `backend/schemas/*.py` | Various | ⏳ TODO | Use `from_attributes = True` instead |
 
-*No current deprecation warnings.*
+**Pydantic V1 → V2 Migration:** The codebase uses Pydantic V1 patterns that still work in V2 but are deprecated. These will break in Pydantic V3 (no release date announced yet). Low priority but should be addressed eventually.
+
+**pytest return warnings:** Some tests in `test_comprehensive_transactions.py` use `return True` instead of just assertions. Cosmetic issue only - tests still pass.
 
 ### How to Find New Deprecations
 

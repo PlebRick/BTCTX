@@ -2,6 +2,50 @@
 
 declare global {
   // --------------------------------------------------------------
+  // 0) PyWebView Desktop API Types
+  // --------------------------------------------------------------
+
+  /**
+   * Response from pywebview save_file API
+   */
+  interface PyWebViewSaveResult {
+    success: boolean;
+    path?: string;
+    error?: string;
+  }
+
+  /**
+   * PyWebView JavaScript API exposed by the desktop app
+   */
+  interface PyWebViewAPI {
+    /**
+     * Save a file using native macOS save dialog
+     * @param filename - Suggested filename
+     * @param data_base64 - Base64-encoded file content
+     * @param file_type - File type hint (pdf, csv)
+     */
+    save_file(
+      filename: string,
+      data_base64: string,
+      file_type: string
+    ): Promise<PyWebViewSaveResult>;
+
+    /**
+     * Check if running in desktop mode
+     */
+    is_desktop(): Promise<boolean>;
+  }
+
+  /**
+   * Extended Window interface with pywebview API
+   */
+  interface Window {
+    pywebview?: {
+      api: PyWebViewAPI;
+    };
+  }
+
+  // --------------------------------------------------------------
   // 1) Domain Models for Account Balances & Gains/Losses
   // --------------------------------------------------------------
 

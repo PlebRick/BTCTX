@@ -5,6 +5,25 @@ All notable changes to BitcoinTX are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Comprehensive Test Suite**: `backend/tests/test_stress_and_forms.py` with 46 new pytest tests
+  - Volume/stress testing (250+ transactions, backdating cascades, multi-year)
+  - Edge cases: holding period boundaries (364/365/366 days), satoshi precision, $100M amounts
+  - Account-specific FIFO verification (Exchange vs Wallet isolation)
+  - All deposit sources tested: MyBTC, Gift, Income, Interest, Reward
+  - All withdrawal purposes tested: Spent, Gift, Donation, Lost (with correct tax treatment)
+  - IRS Form 8949 validation: multi-page (15/30 disposals), non-taxable exclusions
+  - Schedule D totals verification
+  - Total pytest tests: 131 (was 84)
+- **macOS Desktop App**: Native macOS application using PyInstaller + pywebview
+  - Self-contained `.app` bundle (~61MB) with embedded FastAPI backend
+  - Data persists in `~/Library/Application Support/BitcoinTX/btctx.db`
+  - Automated build script: `desktop/build-mac.sh`
+  - PyInstaller spec with all hidden imports configured
+  - Dynamic port allocation for backend server
+  - Dark mode support, resizable window (1280x800 default, 800x600 min)
+  - pdftk detection with user warning dialog if missing
+  - Files added: `desktop/entrypoint.py`, `desktop/BitcoinTX.spec`, `desktop/build-mac.sh`, `desktop/requirements.txt`, `desktop/README.md`
+  - Documentation: `docs/MACOS_DESKTOP_APP.md`
 - **Mobile Responsiveness Overhaul**: Comprehensive mobile-friendly UI updates
   - Transaction panel: responsive width, fixed overlay positioning on mobile
   - Login page: fluid width for small screens
@@ -32,10 +51,35 @@ All notable changes to BitcoinTX are documented in this file.
 - **Sidebar brand layout**: Changed from horizontal to vertical stack (logo above title)
 - **Logout button**: Removed lock emoji, simplified to text-only
 - **Logout link color**: Changed from dark red (#811922) to brighter red (#cf4655) to fix font rendering issue on macOS dark backgrounds
+- **Pydantic V1 → V2 Migration**: Updated all deprecated Pydantic patterns
+  - Replaced `@validator` with `@field_validator` + `@classmethod`
+  - Replaced `class Config` with `model_config = ConfigDict(...)`
+  - Replaced `orm_mode` with `from_attributes`
+  - Replaced `.from_orm()` with `.model_validate()`
+  - Replaced `.dict()` with `.model_dump()`
+  - Eliminates all Pydantic deprecation warnings
+  - Documentation: `docs/PYDANTIC_MIGRATION.md`
 
 ### Fixed
+- **pdftk path resolution for macOS desktop**: Added centralized `pdftk_path.py` module
+  - PyInstaller bundles don't inherit system PATH, breaking pdftk detection
+  - New module checks known Homebrew locations (`/opt/homebrew/bin/pdftk`, `/usr/local/bin/pdftk`)
+  - Caches resolved path for performance
+  - Updated `pdf_utils.py`, `pdftk_filler.py`, `reports.py` to use new module
+- **Reports page desktop downloads**: Reports now download correctly in macOS desktop app
+  - Updated `Reports.tsx` to use desktop-aware download utility
+  - Added PyWebView API TypeScript types to `global.d.ts`
+- **macOS desktop app downloads**: Settings page downloads (backup, CSV export, templates) now work correctly in the desktop app
+  - Added `desktopDownload.ts` utility that detects pywebview environment
+  - Uses native file save dialog via `window.pywebview.api.save_file()` when running in desktop app
+  - Falls back to standard browser download for web/Docker deployment
+  - File: `frontend/src/utils/desktopDownload.ts`
+- **Lint errors fixed**: Removed unused variables in `useBtcPrice.ts` and `Settings.tsx`
 - **Form 8949 non-taxable exclusion**: Gift, Donation, and Lost disposals now correctly excluded
 - **Proceeds degradation fix**: Fixed bug where `proceeds_usd` could degrade during recalculation
+- **None-to-Decimal conversion**: Fixed TypeError in report generation after Pydantic V2 migration
+  - `.model_dump()` includes keys with `None` values, breaking `Decimal(tx_data.get("key", default))`
+  - Changed to `Decimal(tx_data.get("key") or default)` pattern in `transaction.py`
 - **FIFO lot disposal now account-specific**: Fixed bug where selling/withdrawing BTC would consume lots from all accounts globally instead of only from the source account. This ensures correct cost basis tracking when BTC is held across multiple accounts.
 - **SPA routing in Docker**: Fixed browser refresh returning 404 on client-side routes
   - Added custom exception handler to serve `index.html` for non-API 404s
@@ -44,6 +88,9 @@ All notable changes to BitcoinTX are documented in this file.
   - File: `backend/main.py`
 
 ### Files Added
+- `backend/tests/test_stress_and_forms.py` - Comprehensive stress testing and IRS form validation (46 tests)
+- `backend/services/reports/pdftk_path.py` - Centralized pdftk path resolution for macOS desktop compatibility
+- `frontend/src/utils/desktopDownload.ts` - Desktop app file download utility with pywebview integration
 - `frontend/src/hooks/useAccounts.ts` - Account fetching and caching hook
 - `frontend/src/hooks/useApiCall.ts` - Generic API call hook with loading/error states
 - `frontend/src/hooks/useBtcPrice.ts` - BTC price fetching hook

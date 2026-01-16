@@ -31,6 +31,7 @@ from backend.services.reports.form_8949 import (
 # Import pdftk-based utilities (remove ghostscript references)
 from backend.services.reports.pdftk_filler import fill_pdf_with_pdftk
 from backend.services.reports.pdf_utils import flatten_pdf_with_pdftk
+from backend.services.reports.pdftk_path import is_pdftk_available
 
 reports_router = APIRouter()
 
@@ -235,8 +236,7 @@ def _verify_pdftk_installed():
     Verify pdftk is installed and accessible.
     Raises HTTPException with helpful message if not found.
     """
-    import shutil
-    if shutil.which("pdftk") is None:
+    if not is_pdftk_available():
         raise HTTPException(
             status_code=500,
             detail=(

@@ -328,7 +328,7 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
     from_acct_id = tx_data.get("from_account_id")
     to_acct_id = tx_data.get("to_account_id")
     tx_type = tx_data.get("type", "")
-    amount = Decimal(tx_data.get("amount", 0))
+    amount = Decimal(tx_data.get("amount") or 0)
     fee_amount = Decimal(tx_data.get("fee_amount") or "0.0")
     fee_currency = (tx_data.get("fee_currency") or "BTC").upper()
 
@@ -459,9 +459,9 @@ def build_ledger_entries_for_transaction(tx: Transaction, tx_data: dict, db: Ses
         and from_acct and from_acct.currency == "USD"
         and to_acct and to_acct.currency == "BTC"
     ):
-        amount_btc = Decimal(tx_data.get("amount", "0"))
-        fee_amt = Decimal(tx_data.get("fee_amount", "0"))
-        cost_basis_usd = Decimal(tx_data.get("cost_basis_usd", "0"))
+        amount_btc = Decimal(tx_data.get("amount") or 0)
+        fee_amt = Decimal(tx_data.get("fee_amount") or 0)
+        cost_basis_usd = Decimal(tx_data.get("cost_basis_usd") or 0)
 
         total_usd_out = cost_basis_usd + fee_amt
         db.add(LedgerEntry(
@@ -542,7 +542,7 @@ def maybe_create_bitcoin_lot(tx: Transaction, tx_data: dict, db: Session):
     if btc_amount <= 0:
         return
 
-    cost_basis = Decimal(tx_data.get("cost_basis_usd", "0"))
+    cost_basis = Decimal(tx_data.get("cost_basis_usd") or 0)
     fee_cur = (tx_data.get("fee_currency") or "").upper()
     fee_amt = Decimal(tx_data.get("fee_amount") or "0.0")
 
@@ -1035,7 +1035,7 @@ def _enforce_fee_rules(tx_data: dict, db: Session):
     """
     tx_type = tx_data.get("type")
     from_id = tx_data.get("from_account_id")
-    fee_amt = Decimal(tx_data.get("fee_amount", 0))
+    fee_amt = Decimal(tx_data.get("fee_amount") or 0)
     fee_cur = (tx_data.get("fee_currency") or "USD").upper()
 
     # If there's no fee, skip checks

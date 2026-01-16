@@ -81,3 +81,8 @@ backend/create_db.py
 # Add any other temporary or sensitive directories/files specific to your development setup here.
 # --- Test Exports ---
 Export_Tests/
+
+# --- Desktop Build ---
+desktop/build/
+desktop/dist/
+desktop/.venv/
