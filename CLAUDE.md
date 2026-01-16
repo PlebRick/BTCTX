@@ -187,9 +187,9 @@ git push plebrick master --tags  # Sync backup at releases
 ```
 
 ### Current Version
-- **Latest Tag:** `v0.5.2` (2025-01-17)
-- **Status:** Stable release with mobile responsiveness and UI refinements
-- **Docker Image:** `b1ackswan/btctx:v0.5.2` (also `latest`)
+- **Latest Tag:** `v0.5.3` (2025-01-16)
+- **Status:** Stable release with macOS desktop downloads fix and lint fixes
+- **Docker Image:** `b1ackswan/btctx:v0.5.3` (also `latest`)
 - **Target Release:** `v1.0.0`
 
 ---
