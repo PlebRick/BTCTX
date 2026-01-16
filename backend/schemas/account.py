@@ -6,7 +6,7 @@ We add optional validators to ensure 'currency' is one of ["USD","BTC"].
 (Though we already have the main logic in the service layer.)
 """
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional
 from fastapi import HTTPException
 
@@ -21,7 +21,8 @@ class AccountBase(BaseModel):
     name: str
     currency: str
 
-    @validator("currency")
+    @field_validator("currency")
+    @classmethod
     def currency_must_be_valid(cls, v):
         if v not in VALID_CURRENCIES:
             raise ValueError("currency must be 'USD' or 'BTC'")
@@ -43,7 +44,8 @@ class AccountUpdate(BaseModel):
     name: Optional[str] = None
     currency: Optional[str] = None
 
-    @validator("currency")
+    @field_validator("currency")
+    @classmethod
     def currency_must_be_valid(cls, v):
         if v is not None and v not in VALID_CURRENCIES:
             raise ValueError("currency must be 'USD' or 'BTC'")
@@ -58,5 +60,4 @@ class AccountRead(AccountBase):
     id: int
     user_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

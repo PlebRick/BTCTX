@@ -5,6 +5,16 @@ All notable changes to BitcoinTX are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **macOS Desktop App**: Native macOS application using PyInstaller + pywebview
+  - Self-contained `.app` bundle (~61MB) with embedded FastAPI backend
+  - Data persists in `~/Library/Application Support/BitcoinTX/btctx.db`
+  - Automated build script: `desktop/build-mac.sh`
+  - PyInstaller spec with all hidden imports configured
+  - Dynamic port allocation for backend server
+  - Dark mode support, resizable window (1280x800 default, 800x600 min)
+  - pdftk detection with user warning dialog if missing
+  - Files added: `desktop/entrypoint.py`, `desktop/BitcoinTX.spec`, `desktop/build-mac.sh`, `desktop/requirements.txt`, `desktop/README.md`
+  - Documentation: `docs/MACOS_DESKTOP_APP.md`
 - **Mobile Responsiveness Overhaul**: Comprehensive mobile-friendly UI updates
   - Transaction panel: responsive width, fixed overlay positioning on mobile
   - Login page: fluid width for small screens

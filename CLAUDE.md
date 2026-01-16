@@ -27,7 +27,11 @@ git log -3 --oneline  # See recent commits
 
 ### Active Feature Branches
 
-None currently. All feature branches have been merged and deleted.
+| Branch | Purpose | Status |
+|--------|---------|--------|
+| `feature/macos-desktop` | macOS desktop app (PyInstaller + pywebview) | In progress |
+
+See [docs/MACOS_DESKTOP_APP.md](docs/MACOS_DESKTOP_APP.md) for complete desktop build documentation.
 
 ### Feature Branch Rules
 
@@ -135,6 +139,7 @@ LotDisposal (FIFO consumption record)
 - Transaction history export (CSV/PDF)
 - Docker deployment on port 80
 - BTC price fetching with 3-source fallback
+- **macOS desktop app** (PyInstaller + pywebview) - see [docs/MACOS_DESKTOP_APP.md](docs/MACOS_DESKTOP_APP.md)
 
 ### Docker Image
 - **Registry:** Docker Hub
@@ -191,7 +196,16 @@ git push plebrick master --tags  # Sync backup at releases
 
 ## Recent Changes (Jan 2025)
 
-### Session: 2025-01-17
+### Session: 2025-01-17 (macOS Desktop App)
+1. **macOS Desktop App Build**
+   - Added complete PyInstaller + pywebview setup for native macOS app
+   - Files added: `desktop/entrypoint.py`, `desktop/BitcoinTX.spec`, `desktop/build-mac.sh`, `desktop/requirements.txt`, `desktop/README.md`
+   - Modified `backend/main.py` to support `BTCTX_FRONTEND_DIST` env var for bundled frontend path
+   - App bundles entire backend + frontend into single ~61MB `.app`
+   - Data stored in `~/Library/Application Support/BitcoinTX/btctx.db`
+   - See [docs/MACOS_DESKTOP_APP.md](docs/MACOS_DESKTOP_APP.md) for complete documentation
+
+### Session: 2025-01-17 (Mobile/UI)
 1. **Mobile Responsiveness Overhaul**
    - Comprehensive mobile UI fixes across 10 CSS files (330+ lines added)
    - Fixed transaction panel: responsive width (was fixed 500px), overlay positioning bug
@@ -296,6 +310,7 @@ git push plebrick master --tags  # Sync backup at releases
 - [ ] CSV import merge with existing data (Phase 2)
 
 ### Completed Recently
+- [x] macOS desktop app (Jan 2025) - PyInstaller + pywebview bundling
 - [x] Mobile responsiveness overhaul (Jan 2025)
   - 10 CSS files updated with responsive breakpoints
   - Touch-friendly UI with 44px minimum targets
@@ -398,8 +413,9 @@ When starting a new session, the AI should:
 3. Check `docs/ROADMAP.md` for current goals
 4. **Before any database/storage/Docker changes:** Review `docs/STARTOS_COMPATIBILITY.md` - this is CRITICAL for understanding how data persistence works
 5. **Before updating dependencies:** Review `docs/MAINTENANCE.md` for safe update procedures and known issues
-6. Run `git status` to see uncommitted changes
-7. Run `git log -5 --oneline` to see recent commits
+6. **Before any macOS desktop app changes:** Review `docs/MACOS_DESKTOP_APP.md` for build system, architecture, and bundling details
+7. Run `git status` to see uncommitted changes
+8. Run `git log -5 --oneline` to see recent commits
 
 When ending a session:
 1. **Run pre-commit tests:** `./scripts/pre-commit.sh` (or `--no-api` for quick check)

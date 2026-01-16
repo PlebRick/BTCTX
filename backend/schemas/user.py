@@ -9,7 +9,7 @@ Refactored to use 'password' instead of 'password_hash' for creation,
 so hashing happens behind the scenes in create_user().
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 class UserBase(BaseModel):
@@ -40,5 +40,4 @@ class UserRead(UserBase):
     """
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
