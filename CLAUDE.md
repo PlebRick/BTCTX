@@ -3,7 +3,7 @@
 > This file provides context for AI assistants (Claude, etc.) working on this project.
 > It should be updated after significant changes to maintain continuity across sessions.
 
-**Last Updated:** 2025-01-16
+**Last Updated:** 2025-01-17
 
 ---
 
@@ -191,6 +191,19 @@ git push plebrick master --tags  # Sync backup at releases
 
 ## Recent Changes (Jan 2025)
 
+### Session: 2025-01-17
+1. **Mobile Responsiveness Overhaul**
+   - Comprehensive mobile UI fixes across 10 CSS files (330+ lines added)
+   - Fixed transaction panel: responsive width (was fixed 500px), overlay positioning bug
+   - Fixed login card: fluid width instead of fixed 400px
+   - Added `:active` states for touch feedback on all interactive elements
+   - Added mobile labels to transaction list at 800px breakpoint using `::before` pseudo-elements
+   - Added 480px breakpoint for extra small screens across all pages
+   - Improved navigation layout with CSS grid on mobile (3-col at 768px, 2-col at 480px)
+   - Ensured 44px minimum touch targets on all buttons and inputs
+   - Added mobile font size scale to `theme.css`
+   - Files modified: `app.css`, `converter.css`, `dashboard.css`, `login.css`, `reports.css`, `settings.css`, `theme.css`, `transactionForm.css`, `transactionPanel.css`, `transactions.css`
+
 ### Session: 2025-01-16
 1. **CSV Template Fix**
    - Fixed broken template that had incorrect balance math (withdrawals exceeded deposits)
@@ -273,6 +286,11 @@ git push plebrick master --tags  # Sync backup at releases
 - [ ] CSV import merge with existing data (Phase 2)
 
 ### Completed Recently
+- [x] Mobile responsiveness overhaul (Jan 2025)
+  - 10 CSS files updated with responsive breakpoints
+  - Touch-friendly UI with 44px minimum targets
+  - Mobile labels on transaction list
+  - CSS grid navigation on mobile
 - [x] Frontend design system refactor (Jan 2025)
   - Custom hooks: `useAccounts`, `useApiCall`, `useBtcPrice`
   - Toast notification system with context
