@@ -17,7 +17,8 @@ body {
   line-height: var(--leading-normal);
 }
 
-/* Ensure form elements inherit the font family */
+/* Ensure form elements and links inherit the font family */
+a,
 button,
 input,
 select,
@@ -49,19 +50,19 @@ option {
 /* Example brand area at top */
 .sidebar-brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 64px; 
-  margin-top: 1rem;;
-  margin-bottom: 1rem; /* space below brand */
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .sidebar-logo {
-  width: 45px;
-  height: 45px; 
+  width: 50px;
+  height: 50px;
   object-fit: cover;
   border-radius: 50%;
-  margin-right: 0.5rem;
 }
 
 .sidebar-title {
@@ -136,7 +137,9 @@ option {
   color: var(--color-text-secondary);
   text-decoration: none;
   padding: 0.5rem 0.75rem;
+  font-family: var(--font-family);
   font-size: 1rem;
+  font-weight: 400;
   border-radius: 4px;
   transition: background-color 0.2s, color 0.2s;
 }
@@ -199,8 +202,10 @@ option {
 }
 
 .logout-link {
-  color: #811922;
-  font-weight: 700;
+  color: #cf4655;  /* brighter red for better rendering on dark background */
+  font-family: var(--font-family);
+  font-size: 1rem;
+  font-weight: 400;
 }
 
 .logout-link:hover {

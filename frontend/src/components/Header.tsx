@@ -58,7 +58,7 @@ const Header: React.FC = () => {
             handleLogout();
           }}
         >
-          🔒 Logout
+          Logout
         </a>
       </nav>
     </header>
