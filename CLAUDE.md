@@ -3,7 +3,7 @@
 > This file provides context for AI assistants (Claude, etc.) working on this project.
 > It should be updated after significant changes to maintain continuity across sessions.
 
-**Last Updated:** 2025-01-16
+**Last Updated:** 2025-01-17
 
 ---
 
@@ -124,6 +124,7 @@ LotDisposal (FIFO consumption record)
 | `backend/services/bitcoin.py` | BTC price fetching (CoinGecko, Kraken, CoinDesk) |
 | `backend/routers/reports.py` | PDF report generation endpoints |
 | `backend/services/reports/form_8949.py` | IRS Form 8949 data preparation |
+| `backend/services/reports/pdftk_path.py` | Centralized pdftk path resolution (macOS desktop compat) |
 | `Dockerfile` | Multi-stage build (Node for frontend, Python for backend) |
 
 ---
@@ -195,6 +196,32 @@ git push plebrick master --tags  # Sync backup at releases
 ---
 
 ## Recent Changes (Jan 2025)
+
+### Session: 2025-01-17 (Testing & Cleanup)
+1. **Comprehensive Test Suite**
+   - Added `backend/tests/test_stress_and_forms.py` with 46 new pytest tests
+   - Volume/stress testing (250+ transactions, backdating cascades)
+   - Edge cases (holding periods 364/365/366 days, satoshi precision, $100M amounts)
+   - Account-specific FIFO verification
+   - All deposit sources (MyBTC, Gift, Income, Interest, Reward)
+   - All withdrawal purposes (Spent, Gift, Donation, Lost)
+   - IRS Form 8949 validation (multi-page, non-taxable exclusions)
+   - Schedule D totals verification
+   - Total pytest tests now: 131 (was 84)
+
+2. **pdftk Path Resolution Fix**
+   - Added `backend/services/reports/pdftk_path.py` for centralized path resolution
+   - Checks known Homebrew locations for PyInstaller bundles
+   - Fixes pdftk not found in macOS desktop app (bundles don't inherit PATH)
+   - Updated `pdf_utils.py`, `pdftk_filler.py`, `reports.py` to use new module
+
+3. **Reports Page Desktop Download Fix**
+   - Updated `frontend/src/pages/Reports.tsx` to use desktop-aware download utility
+   - Added PyWebView API TypeScript types to `frontend/src/types/global.d.ts`
+
+4. **Codebase Cleanup**
+   - Deleted 7 duplicate files (`* 2.*` pattern from macOS copy conflicts)
+   - Deleted temporary `cookies.txt` file
 
 ### Session: 2025-01-17 (macOS Desktop App)
 1. **macOS Desktop App Build**
@@ -269,7 +296,7 @@ git push plebrick master --tags  # Sync backup at releases
 
 2. **Test Fixes**
    - Fixed 5 stale tests to match current codebase
-   - All 84 tests now pass
+   - All tests pass
    - Files: `test_backend.py`, `test_main.py`, `test_seed_data_integrity.py`
 
 3. **SPA Routing Fix (Docker)**
@@ -321,6 +348,10 @@ git push plebrick master --tags  # Sync backup at releases
 - [ ] CSV import merge with existing data (Phase 2)
 
 ### Completed Recently
+- [x] Comprehensive test suite (Jan 2025) - 131 pytest tests + 17 pre-commit checks
+  - `test_stress_and_forms.py`: stress testing, edge cases, IRS form validation
+  - All deposit sources and withdrawal purposes tested
+  - Account-specific FIFO verification
 - [x] macOS desktop app (Jan 2025) - PyInstaller + pywebview bundling
 - [x] Mobile responsiveness overhaul (Jan 2025)
   - 10 CSS files updated with responsive breakpoints
