@@ -4,13 +4,13 @@
 
 It tracks your BTC and USD balances using **double-entry accounting** and helps you calculate FIFO-based capital gains, cost basis, and income for IRS reporting. It includes a full-featured dashboard, a manual transaction entry form, and exportable reports like Form 8949 and Schedule D.
 
-<img width="1000" alt="Dashboard" src="docs/images/dashboard.jpg" />
+<img width="1000" alt="Dashboard" src="docs/images/dashboard.png" />
 
-<img width="1000" alt="Transactions" src="docs/images/transactions.jpg" />
+<img width="1000" alt="Transactions" src="docs/images/transactions.png" />
 
-<img width="1000" alt="Reports" src="docs/images/reports.jpg" />
+<img width="1000" alt="Reports" src="docs/images/reports.png" />
 
-<img width="1000" alt="Settings" src="docs/images/settings.jpg" />
+<img width="1000" alt="Settings" src="docs/images/settings.png" />
 
 ---
 
