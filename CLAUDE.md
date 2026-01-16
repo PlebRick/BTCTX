@@ -182,9 +182,9 @@ git push plebrick master --tags  # Sync backup at releases
 ```
 
 ### Current Version
-- **Latest Tag:** `v0.5.1` (2025-01-15)
-- **Status:** Stable release with FIFO account-specific fix, test fixes, logo updates
-- **Docker Image:** `b1ackswan/btctx:v0.5.1` (also `latest`)
+- **Latest Tag:** `v0.5.2` (2025-01-17)
+- **Status:** Stable release with mobile responsiveness and UI refinements
+- **Docker Image:** `b1ackswan/btctx:v0.5.2` (also `latest`)
 - **Target Release:** `v1.0.0`
 
 ---
@@ -203,6 +203,16 @@ git push plebrick master --tags  # Sync backup at releases
    - Ensured 44px minimum touch targets on all buttons and inputs
    - Added mobile font size scale to `theme.css`
    - Files modified: `app.css`, `converter.css`, `dashboard.css`, `login.css`, `reports.css`, `settings.css`, `theme.css`, `transactionForm.css`, `transactionPanel.css`, `transactions.css`
+
+2. **UI Refinements**
+   - Sidebar brand: changed from horizontal to vertical stack (logo above title)
+   - Reduced spacing between brand and Sats Converter
+   - Removed lock emoji from logout button
+   - Fixed logout font rendering on macOS dark backgrounds (dark red #811922 → brighter red #cf4655)
+
+3. **Release v0.5.2**
+   - Tagged and pushed to both repos (origin, plebrick)
+   - Built and pushed multi-arch Docker image
 
 ### Session: 2025-01-16
 1. **CSV Template Fix**
