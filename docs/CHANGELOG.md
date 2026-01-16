@@ -5,6 +5,15 @@ All notable changes to BitcoinTX are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Comprehensive Test Suite**: `backend/tests/test_stress_and_forms.py` with 46 new pytest tests
+  - Volume/stress testing (250+ transactions, backdating cascades, multi-year)
+  - Edge cases: holding period boundaries (364/365/366 days), satoshi precision, $100M amounts
+  - Account-specific FIFO verification (Exchange vs Wallet isolation)
+  - All deposit sources tested: MyBTC, Gift, Income, Interest, Reward
+  - All withdrawal purposes tested: Spent, Gift, Donation, Lost (with correct tax treatment)
+  - IRS Form 8949 validation: multi-page (15/30 disposals), non-taxable exclusions
+  - Schedule D totals verification
+  - Total pytest tests: 131 (was 84)
 - **macOS Desktop App**: Native macOS application using PyInstaller + pywebview
   - Self-contained `.app` bundle (~61MB) with embedded FastAPI backend
   - Data persists in `~/Library/Application Support/BitcoinTX/btctx.db`
@@ -52,6 +61,14 @@ All notable changes to BitcoinTX are documented in this file.
   - Documentation: `docs/PYDANTIC_MIGRATION.md`
 
 ### Fixed
+- **pdftk path resolution for macOS desktop**: Added centralized `pdftk_path.py` module
+  - PyInstaller bundles don't inherit system PATH, breaking pdftk detection
+  - New module checks known Homebrew locations (`/opt/homebrew/bin/pdftk`, `/usr/local/bin/pdftk`)
+  - Caches resolved path for performance
+  - Updated `pdf_utils.py`, `pdftk_filler.py`, `reports.py` to use new module
+- **Reports page desktop downloads**: Reports now download correctly in macOS desktop app
+  - Updated `Reports.tsx` to use desktop-aware download utility
+  - Added PyWebView API TypeScript types to `global.d.ts`
 - **macOS desktop app downloads**: Settings page downloads (backup, CSV export, templates) now work correctly in the desktop app
   - Added `desktopDownload.ts` utility that detects pywebview environment
   - Uses native file save dialog via `window.pywebview.api.save_file()` when running in desktop app
@@ -71,6 +88,8 @@ All notable changes to BitcoinTX are documented in this file.
   - File: `backend/main.py`
 
 ### Files Added
+- `backend/tests/test_stress_and_forms.py` - Comprehensive stress testing and IRS form validation (46 tests)
+- `backend/services/reports/pdftk_path.py` - Centralized pdftk path resolution for macOS desktop compatibility
 - `frontend/src/utils/desktopDownload.ts` - Desktop app file download utility with pywebview integration
 - `frontend/src/hooks/useAccounts.ts` - Account fetching and caching hook
 - `frontend/src/hooks/useApiCall.ts` - Generic API call hook with loading/error states
