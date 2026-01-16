@@ -5,6 +5,14 @@ All notable changes to BitcoinTX are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Mobile Responsiveness Overhaul**: Comprehensive mobile-friendly UI updates
+  - Transaction panel: responsive width, fixed overlay positioning on mobile
+  - Login page: fluid width for small screens
+  - Navigation: CSS grid layout for mobile (3-column at 768px, 2-column at 480px)
+  - Touch targets: minimum 44px for all interactive elements
+  - Transaction list: mobile labels via CSS `::before` pseudo-elements
+  - Added `:active` states for touch feedback across all interactive elements
+  - Files modified: `transactionPanel.css`, `login.css`, `transactions.css`, `app.css`, `converter.css`, `reports.css`, `dashboard.css`, `settings.css`, `theme.css`, `transactionForm.css`
 - **Frontend Design System Refactor**: Major code quality and architecture improvements
   - Custom hooks: `useAccounts`, `useApiCall`, `useBtcPrice` for reusable logic
   - Toast notification system with `ToastContext` for user feedback
@@ -19,6 +27,11 @@ All notable changes to BitcoinTX are documented in this file.
   - New endpoint: `GET /api/import/instructions`
 - **Pre-Commit Test Suite**: 17 tests for catching regressions
   - Run with: `./scripts/pre-commit.sh` or `python backend/tests/pre_commit_tests.py`
+
+### Changed
+- **Sidebar brand layout**: Changed from horizontal to vertical stack (logo above title)
+- **Logout button**: Removed lock emoji, simplified to text-only
+- **Logout link color**: Changed from dark red (#811922) to brighter red (#cf4655) to fix font rendering issue on macOS dark backgrounds
 
 ### Fixed
 - **Form 8949 non-taxable exclusion**: Gift, Donation, and Lost disposals now correctly excluded
