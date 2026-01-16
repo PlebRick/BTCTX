@@ -52,6 +52,12 @@ All notable changes to BitcoinTX are documented in this file.
   - Documentation: `docs/PYDANTIC_MIGRATION.md`
 
 ### Fixed
+- **macOS desktop app downloads**: Settings page downloads (backup, CSV export, templates) now work correctly in the desktop app
+  - Added `desktopDownload.ts` utility that detects pywebview environment
+  - Uses native file save dialog via `window.pywebview.api.save_file()` when running in desktop app
+  - Falls back to standard browser download for web/Docker deployment
+  - File: `frontend/src/utils/desktopDownload.ts`
+- **Lint errors fixed**: Removed unused variables in `useBtcPrice.ts` and `Settings.tsx`
 - **Form 8949 non-taxable exclusion**: Gift, Donation, and Lost disposals now correctly excluded
 - **Proceeds degradation fix**: Fixed bug where `proceeds_usd` could degrade during recalculation
 - **None-to-Decimal conversion**: Fixed TypeError in report generation after Pydantic V2 migration
@@ -65,6 +71,7 @@ All notable changes to BitcoinTX are documented in this file.
   - File: `backend/main.py`
 
 ### Files Added
+- `frontend/src/utils/desktopDownload.ts` - Desktop app file download utility with pywebview integration
 - `frontend/src/hooks/useAccounts.ts` - Account fetching and caching hook
 - `frontend/src/hooks/useApiCall.ts` - Generic API call hook with loading/error states
 - `frontend/src/hooks/useBtcPrice.ts` - BTC price fetching hook

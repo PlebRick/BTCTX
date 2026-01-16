@@ -3,7 +3,7 @@
 > This file provides context for AI assistants (Claude, etc.) working on this project.
 > It should be updated after significant changes to maintain continuity across sessions.
 
-**Last Updated:** 2025-01-17
+**Last Updated:** 2025-01-16
 
 ---
 
@@ -204,6 +204,17 @@ git push plebrick master --tags  # Sync backup at releases
    - App bundles entire backend + frontend into single ~61MB `.app`
    - Data stored in `~/Library/Application Support/BitcoinTX/btctx.db`
    - See [docs/MACOS_DESKTOP_APP.md](docs/MACOS_DESKTOP_APP.md) for complete documentation
+
+2. **Desktop App Downloads Fix**
+   - Fixed Settings page downloads (backup, CSV export, templates) not working in desktop app
+   - Added `frontend/src/utils/desktopDownload.ts` utility that detects pywebview environment
+   - Uses native file save dialog via `window.pywebview.api.save_file()` in desktop app
+   - Falls back to standard browser download for web/Docker deployment
+   - Updated `desktop/entrypoint.py` to expose `save_file` API to JavaScript
+
+3. **Lint Fixes**
+   - Removed unused `err` variables in catch blocks in `useBtcPrice.ts`
+   - Removed unused `dbStatus` variable in `Settings.tsx` (only setter was used)
 
 ### Session: 2025-01-17 (Mobile/UI)
 1. **Mobile Responsiveness Overhaul**

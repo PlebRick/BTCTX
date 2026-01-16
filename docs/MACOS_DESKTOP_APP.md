@@ -2,8 +2,8 @@
 
 > Complete documentation for building BitcoinTX as a native macOS application.
 
-**Version:** 0.6.0
-**Last Updated:** 2025-01-17
+**Version:** 0.6.1
+**Last Updated:** 2025-01-16
 **Branch:** `feature/macos-desktop`
 
 ---
@@ -267,6 +267,40 @@ Environment variables set by entrypoint.py:
 - `SECRET_KEY`: Desktop app secret key
 - `BTCTX_FRONTEND_DIST`: Path to bundled frontend dist
 
+### File Downloads (pywebview API)
+
+The desktop app exposes a JavaScript API for file downloads that bypasses browser restrictions:
+
+**entrypoint.py** exposes:
+```python
+class Api:
+    def save_file(self, filename: str, data: str, file_type: str) -> dict:
+        # Opens native macOS save dialog
+        # Returns {"success": True, "path": "/saved/path"} or {"success": False, "error": "..."}
+```
+
+**Frontend** (`desktopDownload.ts`) detects and uses this API:
+```typescript
+export function isDesktopApp(): boolean {
+    return typeof window !== 'undefined' &&
+           'pywebview' in window &&
+           window.pywebview?.api?.save_file;
+}
+
+export async function downloadFile(blob: Blob, filename: string, fileType: string) {
+    if (isDesktopApp()) {
+        // Use native save dialog via pywebview
+        const base64 = await blobToBase64(blob);
+        return window.pywebview.api.save_file(filename, base64, fileType);
+    } else {
+        // Fall back to browser download
+        // ...
+    }
+}
+```
+
+This enables Settings page downloads (backups, CSV exports, templates) to work correctly in the desktop app.
+
 ---
 
 ## Data Storage
@@ -407,6 +441,7 @@ If you add new Python packages to the backend:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.6.1 | 2025-01-17 | Fixed Settings page downloads (backup, CSV export, templates) |
 | 0.6.0 | 2025-01-17 | Initial macOS desktop app release |
 
 ---
