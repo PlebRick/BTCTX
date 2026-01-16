@@ -3,7 +3,7 @@
 > This file provides context for AI assistants (Claude, etc.) working on this project.
 > It should be updated after significant changes to maintain continuity across sessions.
 
-**Last Updated:** 2025-01-15
+**Last Updated:** 2025-01-16
 
 ---
 
@@ -190,6 +190,29 @@ git push plebrick master --tags  # Sync backup at releases
 ---
 
 ## Recent Changes (Jan 2025)
+
+### Session: 2025-01-16
+1. **CSV Template Fix**
+   - Fixed broken template that had incorrect balance math (withdrawals exceeded deposits)
+   - New template has 18 transactions (was 7) with verified balance math
+   - Includes all transaction types: Deposit, Withdrawal, Transfer, Buy, Sell
+   - Includes all deposit sources: MyBTC, Gift, Income, Interest, Reward
+   - Includes all withdrawal purposes: Spent, Gift, Donation, Lost
+   - File: `backend/services/csv_import.py`
+
+2. **CSV Import Ordering Fix**
+   - Added same-timestamp sorting: acquisitions (Deposit, Buy) process before disposals (Sell, Withdrawal)
+   - Fixes edge case where same-timestamp transactions could fail due to ordering
+   - File: `backend/services/csv_import.py`
+
+3. **CSV Export Ordering Fix**
+   - Added deterministic ordering by ID for same-timestamp transactions
+   - Ensures consistent export order across runs
+   - File: `backend/routers/backup.py`
+
+4. **Docker Image Update**
+   - Rebuilt with `--no-cache` and pushed to Docker Hub
+   - Tags: `b1ackswan/btctx:v0.5.1`, `b1ackswan/btctx:latest`
 
 ### Session: 2025-01-15
 1. **FIFO Lot Disposal Fix**
