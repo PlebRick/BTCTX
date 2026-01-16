@@ -57,7 +57,7 @@ const Settings: React.FC = () => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvPreview, setCsvPreview] = useState<CSVPreviewResponse | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [dbStatus, setDbStatus] = useState<DatabaseStatusResponse | null>(null);
+  const [, setDbStatus] = useState<DatabaseStatusResponse | null>(null);
 
   // Reused for most actions
   const getUserId = async (): Promise<number | null> => {

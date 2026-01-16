@@ -48,7 +48,7 @@ export function useBtcPrice(options: UseBtcPriceOptions = {}): UseBtcPriceReturn
       } else {
         setError('Invalid price response');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to fetch BTC price');
       setPrice(0);
     } finally {
@@ -70,7 +70,7 @@ export function useBtcPrice(options: UseBtcPriceOptions = {}): UseBtcPriceReturn
       } else {
         setError('Invalid historical price response');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to fetch historical BTC price');
       setPrice(0);
     } finally {
