@@ -42,10 +42,21 @@ All notable changes to BitcoinTX are documented in this file.
 - **Sidebar brand layout**: Changed from horizontal to vertical stack (logo above title)
 - **Logout button**: Removed lock emoji, simplified to text-only
 - **Logout link color**: Changed from dark red (#811922) to brighter red (#cf4655) to fix font rendering issue on macOS dark backgrounds
+- **Pydantic V1 → V2 Migration**: Updated all deprecated Pydantic patterns
+  - Replaced `@validator` with `@field_validator` + `@classmethod`
+  - Replaced `class Config` with `model_config = ConfigDict(...)`
+  - Replaced `orm_mode` with `from_attributes`
+  - Replaced `.from_orm()` with `.model_validate()`
+  - Replaced `.dict()` with `.model_dump()`
+  - Eliminates all Pydantic deprecation warnings
+  - Documentation: `docs/PYDANTIC_MIGRATION.md`
 
 ### Fixed
 - **Form 8949 non-taxable exclusion**: Gift, Donation, and Lost disposals now correctly excluded
 - **Proceeds degradation fix**: Fixed bug where `proceeds_usd` could degrade during recalculation
+- **None-to-Decimal conversion**: Fixed TypeError in report generation after Pydantic V2 migration
+  - `.model_dump()` includes keys with `None` values, breaking `Decimal(tx_data.get("key", default))`
+  - Changed to `Decimal(tx_data.get("key") or default)` pattern in `transaction.py`
 - **FIFO lot disposal now account-specific**: Fixed bug where selling/withdrawing BTC would consume lots from all accounts globally instead of only from the source account. This ensures correct cost basis tracking when BTC is held across multiple accounts.
 - **SPA routing in Docker**: Fixed browser refresh returning 404 on client-side routes
   - Added custom exception handler to serve `index.html` for non-API 404s
