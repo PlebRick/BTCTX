@@ -297,7 +297,7 @@ const BtcConverter: React.FC = () => {
         />
       </div>
       <div className="converter-row">
-        <label htmlFor="satsInput">Satoshi</label>
+        <label htmlFor="satsInput">Sats</label>
         <input
           id="satsInput"
           type="number"
