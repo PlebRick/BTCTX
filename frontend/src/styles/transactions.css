@@ -100,7 +100,7 @@
 /* Date heading (e.g. "Mar 15, 2025") */
 .date-heading {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--color-text-dim);
