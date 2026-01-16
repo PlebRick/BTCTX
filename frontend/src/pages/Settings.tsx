@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import api from "../api";
+import { downloadFile, isDesktopApp } from "../utils/desktopDownload";
 import "../styles/settings.css";
 
 // ApiErrorResponse is defined in types/global.d.ts
@@ -161,15 +162,18 @@ const Settings: React.FC = () => {
         responseType: "blob",
       });
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", "bitcoin_backup.btx");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      const blob = new Blob([res.data]);
+      const result = await downloadFile(blob, "bitcoin_backup.btx", "btx");
 
-      setMessage("Backup downloaded.");
+      if (result.success) {
+        if (isDesktopApp() && result.path) {
+          setMessage(`Backup saved to: ${result.path}`);
+        } else {
+          setMessage("Backup downloaded.");
+        }
+      } else if (result.error && result.error !== "Save cancelled") {
+        setMessage(`Save failed: ${result.error}`);
+      }
     } catch {
       setMessage("Failed to download backup.");
     } finally {
@@ -215,14 +219,18 @@ const Settings: React.FC = () => {
 
     try {
       const res = await api.get("/import/template", { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", "btctx_import_template.csv");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setMessage("Template downloaded.");
+      const blob = new Blob([res.data]);
+      const result = await downloadFile(blob, "btctx_import_template.csv", "csv");
+
+      if (result.success) {
+        if (isDesktopApp() && result.path) {
+          setMessage(`Template saved to: ${result.path}`);
+        } else {
+          setMessage("Template downloaded.");
+        }
+      } else if (result.error && result.error !== "Save cancelled") {
+        setMessage(`Save failed: ${result.error}`);
+      }
     } catch {
       setMessage("Failed to download template.");
     } finally {
@@ -236,14 +244,18 @@ const Settings: React.FC = () => {
 
     try {
       const res = await api.get("/import/instructions", { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", "BitcoinTX_CSV_Import_Guide.pdf");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setMessage("Instructions downloaded.");
+      const blob = new Blob([res.data]);
+      const result = await downloadFile(blob, "BitcoinTX_CSV_Import_Guide.pdf", "pdf");
+
+      if (result.success) {
+        if (isDesktopApp() && result.path) {
+          setMessage(`Instructions saved to: ${result.path}`);
+        } else {
+          setMessage("Instructions downloaded.");
+        }
+      } else if (result.error && result.error !== "Save cancelled") {
+        setMessage(`Save failed: ${result.error}`);
+      }
     } catch {
       setMessage("Failed to download instructions.");
     } finally {
@@ -257,15 +269,20 @@ const Settings: React.FC = () => {
 
     try {
       const res = await api.get("/backup/csv", { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
-      link.href = url;
+      const blob = new Blob([res.data]);
       const date = new Date().toISOString().split("T")[0];
-      link.setAttribute("download", `btctx_transactions_${date}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setMessage("CSV export downloaded.");
+      const filename = `btctx_transactions_${date}.csv`;
+      const result = await downloadFile(blob, filename, "csv");
+
+      if (result.success) {
+        if (isDesktopApp() && result.path) {
+          setMessage(`CSV export saved to: ${result.path}`);
+        } else {
+          setMessage("CSV export downloaded.");
+        }
+      } else if (result.error && result.error !== "Save cancelled") {
+        setMessage(`Save failed: ${result.error}`);
+      }
     } catch {
       setMessage("Failed to export CSV.");
     } finally {

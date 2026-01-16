@@ -12,6 +12,7 @@ import socket
 import threading
 import time
 import logging
+import base64
 from pathlib import Path
 
 # Setup logging before any other imports
@@ -20,6 +21,31 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("BitcoinTX")
+
+
+def extend_path_for_homebrew():
+    """
+    Extend PATH to include common Homebrew installation directories.
+
+    PyInstaller bundles don't inherit the full system PATH, so pdftk
+    (installed via Homebrew) won't be found. This must be called BEFORE
+    importing any backend modules that use pdftk.
+    """
+    homebrew_paths = [
+        "/opt/homebrew/bin",  # Apple Silicon
+        "/usr/local/bin",      # Intel Mac
+    ]
+
+    current_path = os.environ.get("PATH", "")
+    path_parts = current_path.split(os.pathsep) if current_path else []
+
+    # Prepend Homebrew paths if not already present
+    for hp in reversed(homebrew_paths):
+        if hp not in path_parts:
+            path_parts.insert(0, hp)
+
+    os.environ["PATH"] = os.pathsep.join(path_parts)
+    logger.info(f"Extended PATH for Homebrew: {os.environ['PATH']}")
 
 
 def get_application_support_dir() -> Path:
@@ -84,8 +110,83 @@ def wait_for_backend(port: int, timeout: float = 30.0) -> bool:
 
 def check_pdftk_available() -> bool:
     """Check if pdftk is installed and available."""
-    import shutil
-    return shutil.which("pdftk") is not None
+    from backend.services.reports.pdftk_path import is_pdftk_available
+    return is_pdftk_available()
+
+
+class DesktopAPI:
+    """
+    Python API exposed to JavaScript via pywebview's js_api.
+
+    Provides native desktop functionality like file save dialogs
+    that aren't available in the WebKit renderer.
+    """
+
+    def __init__(self):
+        self._window = None
+
+    def set_window(self, window):
+        """Set the pywebview window reference."""
+        self._window = window
+
+    def is_desktop(self) -> bool:
+        """Check if running in desktop mode (always True for this API)."""
+        return True
+
+    def save_file(self, filename: str, data_base64: str, file_type: str = "pdf") -> dict:
+        """
+        Save a file using native macOS save dialog.
+
+        Args:
+            filename: Suggested filename for the save dialog
+            data_base64: Base64-encoded file content
+            file_type: File type for the filter (pdf, csv)
+
+        Returns:
+            dict with keys:
+                - success: bool
+                - path: str (if success)
+                - error: str (if not success)
+        """
+        import webview
+
+        try:
+            # Decode base64 data
+            file_data = base64.b64decode(data_base64)
+
+            # Configure file type filters
+            if file_type.lower() == "csv":
+                file_types = ("CSV Files (*.csv)", "All files (*.*)")
+            elif file_type.lower() == "btx":
+                file_types = ("BitcoinTX Backup (*.btx)", "All files (*.*)")
+            else:
+                file_types = ("PDF Files (*.pdf)", "All files (*.*)")
+
+            # Show native save dialog
+            save_path = webview.windows[0].create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename=filename,
+                file_types=file_types,
+            )
+
+            if save_path:
+                # save_path is a tuple for SAVE_DIALOG, get the first element
+                if isinstance(save_path, (list, tuple)):
+                    save_path = save_path[0]
+
+                # Write the file
+                with open(save_path, "wb") as f:
+                    f.write(file_data)
+
+                logger.info(f"File saved to: {save_path}")
+                return {"success": True, "path": save_path}
+            else:
+                # User cancelled the dialog
+                return {"success": False, "error": "Save cancelled"}
+
+        except Exception as e:
+            logger.error(f"Failed to save file: {e}")
+            return {"success": False, "error": str(e)}
 
 
 def run_backend(port: int):
@@ -103,6 +204,10 @@ def run_backend(port: int):
 
 def main():
     """Main entry point for the desktop application."""
+    # IMPORTANT: Extend PATH for Homebrew FIRST, before any backend imports
+    # This ensures pdftk can be found in PyInstaller bundles
+    extend_path_for_homebrew()
+
     import webview
 
     # Set up data directory
@@ -144,7 +249,10 @@ def main():
         logger.error("Failed to start backend")
         sys.exit(1)
 
-    # Create the webview window
+    # Create the desktop API for pywebview
+    api = DesktopAPI()
+
+    # Create the webview window with the API
     window = webview.create_window(
         title="BitcoinTX",
         url=f"http://127.0.0.1:{port}/",
@@ -153,7 +261,11 @@ def main():
         min_size=(800, 600),
         resizable=True,
         confirm_close=False,
+        js_api=api,
     )
+
+    # Store window reference in the API
+    api.set_window(window)
 
     # Show pdftk warning after window loads (if needed)
     def on_loaded():
