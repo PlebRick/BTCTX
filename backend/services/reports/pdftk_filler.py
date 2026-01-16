@@ -5,6 +5,8 @@ import tempfile
 import os
 import logging
 
+from backend.services.reports.pdftk_path import get_pdftk_path
+
 logger = logging.getLogger(__name__)
 
 def generate_fdf(field_data: dict) -> str:
@@ -57,11 +59,14 @@ def fill_pdf_with_pdftk(template_path: str, field_data: dict) -> bytes:
         pdf_bytes = fill_pdf_with_pdftk("Form_8949_Fillable_2024.pdf", fields)
         # => PDF with fields filled and flattened
     """
+    # Get the resolved pdftk path (handles PyInstaller bundles)
+    pdftk_bin = get_pdftk_path()
+
     with tempfile.TemporaryDirectory() as tmpdir:
         # 1) Force removing XFA to ensure an AcroForm
         no_xfa_path = os.path.join(tmpdir, "no_xfa.pdf")
         cmd_drop = [
-            "pdftk",
+            pdftk_bin,
             template_path,
             "output",
             no_xfa_path,
@@ -80,7 +85,7 @@ def fill_pdf_with_pdftk(template_path: str, field_data: dict) -> bytes:
         # 3) Fill form & flatten
         filled_path = os.path.join(tmpdir, "filled_form.pdf")
         cmd_fill = [
-            "pdftk",
+            pdftk_bin,
             no_xfa_path,
             "fill_form",
             fdf_path,

@@ -1,15 +1,17 @@
 # FILE: backend/services/reports/pdf_utils.py
 
 import subprocess
-import uuid
+import tempfile
 import os
+
+from backend.services.reports.pdftk_path import get_pdftk_path
 
 # -----------------------------------------------------------------------------
 # (DEPRECATED) Old Ghostscript flattening method
 # -----------------------------------------------------------------------------
 # def flatten_pdf_with_ghostscript(pdf_bytes: bytes) -> bytes:
 #     """
-#     (DEPRECATED) Flatten PDF via Ghostscript. 
+#     (DEPRECATED) Flatten PDF via Ghostscript.
 #     No longer used now that we rely on pdftk for XFA forms.
 #     """
 #     ...
@@ -25,19 +27,21 @@ def flatten_pdf_with_pdftk(pdf_bytes: bytes) -> bytes:
       1) Write the PDF bytes to a temp file.
       2) Call 'pdftk input.pdf output output.pdf flatten'.
       3) Return the flattened PDF as bytes.
-      4) Remove temp files.
+      4) Cleanup is automatic via TemporaryDirectory.
     """
-    random_id = uuid.uuid4().hex
-    input_pdf = f"/tmp/original_{random_id}.pdf"
-    flattened_pdf = f"/tmp/flattened_{random_id}.pdf"
+    # Get the resolved pdftk path (handles PyInstaller bundles)
+    pdftk_bin = get_pdftk_path()
 
-    # 1) Write the original PDF bytes to disk
-    with open(input_pdf, "wb") as f:
-        f.write(pdf_bytes)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        input_pdf = os.path.join(tmpdir, "original.pdf")
+        flattened_pdf = os.path.join(tmpdir, "flattened.pdf")
 
-    try:
+        # 1) Write the original PDF bytes to disk
+        with open(input_pdf, "wb") as f:
+            f.write(pdf_bytes)
+
         # 2) Run pdftk to flatten
-        cmd = ["pdftk", input_pdf, "output", flattened_pdf, "flatten"]
+        cmd = [pdftk_bin, input_pdf, "output", flattened_pdf, "flatten"]
         subprocess.run(cmd, check=True)
 
         # 3) Read the flattened output
@@ -45,10 +49,3 @@ def flatten_pdf_with_pdftk(pdf_bytes: bytes) -> bytes:
             final_bytes = f.read()
 
         return final_bytes
-
-    finally:
-        # 4) Always delete temp files to avoid leftover artifacts
-        if os.path.exists(input_pdf):
-            os.remove(input_pdf)
-        if os.path.exists(flattened_pdf):
-            os.remove(flattened_pdf)
