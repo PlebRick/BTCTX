@@ -23,7 +23,7 @@ FIFO acquisitions/disposals are in BitcoinLot and LotDisposal schemas.
 from __future__ import annotations
 
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -248,8 +248,7 @@ class TransactionRead(TransactionBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True  # Enables ORM-to-Pydantic conversion
+    model_config = ConfigDict(from_attributes=True)  # Enables ORM-to-Pydantic conversion
 
 # -------------------------------------------------
 # LEDGER ENTRY SCHEMAS
@@ -284,8 +283,7 @@ class LedgerEntryRead(LedgerEntryBase):
     """
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # -------------------------------------------------
 # BITCOIN LOT SCHEMAS
@@ -344,8 +342,7 @@ class BitcoinLotRead(BitcoinLotBase):
     created_txn_id: int
     acquired_date: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # -------------------------------------------------
 # LOT DISPOSAL SCHEMAS
@@ -395,5 +392,4 @@ class LotDisposalRead(LotDisposalBase):
     disposal_basis_usd: Optional[Decimal] = None
     proceeds_usd_for_that_portion: Optional[Decimal] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

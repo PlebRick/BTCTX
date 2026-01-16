@@ -53,8 +53,8 @@ def _attach_utc_and_build_read_model(tx) -> TransactionRead:
     """
 
     # 1) Convert to Pydantic
-    pyd_model = TransactionRead.from_orm(tx)
-    data = pyd_model.dict()
+    pyd_model = TransactionRead.model_validate(tx)
+    data = pyd_model.model_dump()
 
     # 2) Turn any '+00:00' suffix into 'Z'
     for field in ["timestamp", "created_at", "updated_at"]:
@@ -114,7 +114,7 @@ def create_transaction(tx: TransactionCreate, db: Session = Depends(get_db)):
         4) Runs the double-entry balance check (if both sides are internal).
     - Returns the newly created Transaction with an 'id'.
     """
-    tx_data = tx.dict()
+    tx_data = tx.model_dump()
     new_tx = tx_service.create_transaction_record(tx_data, db)
     if not new_tx:
         raise HTTPException(status_code=400, detail="Transaction creation failed.")
@@ -130,7 +130,7 @@ def update_transaction(transaction_id: int, tx: TransactionUpdate, db: Session =
       if the user changed critical fields like amount or type.
     - If the transaction is locked or nonexistent, return 404 or 400.
     """
-    tx_data = tx.dict(exclude_unset=True)
+    tx_data = tx.model_dump(exclude_unset=True)
     updated_tx = tx_service.update_transaction_record(transaction_id, tx_data, db)
     if not updated_tx:
         raise HTTPException(status_code=404, detail="Transaction not found or is locked.")
