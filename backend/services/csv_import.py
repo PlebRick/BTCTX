@@ -642,8 +642,14 @@ def execute_import(db: Session, transactions: List[Dict[str, Any]]) -> int:
     Raises:
         Exception on failure (all transactions rolled back)
     """
-    # Sort by timestamp to ensure FIFO is calculated correctly
-    sorted_txns = sorted(transactions, key=lambda x: x["timestamp"])
+    # Sort by timestamp, then by type to ensure FIFO is calculated correctly
+    # Type ordering ensures acquisitions (Deposit, Buy) are processed before
+    # disposals (Sell, Withdrawal), with Transfers in the middle
+    TYPE_ORDER = {"Deposit": 0, "Buy": 1, "Transfer": 2, "Sell": 3, "Withdrawal": 4}
+    sorted_txns = sorted(
+        transactions,
+        key=lambda x: (x["timestamp"], TYPE_ORDER.get(x["type"], 99))
+    )
 
     imported_count = 0
 
@@ -667,6 +673,13 @@ def generate_template_csv() -> str:
     """
     Generate a CSV template with headers and sample rows.
 
+    Includes at least one of each:
+    - Transaction type: Deposit, Withdrawal, Transfer, Buy, Sell
+    - Deposit source: MyBTC, Gift, Income, Interest, Reward (and blank/N/A)
+    - Withdrawal purpose: Spent, Gift, Donation, Lost
+
+    Balance math is verified to work correctly.
+
     Returns:
         CSV content as a string
     """
@@ -680,41 +693,116 @@ def generate_template_csv() -> str:
         "source", "purpose", "notes"
     ])
 
-    # Sample rows (one per type + extras)
+    # === USD SETUP ===
+    # Deposit USD to Bank
     writer.writerow([
-        "2024-01-15T10:30:00Z", "Buy", "0.012", "Exchange USD", "Exchange BTC",
-        "500.00", "", "5.00", "USD",
-        "", "", "Example: Bought BTC on exchange"
+        "2024-01-01T10:00:00Z", "Deposit", "20000.00", "External", "Bank",
+        "", "", "", "",
+        "", "", "Initial USD deposit to bank"
+    ])
+    # Transfer USD from Bank to Exchange
+    writer.writerow([
+        "2024-01-02T10:00:00Z", "Transfer", "20000.00", "Bank", "Exchange USD",
+        "", "", "", "",
+        "", "", "Move USD to exchange for trading"
+    ])
+
+    # === BUY BTC ===
+    writer.writerow([
+        "2024-01-03T10:00:00Z", "Buy", "0.5", "Exchange USD", "Exchange BTC",
+        "10000.00", "", "50.00", "USD",
+        "", "", "Buy 0.5 BTC at $20k/BTC with $50 fee"
+    ])
+
+    # === BTC DEPOSITS (all sources) ===
+    writer.writerow([
+        "2024-01-10T10:00:00Z", "Deposit", "1.0", "External", "Wallet",
+        "20000.00", "", "", "",
+        "MyBTC", "", "Transfer from my own cold storage"
     ])
     writer.writerow([
-        "2024-01-20T14:00:00Z", "Deposit", "0.5", "External", "Wallet",
-        "21000.00", "", "", "",
-        "Income", "", "Example: Received payment in BTC"
-    ])
-    writer.writerow([
-        "2024-01-25T08:00:00Z", "Deposit", "0.05", "External", "Wallet",
+        "2024-01-15T10:00:00Z", "Deposit", "0.1", "External", "Wallet",
         "0", "", "", "",
-        "Gift", "", "Example: Received BTC as gift (no cost basis)"
+        "Gift", "", "BTC received as birthday gift (no cost basis)"
     ])
     writer.writerow([
-        "2024-02-01T09:00:00Z", "Transfer", "0.4", "Wallet", "Exchange BTC",
+        "2024-01-20T10:00:00Z", "Deposit", "0.05", "External", "Wallet",
+        "2500.00", "", "", "",
+        "Income", "", "Payment received for freelance work"
+    ])
+    writer.writerow([
+        "2024-01-25T10:00:00Z", "Deposit", "0.02", "External", "Wallet",
+        "1000.00", "", "", "",
+        "Interest", "", "Interest earned from lending"
+    ])
+    writer.writerow([
+        "2024-01-30T10:00:00Z", "Deposit", "0.01", "External", "Wallet",
+        "500.00", "", "", "",
+        "Reward", "", "Mining or staking reward"
+    ])
+    writer.writerow([
+        "2024-01-31T10:00:00Z", "Deposit", "0.02", "External", "Wallet",
+        "1000.00", "", "", "",
+        "", "", "BTC deposit with no specific source"
+    ])
+
+    # === BTC TRANSFERS ===
+    # Wallet to Exchange
+    writer.writerow([
+        "2024-02-01T10:00:00Z", "Transfer", "0.5", "Wallet", "Exchange BTC",
         "", "", "0.0001", "BTC",
-        "", "", "Example: Moved BTC to exchange"
+        "", "", "Move BTC to exchange for trading"
+    ])
+
+    # === SELL BTC ===
+    writer.writerow([
+        "2024-02-10T10:00:00Z", "Sell", "0.3", "Exchange BTC", "Exchange USD",
+        "", "18000.00", "10.00", "USD",
+        "", "", "Sell 0.3 BTC for $18,000 with $10 fee"
+    ])
+
+    # === USD TRANSFER BACK ===
+    writer.writerow([
+        "2024-02-15T10:00:00Z", "Transfer", "15000.00", "Exchange USD", "Bank",
+        "", "", "", "",
+        "", "", "Move profits back to bank"
+    ])
+
+    # === BTC TRANSFER BACK ===
+    # Exchange to Wallet
+    writer.writerow([
+        "2024-02-20T10:00:00Z", "Transfer", "0.2", "Exchange BTC", "Wallet",
+        "", "", "0.0001", "BTC",
+        "", "", "Move BTC to wallet for cold storage"
+    ])
+
+    # === USD WITHDRAWAL ===
+    writer.writerow([
+        "2024-03-01T10:00:00Z", "Withdrawal", "5000.00", "Bank", "External",
+        "", "", "", "",
+        "", "", "USD withdrawal for expenses"
+    ])
+
+    # === BTC WITHDRAWALS (all purposes) ===
+    writer.writerow([
+        "2024-03-10T10:00:00Z", "Withdrawal", "0.15", "Wallet", "External",
+        "", "9000.00", "0.0001", "BTC",
+        "", "Spent", "Spent BTC on purchase (taxable event)"
     ])
     writer.writerow([
-        "2024-02-15T11:30:00Z", "Sell", "0.3", "Exchange BTC", "Exchange USD",
-        "", "15000.00", "10.00", "USD",
-        "", "", "Example: Sold BTC on exchange"
+        "2024-03-15T10:00:00Z", "Withdrawal", "0.1", "Wallet", "External",
+        "", "", "0.0001", "BTC",
+        "", "Gift", "Gifted BTC to family (non-taxable for giver)"
     ])
     writer.writerow([
-        "2024-03-01T16:00:00Z", "Withdrawal", "0.1", "Wallet", "External",
-        "", "", "0.00005", "BTC",
-        "", "Gift", "Example: Sent BTC as gift"
+        "2024-03-20T10:00:00Z", "Withdrawal", "0.05", "Wallet", "External",
+        "", "", "0.0001", "BTC",
+        "", "Donation", "Donated BTC to charity (non-taxable)"
     ])
     writer.writerow([
-        "2024-03-10T12:00:00Z", "Withdrawal", "0.05", "Wallet", "External",
-        "", "2500.00", "0.00002", "BTC",
-        "", "Spent", "Example: Spent BTC on purchase"
+        "2024-03-25T10:00:00Z", "Withdrawal", "0.03", "Wallet", "External",
+        "", "", "", "",
+        "", "Lost", "Lost access to BTC (capital loss)"
     ])
 
     return output.getvalue()

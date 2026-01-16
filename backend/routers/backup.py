@@ -117,8 +117,12 @@ def export_transactions_csv(
     """
     _require_auth(request)
 
-    # Query all transactions ordered by timestamp
-    transactions = db.query(Transaction).order_by(Transaction.timestamp.asc()).all()
+    # Query all transactions ordered by timestamp, then by ID for deterministic ordering
+    # This ensures consistent export order for same-timestamp transactions
+    transactions = db.query(Transaction).order_by(
+        Transaction.timestamp.asc(),
+        Transaction.id.asc()
+    ).all()
 
     # Build CSV content
     output = io.StringIO()
