@@ -17,6 +17,7 @@ function localDatetimeToIso(localDatetime: string): string {
 }
 
 // Hardcoded account IDs
+const BANK_ID = 1;
 const EXTERNAL_ID = 99;
 const EXCHANGE_USD_ID = 3;
 const EXCHANGE_BTC_ID = 4;
@@ -57,7 +58,7 @@ function mapDoubleEntryAccounts(data: TransactionFormData): IAccountMapping {
       };
     case "Buy":
       return {
-        from_account_id: EXCHANGE_USD_ID,
+        from_account_id: data.buyFromAccount === "Bank" ? BANK_ID : EXCHANGE_USD_ID,
         to_account_id: EXCHANGE_BTC_ID,
       };
     case "Sell":
@@ -154,13 +155,17 @@ function mapTransactionToFormData(tx: ITransaction): TransactionFormData {
             : tx.amount,
       };
     }
-    case "Buy":
+    case "Buy": {
+      // Determine if Buy was from Bank (ID 1) or Exchange USD (ID 3)
+      const buyFromAccount = tx.from_account_id === 1 ? "Bank" : "Exchange";
       return {
         ...baseData,
         account: "Exchange",
+        buyFromAccount,
         amountUSD: tx.cost_basis_usd ?? 0,
         amountBTC: tx.amount,
       };
+    }
     case "Sell":
       return {
         ...baseData,
@@ -210,6 +215,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
       // NEW: Initialize "grossProceedsUSD"
       grossProceedsUSD: 0,
+
+      // Default for Buy transactions: Exchange USD
+      buyFromAccount: "Exchange",
     },
   });
 
@@ -252,6 +260,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
         proceeds_usd: 0,
         fmv_usd: 0,
         grossProceedsUSD: 0,
+        buyFromAccount: "Exchange",
       });
       setCurrentType("");
     }
@@ -349,6 +358,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       proceeds_usd: 0,
       fmv_usd: 0,
       grossProceedsUSD: 0,
+      buyFromAccount: "Exchange",
     });
   };
 
@@ -962,16 +972,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
       case "Buy": {
         return (
           <>
-            {/* Account is always Exchange */}
+            {/* Source Account: Bank or Exchange */}
             <div className="form-group">
-              <label>Account:</label>
-              <input
-                type="text"
+              <label>From Account:</label>
+              <select
                 className="form-control"
-                value="Exchange"
-                {...register("account")}
-                readOnly
-              />
+                {...register("buyFromAccount", { required: true })}
+              >
+                <option value="Exchange">Exchange USD</option>
+                <option value="Bank">Bank (auto-buy)</option>
+              </select>
+              <small className="form-hint">
+                Select where the USD is coming from.
+              </small>
             </div>
 
             {/* Amount USD */}

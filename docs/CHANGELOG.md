@@ -2,6 +2,35 @@
 
 All notable changes to BitcoinTX are documented in this file.
 
+## [Unreleased] - Buy from Bank Feature
+
+> **Rollback Tags:** If issues arise with this feature, rollback to these tags:
+> - `pre-bank-buy` - develop branch before merge
+> - `pre-bank-buy-master` - master branch before merge
+>
+> ```bash
+> # To rollback develop:
+> git checkout develop && git reset --hard pre-bank-buy && git push --force origin develop
+> # To rollback master:
+> git checkout master && git reset --hard pre-bank-buy-master && git push --force origin master
+> ```
+
+### Added
+- **Buy from Bank**: Buy transactions can now originate from Bank account (auto-buy support)
+  - New "From Account" dropdown in Buy form: Exchange USD (default) or Bank (auto-buy)
+  - CSV import accepts `Bank` as source for Buy transactions
+  - FIFO cost basis tracking works correctly - lots land in Exchange BTC pool regardless of USD source
+  - Backend validation relaxed to allow `from_account = Bank (1) OR Exchange USD (3)`
+  - 5 new tests in `TestBuyFromBank` class covering basic flow, FIFO order, CSV import, backward compatibility
+  - Documentation: `docs/BUY_FROM_BANK_FEATURE.md`
+
+### Technical Notes
+- **Risk Level:** LOW - FIFO logic uses `to_account_id` (unchanged), not `from_account_id`
+- **Backward Compatible:** Existing Buy transactions and CSVs continue to work unchanged
+- **Files Modified:** `transaction.py`, `csv_import.py`, `TransactionForm.tsx`, `global.d.ts`, `test_stress_and_forms.py`
+
+---
+
 ## [v0.5.3] - 2025-01-17 - Comprehensive Test Suite & Desktop Fixes
 
 ### Added
