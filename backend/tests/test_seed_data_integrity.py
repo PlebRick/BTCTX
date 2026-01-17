@@ -1,7 +1,10 @@
 import sys
+import pytest
+import requests
 from pathlib import Path
 from decimal import Decimal
 from collections import defaultdict
+from datetime import datetime, timezone
 from sqlalchemy import func
 
 # Add project root for absolute imports
@@ -14,37 +17,117 @@ from backend.database import SessionLocal
 from backend.models.transaction import Transaction, LedgerEntry, BitcoinLot, LotDisposal
 from backend.models.account import Account
 
-db = SessionLocal()
+# API configuration for creating test data
+BASE_URL = "http://127.0.0.1:8000"
+TRANSACTIONS_URL = f"{BASE_URL}/api/transactions"
+
+
+def _ensure_test_data_exists(db):
+    """
+    Ensure database has minimal test data for integrity tests.
+    Creates transactions via API if database is empty.
+    Uses all main accounts to ensure non-zero balances.
+    """
+    tx_count = db.query(Transaction).count()
+    if tx_count > 0:
+        return  # Data already exists
+
+    # Create minimal test data via API (to trigger proper FIFO/ledger logic)
+    def build_ts(year, month, day):
+        dt = datetime(year, month, day, 12, 0, 0, tzinfo=timezone.utc)
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # 1. Deposit USD to Bank (ensures Bank has balance)
+    requests.post(TRANSACTIONS_URL, json={
+        "type": "Deposit",
+        "timestamp": build_ts(2024, 1, 1),
+        "from_account_id": 99,
+        "to_account_id": 1,  # Bank
+        "amount": "100000",
+        "is_income": False,
+    })
+
+    # 2. Transfer USD from Bank to Exchange (uses Bank)
+    requests.post(TRANSACTIONS_URL, json={
+        "type": "Transfer",
+        "timestamp": build_ts(2024, 1, 5),
+        "from_account_id": 1,  # Bank
+        "to_account_id": 3,    # Exchange USD
+        "amount": "50000",
+    })
+
+    # 3. Buy BTC
+    requests.post(TRANSACTIONS_URL, json={
+        "type": "Buy",
+        "timestamp": build_ts(2024, 2, 1),
+        "from_account_id": 3,  # Exchange USD
+        "to_account_id": 4,   # Exchange BTC
+        "amount": "1.0",
+        "cost_basis_usd": "40000",
+    })
+
+    # 4. Transfer BTC with fee (creates disposal for fee, moves to Wallet)
+    requests.post(TRANSACTIONS_URL, json={
+        "type": "Transfer",
+        "timestamp": build_ts(2024, 3, 1),
+        "from_account_id": 4,  # Exchange BTC
+        "to_account_id": 2,    # Wallet
+        "amount": "0.5",
+        "fee_amount": "0.0001",
+        "fee_currency": "BTC",
+    })
+
+    # 5. Sell BTC (creates disposal)
+    requests.post(TRANSACTIONS_URL, json={
+        "type": "Sell",
+        "timestamp": build_ts(2024, 4, 1),
+        "from_account_id": 4,  # Exchange BTC
+        "to_account_id": 3,    # Exchange USD
+        "amount": "0.25",
+        "proceeds_usd": "15000",
+    })
+
+    # Refresh database session to see new data
+    db.expire_all()
+
+
+@pytest.fixture(scope="module")
+def db_session():
+    """Provide a database session with test data."""
+    db = SessionLocal()
+    _ensure_test_data_exists(db)
+    yield db
+    db.close()
 
 # ----------------------------
 # Test 1: Core Account IDs
 # ----------------------------
-def test_accounts_exist():
-    ids = [acct.id for acct in db.query(Account).all()]
+def test_accounts_exist(db_session):
+    ids = [acct.id for acct in db_session.query(Account).all()]
     for expected_id in [1, 2, 3, 4, 5, 6]:
         assert expected_id in ids, f"Missing Account ID={expected_id}"
 
 # ----------------------------
 # Test 2: Transaction Count
 # ----------------------------
-def test_transaction_count():
-    txs = db.query(Transaction).all()
+def test_transaction_count(db_session):
+    txs = db_session.query(Transaction).all()
     # Just verify there are transactions in the database (count varies based on test runs)
     assert len(txs) >= 1, f"Expected at least 1 transaction, found {len(txs)}"
 
 # ----------------------------
 # Test 3: BitcoinLots for BTC-acquiring Deposits/Buys
 # ----------------------------
-def test_bitcoin_lots_created():
-    txs = db.query(Transaction).all()
+def test_bitcoin_lots_created(db_session):
+    txs = db_session.query(Transaction).all()
     btc_deposits_or_buys = []
     for tx in txs:
         if tx.type in ("Deposit", "Buy"):
-            to_acct = db.get(Account, tx.to_account_id)
+            to_acct = db_session.get(Account, tx.to_account_id)
             if to_acct and to_acct.currency == "BTC":
                 btc_deposits_or_buys.append(tx.id)
 
-    lots = db.query(BitcoinLot).all()
+    lots = db_session.query(BitcoinLot).all()
     lot_tx_ids = [lot.created_txn_id for lot in lots]
     missing = [txid for txid in btc_deposits_or_buys if txid not in lot_tx_ids]
     assert not missing, f"Missing BitcoinLots for Deposit/Buy BTC transactions: {missing}"
@@ -52,17 +135,17 @@ def test_bitcoin_lots_created():
 # ----------------------------
 # Test 4: FIFO Lots and Disposals Exist
 # ----------------------------
-def test_fifo_lot_tracking():
-    lots = db.query(BitcoinLot).all()
-    disposals = db.query(LotDisposal).all()
+def test_fifo_lot_tracking(db_session):
+    lots = db_session.query(BitcoinLot).all()
+    disposals = db_session.query(LotDisposal).all()
     assert lots, "Expected at least one BitcoinLot"
     assert disposals, "Expected at least one LotDisposal"
 
 # ----------------------------
 # Test 5: FMV Rules on Non-Sale Withdrawals
 # ----------------------------
-def test_fmv_logic_present_for_non_sale_withdrawals():
-    withdrawals = db.query(Transaction).filter(Transaction.type == "Withdrawal").all()
+def test_fmv_logic_present_for_non_sale_withdrawals(db_session):
+    withdrawals = db_session.query(Transaction).filter(Transaction.type == "Withdrawal").all()
     for tx in withdrawals:
         if tx.purpose in ("Gift", "Donation", "Lost"):
             # proceeds_usd should be None or 0 for non-sale withdrawals
@@ -76,16 +159,16 @@ def test_fmv_logic_present_for_non_sale_withdrawals():
 # ----------------------------
 # Test 6: No Negative Lot Balances
 # ----------------------------
-def test_no_negative_lot_balances():
-    broken = db.query(BitcoinLot).filter(BitcoinLot.remaining_btc < 0).all()
+def test_no_negative_lot_balances(db_session):
+    broken = db_session.query(BitcoinLot).filter(BitcoinLot.remaining_btc < 0).all()
     assert not broken, "One or more lots have negative remaining_btc!"
 
 # ----------------------------
 # Test 7: Ledger Entry Count and Per-Tx Match
 # ----------------------------
-def test_ledger_entries_exist():
-    txs = db.query(Transaction).all()
-    total_ledger = db.query(LedgerEntry).count()
+def test_ledger_entries_exist(db_session):
+    txs = db_session.query(Transaction).all()
+    total_ledger = db_session.query(LedgerEntry).count()
 
     def expected_entries(tx):
         fee = float(tx.fee_amount or 0)
@@ -112,9 +195,9 @@ def test_ledger_entries_exist():
 # ----------------------------
 # Test 8: Account Ledger Balances
 # ----------------------------
-def test_account_balances_non_null():
-    accounts = db.query(Account).all()
-    ledger_entries = db.query(LedgerEntry).all()
+def test_account_balances_non_null(db_session):
+    accounts = db_session.query(Account).all()
+    ledger_entries = db_session.query(LedgerEntry).all()
     balances = defaultdict(float)
 
     for entry in ledger_entries:
@@ -132,16 +215,16 @@ def test_account_balances_non_null():
 # ----------------------------
 # Test 9: No Locked Transactions
 # ----------------------------
-def test_locked_flag_respected():
-    locked = db.query(Transaction).filter_by(is_locked=True).count()
+def test_locked_flag_respected(db_session):
+    locked = db_session.query(Transaction).filter_by(is_locked=True).count()
     assert locked == 0, f"{locked} transactions are unexpectedly locked."
 
 # ----------------------------
 # Test 10: LotDisposal vs BTC Amount Consistency
 # ----------------------------
-def test_disposal_amount_matches_transaction():
-    txs = db.query(Transaction).all()
-    all_disposals = db.query(LotDisposal).all()
+def test_disposal_amount_matches_transaction(db_session):
+    txs = db_session.query(Transaction).all()
+    all_disposals = db_session.query(LotDisposal).all()
     tx_disposals = defaultdict(list)
 
     for disp in all_disposals:
@@ -150,7 +233,20 @@ def test_disposal_amount_matches_transaction():
     problems = []
 
     for tx in txs:
+        # Skip non-disposal transaction types
         if tx.type not in ("Sell", "Withdrawal", "Transfer"):
+            continue
+
+        # Check if this transaction involves BTC
+        from_acct = db_session.get(Account, tx.from_account_id)
+        fee_btc = float(tx.fee_amount or 0) if (tx.fee_currency or "").upper() == "BTC" else 0.0
+
+        # Determine if this transaction should have disposals
+        is_btc_sell_or_withdrawal = tx.type in ("Sell", "Withdrawal") and from_acct and from_acct.currency == "BTC"
+        is_btc_fee_transfer = tx.type == "Transfer" and fee_btc > 0
+
+        if not is_btc_sell_or_withdrawal and not is_btc_fee_transfer:
+            # USD transfers or transfers with no BTC fee don't need disposals
             continue
 
         if tx.id not in tx_disposals:
@@ -158,7 +254,6 @@ def test_disposal_amount_matches_transaction():
             continue
 
         total_disposed = sum(float(d.disposed_btc) for d in tx_disposals[tx.id])
-        fee_btc = float(tx.fee_amount or 0) if (tx.fee_currency or "").upper() == "BTC" else 0.0
 
         # Compute expected disposal amount
         if tx.type in ("Sell", "Withdrawal"):
@@ -170,9 +265,3 @@ def test_disposal_amount_matches_transaction():
             problems.append((tx.id, f"Disposed {total_disposed}, expected {expected_disposal}"))
 
     assert not problems, f"LotDisposal mismatch: {problems}"
-
-# ----------------------------
-# Final Teardown
-# ----------------------------
-def teardown_module(module):
-    db.close()
