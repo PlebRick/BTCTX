@@ -2,6 +2,24 @@
 
 All notable changes to BitcoinTX are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **PDF Content Verification Test Suite**: `backend/tests/test_pdf_content.py` with 23 new tests
+  - Uses `pypdf` to extract and verify actual PDF content, not just file generation
+  - Complete Tax Report tests: year, sections, capital gains, ending balance, income, long/short-term
+  - IRS Form tests: Schedule D present, Form 8949, proceeds, tax year, long-term section, page count
+  - Transaction History tests: CSV headers, transaction data, types, PDF content
+  - Edge case tests: empty year, large amounts ($7.5M), small BTC precision (0.00012345), same-day sales
+  - Data accuracy tests: gain calculation, FIFO cost basis tracking, income totals
+  - Total pytest tests: **158** (was 135)
+
+### Fixed
+- **test_seed_data_integrity.py**: Made tests self-contained with fixture that creates test data if database is empty
+- **Disposal test logic**: Fixed to correctly skip USD transfers (only BTC transfers require lot disposals)
+
+---
+
 ## [v0.5.5] - 2025-01-17 - Transaction Edit Fix
 
 ### Fixed
