@@ -21,6 +21,7 @@ from backend.services.transaction import create_transaction_record
 from backend.schemas.csv_import import CSVRowPreview, CSVParseError
 from backend.constants import (
     ACCOUNT_NAME_TO_ID,
+    ACCOUNT_BANK,
     ACCOUNT_WALLET,
     ACCOUNT_EXCHANGE_USD,
     ACCOUNT_EXCHANGE_BTC,
@@ -498,11 +499,11 @@ def _validate_accounts_for_type(
             ))
 
     elif tx_type == "Buy":
-        if from_id != ACCOUNT_EXCHANGE_USD:
+        if from_id not in (ACCOUNT_BANK, ACCOUNT_EXCHANGE_USD):
             errors.append(CSVParseError(
                 row_number=row_number,
                 column="from_account",
-                message="Buy must have from_account = 'Exchange USD'.",
+                message="Buy must have from_account = 'Bank' or 'Exchange USD'.",
                 severity="error"
             ))
         if to_id != ACCOUNT_EXCHANGE_BTC:
