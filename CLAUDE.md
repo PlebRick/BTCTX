@@ -172,12 +172,27 @@ LotDisposal (FIFO consumption record)
 ## Git Workflow & Versioning
 
 ### Remotes
-| Remote | Repo | Push Frequency |
-|--------|------|----------------|
-| `origin` | BitcoinTX-org/BTCTX | Every commit during development |
-| `plebrick` | PlebRick/BTCTX | **Only at stable milestones/releases** |
+| Remote | Repo | Purpose |
+|--------|------|---------|
+| `origin` | BitcoinTX-org/BTCTX-org | Organization repo |
+| `plebrick` | PlebRick/BTCTX | Personal backup repo |
 
-**IMPORTANT:** Do NOT push to `plebrick` automatically. Only sync when explicitly requested or at tagged releases.
+**IMPORTANT: Keep Both Repos in Perfect Sync**
+
+These two repos must always be identical. When releasing:
+1. Push branches to BOTH remotes: `git push origin <branch> && git push plebrick <branch>`
+2. Push tags to BOTH remotes: `git push origin --tags && git push plebrick --tags`
+3. Create GitHub releases on BOTH repos with identical content
+4. Upload release assets (DMG, etc.) to BOTH repos
+
+```bash
+# Release checklist:
+git push origin master --tags && git push plebrick master --tags
+gh release create vX.Y.Z --repo BitcoinTX-org/BTCTX-org --title "..." --notes "..."
+gh release create vX.Y.Z --repo PlebRick/BTCTX --title "..." --notes "..."
+gh release upload vX.Y.Z asset.dmg --repo BitcoinTX-org/BTCTX-org
+gh release upload vX.Y.Z asset.dmg --repo PlebRick/BTCTX
+```
 
 ### Branches
 - `develop` - Active development, push here regularly
