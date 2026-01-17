@@ -139,15 +139,21 @@ After a successful build:
 
 ## Creating a DMG for Distribution
 
-To create a distributable disk image:
+The build script automatically creates a DMG if `create-dmg` is installed:
 
 ```bash
-# Simple DMG
-hdiutil create -volname "BitcoinTX" -srcfolder dist/BitcoinTX.app \
-  -ov -format UDZO dist/BitcoinTX.dmg
-
-# Or use create-dmg for a prettier result
+# Install create-dmg (one-time)
 brew install create-dmg
+
+# Build app AND create DMG
+cd desktop
+./build-mac.sh
+# Output: dist/BitcoinTX.app and dist/BitcoinTX.dmg
+```
+
+To create a DMG manually:
+
+```bash
 create-dmg \
   --volname "BitcoinTX" \
   --window-pos 200 120 \

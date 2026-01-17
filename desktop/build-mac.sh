@@ -130,8 +130,35 @@ if [ -d "$APP_PATH" ]; then
     echo "To test:"
     echo "  open $APP_PATH"
     echo ""
-    echo "To create DMG for distribution:"
-    echo "  hdiutil create -volname BitcoinTX -srcfolder $APP_PATH -ov -format UDZO BitcoinTX.dmg"
+
+    # Create DMG if create-dmg is available
+    if command -v create-dmg &> /dev/null; then
+        echo "Creating DMG installer..."
+        DMG_PATH="$SCRIPT_DIR/dist/BitcoinTX.dmg"
+        rm -f "$DMG_PATH"
+        create-dmg \
+            --volname "BitcoinTX" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "BitcoinTX.app" 150 190 \
+            --app-drop-link 450 190 \
+            "$DMG_PATH" \
+            "$APP_PATH"
+
+        if [ -f "$DMG_PATH" ]; then
+            DMG_SIZE=$(du -sh "$DMG_PATH" | cut -f1)
+            echo ""
+            echo "  DMG created: $DMG_PATH"
+            echo "  DMG size: $DMG_SIZE"
+        fi
+    else
+        echo "To create DMG for distribution, install create-dmg:"
+        echo "  brew install create-dmg"
+        echo ""
+        echo "Then run:"
+        echo "  create-dmg --volname BitcoinTX --app-drop-link 450 190 BitcoinTX.dmg $APP_PATH"
+    fi
 else
     echo "  ERROR: Application bundle not created"
     deactivate
