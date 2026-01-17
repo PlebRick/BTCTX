@@ -1,10 +1,11 @@
 # Roadmap
 
-## Current Status: v0.5.3 - macOS Desktop App & Testing ✅
+## Current Status: v0.5.4 - Buy from Bank Feature ✅
 
-Native macOS desktop app complete with PyInstaller + pywebview. Comprehensive test suite with 131 pytest tests + 17 pre-commit checks. Mobile-responsive UI.
+Buy transactions can now originate from Bank account (auto-buy support). Native macOS desktop app complete. Comprehensive test suite with 136 pytest tests + 17 pre-commit checks.
 
 ### v0.5.x Features
+- **Buy from Bank**: Purchase BTC directly from Bank account (auto-buy/recurring)
 - macOS desktop app (.app bundle with embedded backend)
 - Mobile responsiveness overhaul (10 CSS files, touch-friendly)
 - Comprehensive test suite (stress testing, edge cases, IRS form validation)

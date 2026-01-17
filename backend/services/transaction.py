@@ -34,6 +34,7 @@ from backend.models.transaction import (Transaction, LedgerEntry, BitcoinLot, Lo
 from backend.models.account import Account
 from backend.schemas.transaction import TransactionCreate
 from backend.constants import (
+    ACCOUNT_BANK,
     ACCOUNT_EXCHANGE_USD,
     ACCOUNT_EXCHANGE_BTC,
     ACCOUNT_EXTERNAL,
@@ -1102,8 +1103,8 @@ def _enforce_transaction_type_rules(tx_data: dict, db: Session):
             raise HTTPException(400, "Transfer => same currency required.")
 
     elif tx_type == "Buy":
-        if from_id != ACCOUNT_EXCHANGE_USD:
-            raise HTTPException(400, "Buy => from must be Exchange USD.")
+        if from_id not in (ACCOUNT_BANK, ACCOUNT_EXCHANGE_USD):
+            raise HTTPException(400, "Buy => from must be Bank or Exchange USD.")
         if to_id != ACCOUNT_EXCHANGE_BTC:
             raise HTTPException(400, "Buy => to must be Exchange BTC.")
 

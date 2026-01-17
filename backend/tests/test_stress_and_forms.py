@@ -1811,6 +1811,227 @@ class TestIRSFormValidation:
 
 
 # =============================================================================
+# BUY FROM BANK TESTS
+# =============================================================================
+
+class TestBuyFromBank:
+    """Tests for Buy transactions originating from Bank account (ID 1)."""
+
+    @pytest.fixture
+    def funded_bank(self, clean_db):
+        """Fund the Bank account with USD for testing."""
+        deposit = create_tx({
+            "type": "Deposit",
+            "timestamp": build_timestamp(2024, 1, 1),
+            "from_account_id": EXTERNAL,
+            "to_account_id": BANK_USD,
+            "amount": "50000",
+            "fee_amount": "0",
+            "fee_currency": "USD",
+            "source": "N/A",
+        })
+        assert "error" not in deposit, f"Bank deposit failed: {deposit}"
+        return deposit
+
+    def test_buy_from_bank_basic(self, funded_bank):
+        """Buy 0.5 BTC from Bank for $10,000 - verify balances and lot creation."""
+        bank_balance_before = get_balance(BANK_USD)
+        assert bank_balance_before >= 10000, "Bank should have sufficient USD"
+
+        buy_tx = create_tx({
+            "type": "Buy",
+            "timestamp": build_timestamp(2024, 1, 15, 12, 0),
+            "from_account_id": BANK_USD,
+            "to_account_id": EXCHANGE_BTC,
+            "amount": "0.5",
+            "fee_amount": "25",
+            "fee_currency": "USD",
+            "cost_basis_usd": "10000",
+        })
+        assert "error" not in buy_tx, f"Buy from Bank failed: {buy_tx}"
+
+        # Verify Bank balance decreased by cost_basis + fee
+        bank_balance_after = get_balance(BANK_USD)
+        expected_bank = bank_balance_before - 10000 - 25
+        assert abs(bank_balance_after - expected_bank) < 1, \
+            f"Bank balance should be ~{expected_bank}, got {bank_balance_after}"
+
+        # Verify Exchange BTC balance increased by 0.5
+        exchange_btc_balance = get_balance(EXCHANGE_BTC)
+        assert abs(exchange_btc_balance - 0.5) < 0.00000001, \
+            f"Exchange BTC should be 0.5, got {exchange_btc_balance}"
+
+        # Verify BitcoinLot created with correct cost basis (including fee)
+        lots = get_lots()
+        buy_lot = next(
+            (l for l in lots if l.get("created_txn_id") == buy_tx["id"]),
+            None
+        )
+        assert buy_lot is not None, "Should create a Bitcoin lot"
+        lot_basis = Decimal(str(buy_lot.get("cost_basis_usd", 0)))
+        # Cost basis for Buy with USD fee includes the fee
+        expected_basis = Decimal("10025")  # 10000 + 25 fee
+        assert abs(lot_basis - expected_basis) < DECIMAL_TOLERANCE, \
+            f"Lot cost basis should be {expected_basis}, got {lot_basis}"
+
+    def test_buy_from_bank_fifo_with_exchange(self, funded_bank):
+        """Buy from Bank then Exchange, sell consumes in FIFO order."""
+        # Also fund Exchange USD
+        create_tx({
+            "type": "Deposit",
+            "timestamp": build_timestamp(2024, 1, 2),
+            "from_account_id": EXTERNAL,
+            "to_account_id": EXCHANGE_USD,
+            "amount": "50000",
+            "fee_amount": "0",
+            "fee_currency": "USD",
+            "source": "N/A",
+        })
+
+        # Buy 0.5 BTC from Bank at $30k ($15k for 0.5)
+        bank_buy = create_tx({
+            "type": "Buy",
+            "timestamp": build_timestamp(2024, 1, 10),
+            "from_account_id": BANK_USD,
+            "to_account_id": EXCHANGE_BTC,
+            "amount": "0.5",
+            "fee_amount": "10",
+            "fee_currency": "USD",
+            "cost_basis_usd": "15000",
+        })
+        assert "error" not in bank_buy, f"Buy from Bank failed: {bank_buy}"
+
+        # Buy 0.5 BTC from Exchange at $40k ($20k for 0.5)
+        exchange_buy = create_tx({
+            "type": "Buy",
+            "timestamp": build_timestamp(2024, 1, 15),
+            "from_account_id": EXCHANGE_USD,
+            "to_account_id": EXCHANGE_BTC,
+            "amount": "0.5",
+            "fee_amount": "10",
+            "fee_currency": "USD",
+            "cost_basis_usd": "20000",
+        })
+        assert "error" not in exchange_buy, f"Buy from Exchange failed: {exchange_buy}"
+
+        # Sell 0.5 BTC - should consume Bank-bought lot first (older)
+        sell_tx = create_tx({
+            "type": "Sell",
+            "timestamp": build_timestamp(2024, 2, 1),
+            "from_account_id": EXCHANGE_BTC,
+            "to_account_id": EXCHANGE_USD,
+            "amount": "0.5",
+            "fee_amount": "10",
+            "fee_currency": "USD",
+            "proceeds_usd": "25000",
+        })
+        assert "error" not in sell_tx, f"Sell failed: {sell_tx}"
+
+        # Verify disposal used Bank-bought lot (cost basis $15k + $10 fee = $15010)
+        disposals = get_disposals()
+        sell_disposals = [d for d in disposals if d.get("transaction_id") == sell_tx["id"]]
+        assert len(sell_disposals) == 1, "Should have one disposal"
+
+        disposal_basis = Decimal(str(sell_disposals[0].get("disposal_basis_usd", 0)))
+        # Cost basis for 0.5 BTC from Bank lot = $15,010 total / 0.5 BTC * 0.5 BTC = $15,010
+        expected_basis = Decimal("15010")
+        assert abs(disposal_basis - expected_basis) < DECIMAL_TOLERANCE, \
+            f"Disposal basis should be ~{expected_basis} (from Bank lot), got {disposal_basis}"
+
+        # Verify Exchange-bought lot is still full (remaining = 0.5)
+        lots = get_lots()
+        exchange_lot = next(
+            (l for l in lots if l.get("created_txn_id") == exchange_buy["id"]),
+            None
+        )
+        assert exchange_lot is not None, "Exchange lot should exist"
+        remaining = Decimal(str(exchange_lot.get("remaining_btc", 0)))
+        assert abs(remaining - Decimal("0.5")) < SATOSHI_TOLERANCE, \
+            f"Exchange lot should be untouched, remaining={remaining}"
+
+    def test_buy_from_bank_allows_negative_balance(self, funded_bank):
+        """Buy exceeding Bank balance creates negative balance (ledger behavior)."""
+        # Bank has $50,000 from fixture
+        # Double-entry ledgers allow negative balances - enforcement is frontend concern
+        buy_tx = create_tx({
+            "type": "Buy",
+            "timestamp": build_timestamp(2024, 1, 15),
+            "from_account_id": BANK_USD,
+            "to_account_id": EXCHANGE_BTC,
+            "amount": "1.0",
+            "fee_amount": "100",
+            "fee_currency": "USD",
+            "cost_basis_usd": "60000",  # More than Bank balance
+        })
+
+        # Transaction succeeds (ledger allows negative balances)
+        assert "error" not in buy_tx, f"Transaction should succeed: {buy_tx}"
+
+        # Bank balance should be negative
+        bank_balance = get_balance(BANK_USD)
+        assert bank_balance < 0, f"Bank balance should be negative, got {bank_balance}"
+
+    def test_buy_from_bank_csv_import(self, clean_db):
+        """CSV import with Buy from Bank should work."""
+        import io
+        import csv
+        from backend.services.csv_import import parse_csv_file
+
+        # Create CSV content with Buy from Bank
+        csv_content = """date,type,amount,from_account,to_account,cost_basis_usd,proceeds_usd,fee_amount,fee_currency,source,purpose,notes
+2024-01-01T10:00:00Z,Deposit,50000,External,Bank,,,,,,,Initial USD
+2024-01-15T10:00:00Z,Buy,0.5,Bank,Exchange BTC,10000,,50,USD,,,Buy from Bank
+"""
+        result = parse_csv_file(csv_content.encode('utf-8'))
+
+        # Should parse without errors
+        assert len(result.errors) == 0, f"CSV parse errors: {result.errors}"
+        assert result.can_import, "Should be importable"
+        assert len(result.transactions) == 2, "Should have 2 transactions"
+
+        # Verify second transaction is Buy from Bank
+        buy_tx = result.transactions[1]
+        assert buy_tx["type"] == "Buy"
+        assert buy_tx["from_account_id"] == BANK_USD
+        assert buy_tx["to_account_id"] == EXCHANGE_BTC
+
+    def test_buy_from_exchange_still_works(self, funded_bank):
+        """Traditional Buy from Exchange USD still works."""
+        # Fund Exchange USD
+        create_tx({
+            "type": "Deposit",
+            "timestamp": build_timestamp(2024, 1, 2),
+            "from_account_id": EXTERNAL,
+            "to_account_id": EXCHANGE_USD,
+            "amount": "20000",
+            "fee_amount": "0",
+            "fee_currency": "USD",
+            "source": "N/A",
+        })
+
+        # Buy from Exchange USD (original behavior)
+        buy_tx = create_tx({
+            "type": "Buy",
+            "timestamp": build_timestamp(2024, 1, 15),
+            "from_account_id": EXCHANGE_USD,
+            "to_account_id": EXCHANGE_BTC,
+            "amount": "0.5",
+            "fee_amount": "10",
+            "fee_currency": "USD",
+            "cost_basis_usd": "10000",
+        })
+        assert "error" not in buy_tx, f"Traditional Buy from Exchange should work: {buy_tx}"
+
+        # Verify lot created
+        lots = get_lots()
+        buy_lot = next(
+            (l for l in lots if l.get("created_txn_id") == buy_tx["id"]),
+            None
+        )
+        assert buy_lot is not None, "Should create a Bitcoin lot"
+
+
+# =============================================================================
 # MAIN EXECUTION (for running outside pytest)
 # =============================================================================
 

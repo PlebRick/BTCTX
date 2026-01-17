@@ -297,7 +297,10 @@ declare global {
     amountUSD?: number;
     amountBTC?: number;
 
-    // NEW: For Sell transactions, the user’s typed gross proceeds
+    // For Buy transactions: source account (Bank or Exchange)
+    buyFromAccount?: "Bank" | "Exchange";
+
+    // NEW: For Sell transactions, the user's typed gross proceeds
     grossProceedsUSD?: number; // <-- ADDED
   }
 
