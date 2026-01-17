@@ -214,14 +214,32 @@ git push plebrick master --tags  # Sync backup at releases
 ```
 
 ### Current Version
-- **Latest Tag:** `v0.5.3` (2025-01-16)
-- **Status:** Stable release with macOS desktop downloads fix and lint fixes
-- **Docker Image:** `b1ackswan/btctx:v0.5.3` (also `latest`)
+- **Latest Tag:** `v0.5.5` (2025-01-17)
+- **Status:** Stable release with transaction edit fix for macOS desktop app
+- **Docker Image:** `b1ackswan/btctx:v0.5.5` (also `latest`)
 - **Target Release:** `v1.0.0`
 
 ---
 
 ## Recent Changes (Jan 2025)
+
+### Session: 2025-01-17 (Transaction Edit Bug Fix)
+1. **Fixed Transaction Editing in macOS Desktop App**
+   - Bug: Editing transactions failed with "Not enough BTC" error
+   - Root cause: `update_transaction_record()` had flawed lot logic when backdating
+   - The partial re-lot (`recalculate_subsequent_transactions`) ran before full scorched earth, using stale lot balances
+   - Fix: Simplified update flow to use only full scorched earth (`recalculate_all_transactions`)
+   - Also fixes potential edge cases in Docker deployments with specific transaction histories
+   - Documentation: `docs/edit-tx-bug-mac.md` (full investigation details)
+
+2. **Improved Transaction Form**
+   - Added PUT response validation (defensive programming)
+   - Edit transactions now show realized gain in success toast (feature parity with create)
+
+3. **Release v0.5.5**
+   - Tagged and pushed to both repos (origin, plebrick)
+   - GitHub releases created with DMG on both repos
+   - Docker image pushed: `b1ackswan/btctx:v0.5.5` and `latest`
 
 ### Session: 2025-01-17 (Testing & Cleanup)
 1. **Comprehensive Test Suite**
