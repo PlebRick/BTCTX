@@ -2,18 +2,9 @@
 
 All notable changes to BitcoinTX are documented in this file.
 
-## [Unreleased] - Buy from Bank Feature
+## [v0.5.4] - 2025-01-16 - Buy from Bank Feature
 
-> **Rollback Tags:** If issues arise with this feature, rollback to these tags:
-> - `pre-bank-buy` - develop branch before merge
-> - `pre-bank-buy-master` - master branch before merge
->
-> ```bash
-> # To rollback develop:
-> git checkout develop && git reset --hard pre-bank-buy && git push --force origin develop
-> # To rollback master:
-> git checkout master && git reset --hard pre-bank-buy-master && git push --force origin master
-> ```
+> **Rollback Tags:** If issues arise, rollback to `pre-bank-buy` (develop) or `pre-bank-buy-master` (master)
 
 ### Added
 - **Buy from Bank**: Buy transactions can now originate from Bank account (auto-buy support)
