@@ -2,6 +2,26 @@
 
 All notable changes to BitcoinTX are documented in this file.
 
+## [v0.5.5] - 2025-01-17 - Transaction Edit Fix
+
+### Fixed
+- **Transaction editing in macOS desktop app**: Fixed bug where editing transactions would fail with "Not enough BTC" error
+  - Root cause: Backend's `update_transaction_record()` had flawed lot logic when backdating transactions
+  - The partial re-lot (`recalculate_subsequent_transactions`) ran before full scorched earth, using stale lot balances
+  - Fix: Simplified update flow to use only full scorched earth (`recalculate_all_transactions`)
+  - This also fixes potential edge cases in Docker/web deployments with specific transaction histories
+
+### Improved
+- **PUT response validation**: Edit form now validates backend response before showing success
+- **Realized gain display on edit**: Edit transactions now show realized gain in success toast (matching create behavior)
+
+### Technical Notes
+- **Files Modified:** `backend/services/transaction.py`, `frontend/src/components/TransactionForm.tsx`
+- **Documentation:** `docs/edit-tx-bug-mac.md` - Full investigation and fix details
+- **Tests:** All 135 pytest tests pass, 17/17 pre-commit tests pass
+
+---
+
 ## [v0.5.4] - 2025-01-16 - Buy from Bank Feature
 
 > **Rollback Tags:** If issues arise, rollback to `pre-bank-buy` (develop) or `pre-bank-buy-master` (master)

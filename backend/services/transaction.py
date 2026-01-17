@@ -222,39 +222,19 @@ def update_transaction_record(transaction_id: int, tx_data: dict, db: Session):
 
     tx.updated_at = datetime.now(timezone.utc)
 
-    # Remove existing ledger entries & partial-lot usage
-    remove_ledger_entries_for_tx(tx, db)
-    remove_lot_usage_for_tx(tx, db)
+    # Flush the transaction field changes first
+    db.flush()
 
-    # Rebuild ledger lines
-    build_ledger_entries_for_transaction(tx, tx_data, db)
-    _maybe_verify_balance_for_internal(tx, db)
-
-    # Partial-lot logic
-    if tx.type in ("Deposit", "Buy"):
-        maybe_create_bitcoin_lot(tx, tx_data, db)
-    elif tx.type == "Transfer":
-        maybe_transfer_bitcoin_lot(tx, tx_data, db)
-    elif tx.type in ("Sell", "Withdrawal"):
-        maybe_dispose_lots_fifo(tx, tx_data, db)
-        compute_sell_summary_from_disposals(tx, db)
-
-    # Step 5) Check for backdating
+    # Do a single "Scorched Earth" re-lot to rebuild everything correctly.
+    # This handles all cases (backdating, forward-dating, same timestamp) uniformly.
+    # The partial recalculate_subsequent_transactions was causing issues when
+    # lots from before the new timestamp still had reduced remaining_btc from
+    # the original transaction's consumption.
     new_timestamp = tx.timestamp
-    earliest_timestamp = min(old_timestamp, new_timestamp)
-    if new_timestamp < old_timestamp:
-        logger.info(
-            f"[Backdating Detected] Tx {tx.id} from {old_timestamp} => {new_timestamp}. "
-            f"Re-lot from earliest={earliest_timestamp}"
-        )
-        recalculate_subsequent_transactions(db, earliest_timestamp)
-    else:
-        logger.info(
-            f"[Timestamp Forward/Unchanged] Tx {tx.id} from {old_timestamp} => {new_timestamp}. "
-            "(No partial-lot re-lot needed unless desired.)"
-        )
-
-    # Step 6) "Scorched Earth" to ensure final re-lot
+    logger.info(
+        f"[Update] Tx {tx.id} timestamp {old_timestamp} => {new_timestamp}. "
+        f"Running scorched earth re-lot."
+    )
     recalculate_all_transactions(db)
 
     db.commit()
@@ -307,6 +287,10 @@ def remove_ledger_entries_for_tx(tx: Transaction, db: Session):
 def remove_lot_usage_for_tx(tx: Transaction, db: Session):
     """
     Remove partial-lot disposals & newly created lots for the transaction.
+
+    Note: This function is currently unused - update_transaction_record and
+    delete_transaction_record both use scorched earth (recalculate_all_transactions)
+    instead. Kept for potential future use.
     """
     for disp in list(tx.lot_disposals):
         db.delete(disp)

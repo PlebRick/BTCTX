@@ -495,8 +495,23 @@ const TransactionForm: React.FC<TransactionFormProps> = ({
 
       if (transactionId) {
         // --- EDITING existing transaction ---
-        await api.put(`/transactions/${transactionId}`, payload);
-        toast.success("Transaction updated successfully!");
+        const response = await api.put(`/transactions/${transactionId}`, payload);
+        if (response.status !== 200) {
+          throw new Error(`Update failed with status ${response.status}`);
+        }
+        const updatedTx = response.data as ITransactionRaw;
+        const rg = updatedTx.realized_gain_usd
+          ? parseDecimal(updatedTx.realized_gain_usd)
+          : 0;
+
+        if (rg !== 0) {
+          const sign = rg >= 0 ? "+" : "";
+          toast.success(
+            `Transaction updated! Realized Gain: ${sign}${formatUsd(rg)}`
+          );
+        } else {
+          toast.success("Transaction updated successfully!");
+        }
       } else {
         // --- CREATING new transaction ---
         const createPayload: ICreateTransactionPayload = {
