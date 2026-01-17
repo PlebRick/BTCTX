@@ -223,6 +223,14 @@ git push plebrick master --tags  # Sync backup at releases
 
 ## Recent Changes (Jan 2025)
 
+### Session: 2025-01-17 (PDF Content Tests)
+1. **PDF Content Verification Test Suite**
+   - Added `backend/tests/test_pdf_content.py` with 23 new tests
+   - Uses `pypdf` to extract and verify actual PDF content (not just file generation)
+   - Tests: Complete Tax Report, IRS Forms, Transaction History, edge cases, data accuracy
+   - Fixed `test_seed_data_integrity.py` to be self-contained with auto-seeding fixture
+   - Total pytest tests: 158
+
 ### Session: 2025-01-17 (Transaction Edit Bug Fix)
 1. **Fixed Transaction Editing in macOS Desktop App**
    - Bug: Editing transactions failed with "Not enough BTC" error
@@ -251,7 +259,7 @@ git push plebrick master --tags  # Sync backup at releases
    - All withdrawal purposes (Spent, Gift, Donation, Lost)
    - IRS Form 8949 validation (multi-page, non-taxable exclusions)
    - Schedule D totals verification
-   - Total pytest tests now: 131 (was 84)
+   - Total pytest tests now: 158 (was 84)
 
 2. **pdftk Path Resolution Fix**
    - Added `backend/services/reports/pdftk_path.py` for centralized path resolution
@@ -392,8 +400,9 @@ git push plebrick master --tags  # Sync backup at releases
 - [ ] CSV import merge with existing data (Phase 2)
 
 ### Completed Recently
-- [x] Comprehensive test suite (Jan 2025) - 131 pytest tests + 17 pre-commit checks
+- [x] Comprehensive test suite (Jan 2025) - 158 pytest tests + 17 pre-commit checks
   - `test_stress_and_forms.py`: stress testing, edge cases, IRS form validation
+  - `test_pdf_content.py`: PDF content verification using pypdf text extraction
   - All deposit sources and withdrawal purposes tested
   - Account-specific FIFO verification
 - [x] macOS desktop app (Jan 2025) - PyInstaller + pywebview bundling
