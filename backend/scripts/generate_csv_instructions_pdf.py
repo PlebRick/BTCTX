@@ -281,7 +281,7 @@ def generate_csv_instructions_pdf():
         ["Deposit", "External", "Wallet or\nExchange BTC", "cost_basis_usd (optional, defaults to $0)"],
         ["Withdrawal", "Wallet or\nExchange BTC", "External", "purpose required;\nproceeds_usd for \"Spent\""],
         ["Transfer", "Wallet or\nExchange BTC", "Wallet or\nExchange BTC", "Fee must be BTC if specified;\naccounts must be different"],
-        ["Buy", "Exchange USD", "Exchange BTC", "cost_basis_usd required;\nfee must be USD"],
+        ["Buy", "Bank or\nExchange USD", "Exchange BTC", "cost_basis_usd required;\nfee must be USD"],
         ["Sell", "Exchange BTC", "Exchange USD", "proceeds_usd required;\nfee must be USD"],
     ]
 
@@ -320,9 +320,15 @@ def generate_csv_instructions_pdf():
         normal_style
     ))
 
-    story.append(Paragraph("Buy (purchasing BTC on exchange):", heading2_style))
+    story.append(Paragraph("Buy from Exchange USD:", heading2_style))
     story.append(Paragraph(
         "2024-01-15T10:30:00Z,Buy,0.012,Exchange USD,Exchange BTC,500.00,,5.00,USD,,,",
+        code_style
+    ))
+
+    story.append(Paragraph("Buy from Bank (auto-buy):", heading2_style))
+    story.append(Paragraph(
+        "2024-01-20T08:00:00Z,Buy,0.05,Bank,Exchange BTC,2500.00,,10.00,USD,,,",
         code_style
     ))
 
@@ -363,7 +369,7 @@ def generate_csv_instructions_pdf():
         ["\"cost_basis_usd required for Buy\"", "Add the USD amount spent (including fees)"],
         ["\"proceeds_usd required for Sell\"", "Add the USD amount received"],
         ["\"purpose required for Withdrawal\"", "Add purpose: Spent, Gift, Donation, or Lost"],
-        ["\"Invalid accounts for Buy\"", "Buy must be: from Exchange USD, to Exchange BTC"],
+        ["\"Invalid accounts for Buy\"", "Buy must be: from Bank or Exchange USD, to Exchange BTC"],
         ["\"Invalid accounts for Sell\"", "Sell must be: from Exchange BTC, to Exchange USD"],
         ["\"Invalid accounts for Deposit\"", "Deposit must be: from External, to Wallet or Exchange BTC"],
         ["\"Cannot transfer to same account\"", "Transfer requires different source and destination"],

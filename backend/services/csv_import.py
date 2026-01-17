@@ -676,6 +676,7 @@ def generate_template_csv() -> str:
 
     Includes at least one of each:
     - Transaction type: Deposit, Withdrawal, Transfer, Buy, Sell
+    - Buy sources: Exchange USD (standard) and Bank (auto-buy)
     - Deposit source: MyBTC, Gift, Income, Interest, Reward (and blank/N/A)
     - Withdrawal purpose: Spent, Gift, Donation, Lost
 
@@ -709,10 +710,17 @@ def generate_template_csv() -> str:
     ])
 
     # === BUY BTC ===
+    # Buy from Exchange USD (standard)
     writer.writerow([
         "2024-01-03T10:00:00Z", "Buy", "0.5", "Exchange USD", "Exchange BTC",
         "10000.00", "", "50.00", "USD",
         "", "", "Buy 0.5 BTC at $20k/BTC with $50 fee"
+    ])
+    # Buy from Bank (auto-buy / recurring purchase)
+    writer.writerow([
+        "2024-01-04T10:00:00Z", "Buy", "0.1", "Bank", "Exchange BTC",
+        "2000.00", "", "10.00", "USD",
+        "", "", "Auto-buy: Purchase BTC directly from bank"
     ])
 
     # === BTC DEPOSITS (all sources) ===
