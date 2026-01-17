@@ -2,9 +2,9 @@
 
 > Complete documentation for building BitcoinTX as a native macOS application.
 
-**Version:** 0.6.1
-**Last Updated:** 2025-01-16
-**Branch:** `feature/macos-desktop`
+**Version:** 0.5.4
+**Last Updated:** 2025-01-17
+**Branch:** `develop`
 
 ---
 
@@ -447,8 +447,8 @@ If you add new Python packages to the backend:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.6.1 | 2025-01-17 | Fixed Settings page downloads (backup, CSV export, templates) |
-| 0.6.0 | 2025-01-17 | Initial macOS desktop app release |
+| 0.5.4 | 2025-01-17 | Added Buy from Bank feature, build script auto-creates DMG |
+| 0.5.3 | 2025-01-17 | Initial macOS desktop app release with Settings/Reports download fixes |
 
 ---
 
