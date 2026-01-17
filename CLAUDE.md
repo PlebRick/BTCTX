@@ -29,9 +29,20 @@ git log -3 --oneline  # See recent commits
 
 | Branch | Purpose | Status |
 |--------|---------|--------|
+| `feature/buy-from-bank` | Allow Buy transactions from Bank account | Ready to merge |
 | `feature/macos-desktop` | macOS desktop app (PyInstaller + pywebview) | In progress |
 
 See [docs/MACOS_DESKTOP_APP.md](docs/MACOS_DESKTOP_APP.md) for complete desktop build documentation.
+See [docs/BUY_FROM_BANK_FEATURE.md](docs/BUY_FROM_BANK_FEATURE.md) for Buy from Bank feature details.
+
+### Rollback Tags
+
+| Tag | Branch | Purpose |
+|-----|--------|---------|
+| `pre-bank-buy` | develop | Rollback point before buy-from-bank merge |
+| `pre-bank-buy-master` | master | Rollback point before buy-from-bank release |
+
+To rollback: `git reset --hard <tag> && git push --force origin <branch>`
 
 ### Feature Branch Rules
 

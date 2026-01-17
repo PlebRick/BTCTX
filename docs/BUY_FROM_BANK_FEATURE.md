@@ -246,12 +246,34 @@ Existing exports will show the actual `from_account` used (Bank or Exchange USD)
 
 ## Rollback
 
-If issues are found, revert commit `b30a790`:
+**Rollback tags were created before this feature was merged:**
+
+| Tag | Branch | Commit | Description |
+|-----|--------|--------|-------------|
+| `pre-bank-buy` | develop | aeb3e35 | State before feature merge |
+| `pre-bank-buy-master` | master | 430f584 | State before release |
+
+### To Rollback Develop
+```bash
+git checkout develop
+git reset --hard pre-bank-buy
+git push --force origin develop
+git push --force plebrick develop
+```
+
+### To Rollback Master
+```bash
+git checkout master
+git reset --hard pre-bank-buy-master
+git push --force origin master
+git push --force plebrick master
+```
+
+### Alternative: Revert Single Commit
+If only the feature commit needs reverting (preserving subsequent commits):
 ```bash
 git revert b30a790
 ```
-
-Or cherry-pick only specific file changes if partial rollback needed.
 
 ---
 
