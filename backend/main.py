@@ -12,10 +12,12 @@ Key Roles:
 """
 
 import os
+import hmac
 import logging
+from typing import Optional
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Response, Depends, HTTPException
+from fastapi import FastAPI, Request, Response, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,7 @@ frontend_dist = os.environ.get(
 # Session Configuration
 # ---------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")  # Fallback if not set
+API_KEY = os.getenv("API_KEY")
 
 # Default CORS origins if none specified (dev environment)
 default_origins = (
@@ -140,46 +143,51 @@ async def spa_fallback_handler(request: Request, exc: StarletteHTTPException):
     )
 
 # ---------------------------------------------------------
+# Auth Dependency (must be defined before router includes)
+# ---------------------------------------------------------
+def get_current_user(
+    request: Request,
+    x_api_key: Optional[str] = Header(None),
+) -> str:
+    """
+    Dual-mode auth dependency: session cookie OR API key.
+    - Browser/frontend: uses session cookie (user_id in session)
+    - Programmatic access (e.g., Telegram bot): uses X-API-Key header
+    """
+    # Session auth (browser/frontend)
+    user_id = request.session.get("user_id")
+    if user_id:
+        return user_id
+    # API key auth (programmatic access)
+    if API_KEY and x_api_key and hmac.compare_digest(x_api_key, API_KEY):
+        return "api_key_user"
+    raise HTTPException(status_code=401, detail="Not authenticated")
+
+# ---------------------------------------------------------
 # Routers (Transaction, User, Account, Calculation, Bitcoin, Reports, Debug)
 # ---------------------------------------------------------
 # (Mandatory) Routers (Transaction, User, Account, Calculation, Bitcoin, Reports)
 from backend.routers import transaction, user, account, calculation, bitcoin, reports, backup, csv_import
 
 # Mandatory routers
-app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"])
-app.include_router(user.router, prefix="/api/users", tags=["users"])
-app.include_router(account.router, prefix="/api/accounts", tags=["accounts"])
-app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"])
-app.include_router(bitcoin.router, prefix="/api/bitcoin", tags=["Bitcoin"])
-app.include_router(reports.reports_router, prefix="/api/reports", tags=["reports"])
-app.include_router(backup.router, prefix="/api/backup", tags=["backup"])
-app.include_router(csv_import.router, prefix="/api/import", tags=["import"])
+app.include_router(transaction.router, prefix="/api/transactions", tags=["transactions"], dependencies=[Depends(get_current_user)])
+app.include_router(user.router, prefix="/api/users", tags=["users"])  # No auth — register must work
+app.include_router(account.router, prefix="/api/accounts", tags=["accounts"], dependencies=[Depends(get_current_user)])
+app.include_router(calculation.router, prefix="/api/calculations", tags=["calculations"], dependencies=[Depends(get_current_user)])
+app.include_router(bitcoin.router, prefix="/api/bitcoin", tags=["Bitcoin"], dependencies=[Depends(get_current_user)])
+app.include_router(reports.reports_router, prefix="/api/reports", tags=["reports"], dependencies=[Depends(get_current_user)])
+app.include_router(backup.router, prefix="/api/backup", tags=["backup"], dependencies=[Depends(get_current_user)])
+app.include_router(csv_import.router, prefix="/api/import", tags=["import"], dependencies=[Depends(get_current_user)])
 
 # (Optional) Debug Router
 try:
     from backend.routers import debug
-    app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
+    app.include_router(debug.router, prefix="/api/debug", tags=["debug"], dependencies=[Depends(get_current_user)])
 except ImportError:
     print(
         "WARNING: Could not import 'debug' router. If you need debug features, "
         "ensure 'backend/routers/debug.py' exists."
     )
-
-# ---------------------------------------------------------
-# Session-Based Auth Helpers
-# ---------------------------------------------------------
-def get_current_user(request: Request) -> str:
-    """
-    Session-based "get_current_user" dependency.
-    Looks up 'user_id' in request.session. If not found,
-    raises 401. Otherwise, returns the user_id (or username).
-    
-    In a real app, you might store a "username" or a full user object.
-    """
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return user_id
 
 # ---------------------------------------------------------
 # Protected Route Example
