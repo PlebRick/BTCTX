@@ -21,6 +21,7 @@ Run: python backend/tests/test_comprehensive_transactions.py
 Requires: Backend running at http://127.0.0.1:8000
 """
 
+import pytest
 import requests
 import sys
 import json
@@ -38,6 +39,15 @@ DELETE_ALL_URL = f"{BASE_URL}/api/transactions/delete_all"
 CALCULATIONS_URL = f"{BASE_URL}/api/calculations"
 DEBUG_URL = f"{BASE_URL}/api/debug"
 ACCOUNTS_URL = f"{BASE_URL}/api/accounts"
+
+# Authenticated session (set by autouse fixture or __main__)
+SESSION: requests.Session = None
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _set_session(auth_session):
+    global SESSION
+    SESSION = auth_session
 
 # Account IDs (standard BitcoinTX setup)
 EXTERNAL = 99       # External entity (for deposits/withdrawals)
@@ -72,7 +82,7 @@ def log(msg: str, level: str = "INFO"):
 
 def delete_all_transactions():
     """Clear all transactions for a fresh start."""
-    r = requests.delete(DELETE_ALL_URL)
+    r = SESSION.delete(DELETE_ALL_URL)
     if r.status_code not in (200, 204):
         log(f"Could not delete transactions: {r.status_code}", "FAIL")
         sys.exit(1)
@@ -81,7 +91,7 @@ def delete_all_transactions():
 
 def create_tx(tx_data: Dict) -> Dict:
     """Create a transaction and return the response."""
-    r = requests.post(TRANSACTIONS_URL, json=tx_data)
+    r = SESSION.post(TRANSACTIONS_URL, json=tx_data)
     if not r.ok:
         error_detail = r.text
         try:
@@ -94,7 +104,7 @@ def create_tx(tx_data: Dict) -> Dict:
 
 def get_transaction(tx_id: int) -> Dict:
     """Get a single transaction by ID."""
-    r = requests.get(f"{TRANSACTIONS_URL}/{tx_id}")
+    r = SESSION.get(f"{TRANSACTIONS_URL}/{tx_id}")
     if not r.ok:
         return {"error": True, "status_code": r.status_code}
     return r.json()
@@ -102,7 +112,7 @@ def get_transaction(tx_id: int) -> Dict:
 
 def get_all_transactions() -> List[Dict]:
     """Get all transactions."""
-    r = requests.get(TRANSACTIONS_URL)
+    r = SESSION.get(TRANSACTIONS_URL)
     if not r.ok:
         return []
     return r.json()
@@ -110,7 +120,7 @@ def get_all_transactions() -> List[Dict]:
 
 def get_balances() -> List[Dict]:
     """Get all account balances."""
-    r = requests.get(f"{CALCULATIONS_URL}/accounts/balances")
+    r = SESSION.get(f"{CALCULATIONS_URL}/accounts/balances")
     if not r.ok:
         return []
     return r.json()
@@ -118,7 +128,7 @@ def get_balances() -> List[Dict]:
 
 def get_balance(account_id: int) -> float:
     """Get balance for a specific account."""
-    r = requests.get(f"{CALCULATIONS_URL}/account/{account_id}/balance")
+    r = SESSION.get(f"{CALCULATIONS_URL}/account/{account_id}/balance")
     if not r.ok:
         return 0.0
     return r.json().get("balance", 0.0)
@@ -126,7 +136,7 @@ def get_balance(account_id: int) -> float:
 
 def get_gains_and_losses() -> Dict:
     """Get aggregated gains and losses."""
-    r = requests.get(f"{CALCULATIONS_URL}/gains-and-losses")
+    r = SESSION.get(f"{CALCULATIONS_URL}/gains-and-losses")
     if not r.ok:
         return {}
     return r.json()
@@ -134,7 +144,7 @@ def get_gains_and_losses() -> Dict:
 
 def get_average_cost_basis() -> float:
     """Get average cost basis for held BTC."""
-    r = requests.get(f"{CALCULATIONS_URL}/average-cost-basis")
+    r = SESSION.get(f"{CALCULATIONS_URL}/average-cost-basis")
     if not r.ok:
         return 0.0
     return r.json().get("averageCostBasis", 0.0)
@@ -142,7 +152,7 @@ def get_average_cost_basis() -> float:
 
 def get_lots() -> List[Dict]:
     """Get all Bitcoin lots via debug endpoint."""
-    r = requests.get(f"{DEBUG_URL}/lots")
+    r = SESSION.get(f"{DEBUG_URL}/lots")
     if not r.ok:
         return []
     return r.json()
@@ -150,7 +160,7 @@ def get_lots() -> List[Dict]:
 
 def get_disposals() -> List[Dict]:
     """Get all lot disposals via debug endpoint."""
-    r = requests.get(f"{DEBUG_URL}/disposals")
+    r = SESSION.get(f"{DEBUG_URL}/disposals")
     if not r.ok:
         return []
     return r.json()
@@ -159,9 +169,9 @@ def get_disposals() -> List[Dict]:
 def get_ledger_entries(tx_id: Optional[int] = None) -> List[Dict]:
     """Get ledger entries, optionally filtered by transaction."""
     if tx_id:
-        r = requests.get(f"{DEBUG_URL}/transactions/{tx_id}/ledger-entries")
+        r = SESSION.get(f"{DEBUG_URL}/transactions/{tx_id}/ledger-entries")
     else:
-        r = requests.get(f"{DEBUG_URL}/ledger-entries")
+        r = SESSION.get(f"{DEBUG_URL}/ledger-entries")
     if not r.ok:
         return []
     return r.json()
@@ -2191,8 +2201,15 @@ def run_all_tests():
 
 if __name__ == "__main__":
     try:
+        # Login to get authenticated session
+        SESSION = requests.Session()
+        r = SESSION.post(f"{BASE_URL}/api/login", json={"username": "admin", "password": "password"})
+        if not r.ok:
+            print(f"ERROR: Login failed at {BASE_URL}: {r.status_code}")
+            sys.exit(1)
+
         # Quick connectivity check
-        r = requests.get(f"{BASE_URL}/api/accounts/")
+        r = SESSION.get(f"{BASE_URL}/api/accounts/")
         if not r.ok:
             print(f"ERROR: Cannot connect to backend at {BASE_URL}")
             print("Make sure the backend is running: uvicorn backend.main:app --host 127.0.0.1 --port 8000")

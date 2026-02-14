@@ -22,6 +22,15 @@ BASE_URL = "http://127.0.0.1:8000"
 TRANSACTIONS_URL = f"{BASE_URL}/api/transactions"
 
 
+def _get_auth_session():
+    """Create an authenticated requests.Session."""
+    session = requests.Session()
+    r = session.post(f"{BASE_URL}/api/login", json={"username": "admin", "password": "password"})
+    if r.status_code != 200:
+        raise RuntimeError(f"Login failed: {r.status_code} {r.text}")
+    return session
+
+
 def _ensure_test_data_exists(db):
     """
     Ensure database has minimal test data for integrity tests.
@@ -32,13 +41,15 @@ def _ensure_test_data_exists(db):
     if tx_count > 0:
         return  # Data already exists
 
+    session = _get_auth_session()
+
     # Create minimal test data via API (to trigger proper FIFO/ledger logic)
     def build_ts(year, month, day):
         dt = datetime(year, month, day, 12, 0, 0, tzinfo=timezone.utc)
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # 1. Deposit USD to Bank (ensures Bank has balance)
-    requests.post(TRANSACTIONS_URL, json={
+    session.post(TRANSACTIONS_URL, json={
         "type": "Deposit",
         "timestamp": build_ts(2024, 1, 1),
         "from_account_id": 99,
@@ -48,7 +59,7 @@ def _ensure_test_data_exists(db):
     })
 
     # 2. Transfer USD from Bank to Exchange (uses Bank)
-    requests.post(TRANSACTIONS_URL, json={
+    session.post(TRANSACTIONS_URL, json={
         "type": "Transfer",
         "timestamp": build_ts(2024, 1, 5),
         "from_account_id": 1,  # Bank
@@ -57,7 +68,7 @@ def _ensure_test_data_exists(db):
     })
 
     # 3. Buy BTC
-    requests.post(TRANSACTIONS_URL, json={
+    session.post(TRANSACTIONS_URL, json={
         "type": "Buy",
         "timestamp": build_ts(2024, 2, 1),
         "from_account_id": 3,  # Exchange USD
@@ -67,7 +78,7 @@ def _ensure_test_data_exists(db):
     })
 
     # 4. Transfer BTC with fee (creates disposal for fee, moves to Wallet)
-    requests.post(TRANSACTIONS_URL, json={
+    session.post(TRANSACTIONS_URL, json={
         "type": "Transfer",
         "timestamp": build_ts(2024, 3, 1),
         "from_account_id": 4,  # Exchange BTC
@@ -78,7 +89,7 @@ def _ensure_test_data_exists(db):
     })
 
     # 5. Sell BTC (creates disposal)
-    requests.post(TRANSACTIONS_URL, json={
+    session.post(TRANSACTIONS_URL, json={
         "type": "Sell",
         "timestamp": build_ts(2024, 4, 1),
         "from_account_id": 4,  # Exchange BTC

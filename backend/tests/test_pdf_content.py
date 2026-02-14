@@ -29,6 +29,15 @@ TRANSACTIONS_URL = f"{BASE_URL}/api/transactions"
 DELETE_ALL_URL = f"{BASE_URL}/api/transactions/delete_all"
 REPORTS_URL = f"{BASE_URL}/api/reports"
 
+# Authenticated session (set by autouse fixture from conftest.py)
+SESSION: requests.Session = None
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _set_session(auth_session):
+    global SESSION
+    SESSION = auth_session
+
 # Account IDs (standard BitcoinTX setup)
 BANK_USD = 1
 WALLET_BTC = 2
@@ -42,13 +51,13 @@ EXCHANGE_BTC = 4
 
 def delete_all_transactions() -> bool:
     """Clear all transactions for a fresh start."""
-    r = requests.delete(DELETE_ALL_URL)
+    r = SESSION.delete(DELETE_ALL_URL)
     return r.status_code in (200, 204)
 
 
 def create_tx(tx_data: Dict) -> Dict:
     """Create a transaction and return the response."""
-    r = requests.post(TRANSACTIONS_URL, json=tx_data)
+    r = SESSION.post(TRANSACTIONS_URL, json=tx_data)
     if not r.ok:
         return {"error": True, "status_code": r.status_code, "detail": r.text}
     return r.json()
@@ -62,7 +71,7 @@ def build_timestamp(year: int, month: int, day: int, hour: int = 12) -> str:
 
 def get_complete_tax_report(year: int) -> Optional[bytes]:
     """Get the complete tax report PDF as bytes."""
-    r = requests.get(f"{REPORTS_URL}/complete_tax_report", params={"year": year})
+    r = SESSION.get(f"{REPORTS_URL}/complete_tax_report", params={"year": year})
     if r.status_code == 200:
         return r.content
     return None
@@ -70,7 +79,7 @@ def get_complete_tax_report(year: int) -> Optional[bytes]:
 
 def get_irs_report(year: int) -> Optional[bytes]:
     """Get IRS Form 8949 + Schedule D PDF as bytes."""
-    r = requests.get(f"{REPORTS_URL}/irs_reports", params={"year": year})
+    r = SESSION.get(f"{REPORTS_URL}/irs_reports", params={"year": year})
     if r.status_code == 200:
         return r.content
     return None
@@ -78,7 +87,7 @@ def get_irs_report(year: int) -> Optional[bytes]:
 
 def get_transaction_history_pdf(year: int) -> Optional[bytes]:
     """Get transaction history PDF as bytes."""
-    r = requests.get(
+    r = SESSION.get(
         f"{REPORTS_URL}/simple_transaction_history",
         params={"year": year, "format": "pdf"}
     )
@@ -89,7 +98,7 @@ def get_transaction_history_pdf(year: int) -> Optional[bytes]:
 
 def get_transaction_history_csv(year: int) -> Optional[str]:
     """Get transaction history CSV as string."""
-    r = requests.get(
+    r = SESSION.get(
         f"{REPORTS_URL}/simple_transaction_history",
         params={"year": year, "format": "csv"}
     )

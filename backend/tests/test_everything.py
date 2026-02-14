@@ -38,6 +38,7 @@ from decimal import Decimal, ROUND_HALF_DOWN
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import pytest
 import requests
 
 # =============================================================================
@@ -68,6 +69,15 @@ class TestResults:
 
 RESULTS = TestResults()
 VERBOSE = False
+
+# Authenticated session (set by autouse fixture or __main__)
+SESSION: requests.Session = None
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _set_session(auth_session):
+    global SESSION
+    SESSION = auth_session
 
 # Colors for terminal
 class Colors:
@@ -188,7 +198,7 @@ def get_session() -> requests.Session:
 
 def api_get(endpoint: str, session: Optional[requests.Session] = None, **params) -> Tuple[int, Any]:
     """Make a GET request to the API."""
-    s = session or requests.Session()
+    s = session or SESSION or requests.Session()
     try:
         r = s.get(f"{API_URL}/{endpoint}", params=params, timeout=30)
         try:
@@ -201,7 +211,7 @@ def api_get(endpoint: str, session: Optional[requests.Session] = None, **params)
 
 def api_post(endpoint: str, data: dict, session: Optional[requests.Session] = None) -> Tuple[int, Any]:
     """Make a POST request to the API."""
-    s = session or requests.Session()
+    s = session or SESSION or requests.Session()
     try:
         r = s.post(f"{API_URL}/{endpoint}", json=data, timeout=30)
         try:
@@ -214,7 +224,7 @@ def api_post(endpoint: str, data: dict, session: Optional[requests.Session] = No
 
 def api_delete(endpoint: str, session: Optional[requests.Session] = None) -> Tuple[int, Any]:
     """Make a DELETE request to the API."""
-    s = session or requests.Session()
+    s = session or SESSION or requests.Session()
     try:
         r = s.delete(f"{API_URL}/{endpoint}", timeout=30)
         try:
@@ -823,9 +833,11 @@ def main():
     print(colored("=" * 70, Colors.BOLD))
     print()
 
-    # Check backend is running
+    # Login and check backend is running
+    global SESSION
     try:
-        r = requests.get(f"{API_URL}/accounts/", timeout=5)
+        SESSION = get_session()
+        r = SESSION.get(f"{API_URL}/accounts/", timeout=5)
         if not r.ok:
             print(colored(f"ERROR: Backend returned {r.status_code}", Colors.RED))
             sys.exit(1)

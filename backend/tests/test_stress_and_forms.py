@@ -33,6 +33,15 @@ DEBUG_URL = f"{BASE_URL}/api/debug"
 REPORTS_URL = f"{BASE_URL}/api/reports"
 ACCOUNTS_URL = f"{BASE_URL}/api/accounts"
 
+# Authenticated session (set by autouse fixture from conftest.py)
+SESSION: requests.Session = None
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _set_session(auth_session):
+    global SESSION
+    SESSION = auth_session
+
 # Account IDs (standard BitcoinTX setup)
 EXTERNAL = 99       # External entity (for deposits/withdrawals)
 BANK_USD = 1        # Bank account (USD)
@@ -63,13 +72,13 @@ SATOSHI_TOLERANCE = Decimal("0.00000001")
 
 def delete_all_transactions() -> bool:
     """Clear all transactions for a fresh start."""
-    r = requests.delete(DELETE_ALL_URL)
+    r = SESSION.delete(DELETE_ALL_URL)
     return r.status_code in (200, 204)
 
 
 def create_tx(tx_data: Dict) -> Dict:
     """Create a transaction and return the response."""
-    r = requests.post(TRANSACTIONS_URL, json=tx_data)
+    r = SESSION.post(TRANSACTIONS_URL, json=tx_data)
     if not r.ok:
         error_detail = r.text
         try:
@@ -82,7 +91,7 @@ def create_tx(tx_data: Dict) -> Dict:
 
 def update_tx(tx_id: int, updates: Dict) -> Dict:
     """Update a transaction."""
-    r = requests.put(f"{TRANSACTIONS_URL}/{tx_id}", json=updates)
+    r = SESSION.put(f"{TRANSACTIONS_URL}/{tx_id}", json=updates)
     if not r.ok:
         return {"error": True, "status_code": r.status_code, "detail": r.text}
     return r.json()
@@ -90,13 +99,13 @@ def update_tx(tx_id: int, updates: Dict) -> Dict:
 
 def delete_tx(tx_id: int) -> bool:
     """Delete a transaction."""
-    r = requests.delete(f"{TRANSACTIONS_URL}/{tx_id}")
+    r = SESSION.delete(f"{TRANSACTIONS_URL}/{tx_id}")
     return r.status_code in (200, 204)
 
 
 def get_transaction(tx_id: int) -> Optional[Dict]:
     """Get a single transaction by ID."""
-    r = requests.get(f"{TRANSACTIONS_URL}/{tx_id}")
+    r = SESSION.get(f"{TRANSACTIONS_URL}/{tx_id}")
     if not r.ok:
         return None
     return r.json()
@@ -104,7 +113,7 @@ def get_transaction(tx_id: int) -> Optional[Dict]:
 
 def get_all_transactions() -> List[Dict]:
     """Get all transactions."""
-    r = requests.get(TRANSACTIONS_URL)
+    r = SESSION.get(TRANSACTIONS_URL)
     if not r.ok:
         return []
     return r.json()
@@ -112,7 +121,7 @@ def get_all_transactions() -> List[Dict]:
 
 def get_lots() -> List[Dict]:
     """Get all Bitcoin lots via debug endpoint."""
-    r = requests.get(f"{DEBUG_URL}/lots")
+    r = SESSION.get(f"{DEBUG_URL}/lots")
     if not r.ok:
         return []
     return r.json()
@@ -120,7 +129,7 @@ def get_lots() -> List[Dict]:
 
 def get_disposals() -> List[Dict]:
     """Get all lot disposals via debug endpoint."""
-    r = requests.get(f"{DEBUG_URL}/disposals")
+    r = SESSION.get(f"{DEBUG_URL}/disposals")
     if not r.ok:
         return []
     return r.json()
@@ -128,7 +137,7 @@ def get_disposals() -> List[Dict]:
 
 def get_balance(account_id: int) -> float:
     """Get balance for a specific account."""
-    r = requests.get(f"{CALCULATIONS_URL}/account/{account_id}/balance")
+    r = SESSION.get(f"{CALCULATIONS_URL}/account/{account_id}/balance")
     if not r.ok:
         return 0.0
     return r.json().get("balance", 0.0)
@@ -136,7 +145,7 @@ def get_balance(account_id: int) -> float:
 
 def get_balances() -> List[Dict]:
     """Get all account balances."""
-    r = requests.get(f"{CALCULATIONS_URL}/accounts/balances")
+    r = SESSION.get(f"{CALCULATIONS_URL}/accounts/balances")
     if not r.ok:
         return []
     return r.json()
@@ -144,7 +153,7 @@ def get_balances() -> List[Dict]:
 
 def get_gains_and_losses() -> Dict:
     """Get aggregated gains and losses."""
-    r = requests.get(f"{CALCULATIONS_URL}/gains-and-losses")
+    r = SESSION.get(f"{CALCULATIONS_URL}/gains-and-losses")
     if not r.ok:
         return {}
     return r.json()
@@ -152,7 +161,7 @@ def get_gains_and_losses() -> Dict:
 
 def get_irs_report_data(year: int) -> Optional[bytes]:
     """Get IRS reports PDF for a given year."""
-    r = requests.get(f"{REPORTS_URL}/irs_reports", params={"year": year})
+    r = SESSION.get(f"{REPORTS_URL}/irs_reports", params={"year": year})
     if not r.ok:
         return None
     return r.content
