@@ -1,55 +1,28 @@
-import sys
 import pytest
-import requests
-from pathlib import Path
 from decimal import Decimal
 from collections import defaultdict
 from datetime import datetime, timezone
-from sqlalchemy import func
 
-# Add project root for absolute imports
-THIS_FILE = Path(__file__).resolve()
-PROJECT_ROOT = THIS_FILE.parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-from backend.database import SessionLocal
 from backend.models.transaction import Transaction, LedgerEntry, BitcoinLot, LotDisposal
 from backend.models.account import Account
 
-# API configuration for creating test data
-BASE_URL = "http://127.0.0.1:8000"
-TRANSACTIONS_URL = f"{BASE_URL}/api/transactions"
 
-
-def _get_auth_session():
-    """Create an authenticated requests.Session."""
-    session = requests.Session()
-    r = session.post(f"{BASE_URL}/api/login", json={"username": "admin", "password": "password"})
-    if r.status_code != 200:
-        raise RuntimeError(f"Login failed: {r.status_code} {r.text}")
-    return session
-
-
-def _ensure_test_data_exists(db):
+def _ensure_test_data_exists(client, db):
     """
     Ensure database has minimal test data for integrity tests.
-    Creates transactions via API if database is empty.
+    Creates transactions via TestClient API if database is empty.
     Uses all main accounts to ensure non-zero balances.
     """
     tx_count = db.query(Transaction).count()
     if tx_count > 0:
         return  # Data already exists
 
-    session = _get_auth_session()
-
-    # Create minimal test data via API (to trigger proper FIFO/ledger logic)
     def build_ts(year, month, day):
         dt = datetime(year, month, day, 12, 0, 0, tzinfo=timezone.utc)
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # 1. Deposit USD to Bank (ensures Bank has balance)
-    session.post(TRANSACTIONS_URL, json={
+    client.post("/api/transactions", json={
         "type": "Deposit",
         "timestamp": build_ts(2024, 1, 1),
         "from_account_id": 99,
@@ -59,7 +32,7 @@ def _ensure_test_data_exists(db):
     })
 
     # 2. Transfer USD from Bank to Exchange (uses Bank)
-    session.post(TRANSACTIONS_URL, json={
+    client.post("/api/transactions", json={
         "type": "Transfer",
         "timestamp": build_ts(2024, 1, 5),
         "from_account_id": 1,  # Bank
@@ -68,7 +41,7 @@ def _ensure_test_data_exists(db):
     })
 
     # 3. Buy BTC
-    session.post(TRANSACTIONS_URL, json={
+    client.post("/api/transactions", json={
         "type": "Buy",
         "timestamp": build_ts(2024, 2, 1),
         "from_account_id": 3,  # Exchange USD
@@ -78,7 +51,7 @@ def _ensure_test_data_exists(db):
     })
 
     # 4. Transfer BTC with fee (creates disposal for fee, moves to Wallet)
-    session.post(TRANSACTIONS_URL, json={
+    client.post("/api/transactions", json={
         "type": "Transfer",
         "timestamp": build_ts(2024, 3, 1),
         "from_account_id": 4,  # Exchange BTC
@@ -89,7 +62,7 @@ def _ensure_test_data_exists(db):
     })
 
     # 5. Sell BTC (creates disposal)
-    session.post(TRANSACTIONS_URL, json={
+    client.post("/api/transactions", json={
         "type": "Sell",
         "timestamp": build_ts(2024, 4, 1),
         "from_account_id": 4,  # Exchange BTC
@@ -103,12 +76,11 @@ def _ensure_test_data_exists(db):
 
 
 @pytest.fixture(scope="module")
-def db_session():
+def db_session(auth_client, test_db):
     """Provide a database session with test data."""
-    db = SessionLocal()
-    _ensure_test_data_exists(db)
-    yield db
-    db.close()
+    _ensure_test_data_exists(auth_client, test_db)
+    yield test_db
+
 
 # ----------------------------
 # Test 1: Core Account IDs

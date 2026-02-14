@@ -39,14 +39,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pytest
-import requests
+from fastapi.testclient import TestClient
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-
-BASE_URL = "http://127.0.0.1:8000"
-API_URL = f"{BASE_URL}/api"
 
 # Account IDs
 ACCOUNT_BANK = 1
@@ -70,14 +67,14 @@ class TestResults:
 RESULTS = TestResults()
 VERBOSE = False
 
-# Authenticated session (set by autouse fixture or __main__)
-SESSION: requests.Session = None
+# Authenticated TestClient (set by autouse fixture from conftest.py)
+CLIENT: TestClient = None
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _set_session(auth_session):
-    global SESSION
-    SESSION = auth_session
+def _set_client(auth_client):
+    global CLIENT
+    CLIENT = auth_client
 
 # Colors for terminal
 class Colors:
@@ -186,21 +183,10 @@ def skip_test(description: str, reason: str):
 # HTTP HELPERS
 # =============================================================================
 
-def get_session() -> requests.Session:
-    """Get an authenticated session."""
-    session = requests.Session()
-    # Login
-    r = session.post(f"{API_URL}/login", json={"username": "admin", "password": "password"})
-    if r.status_code != 200:
-        log(f"Login failed: {r.status_code}", "WARN")
-    return session
-
-
-def api_get(endpoint: str, session: Optional[requests.Session] = None, **params) -> Tuple[int, Any]:
+def api_get(endpoint: str, **params) -> Tuple[int, Any]:
     """Make a GET request to the API."""
-    s = session or SESSION or requests.Session()
     try:
-        r = s.get(f"{API_URL}/{endpoint}", params=params, timeout=30)
+        r = CLIENT.get(f"/api/{endpoint}", params=params)
         try:
             return r.status_code, r.json()
         except:
@@ -209,11 +195,10 @@ def api_get(endpoint: str, session: Optional[requests.Session] = None, **params)
         return 0, str(e)
 
 
-def api_post(endpoint: str, data: dict, session: Optional[requests.Session] = None) -> Tuple[int, Any]:
+def api_post(endpoint: str, data: dict) -> Tuple[int, Any]:
     """Make a POST request to the API."""
-    s = session or SESSION or requests.Session()
     try:
-        r = s.post(f"{API_URL}/{endpoint}", json=data, timeout=30)
+        r = CLIENT.post(f"/api/{endpoint}", json=data)
         try:
             return r.status_code, r.json()
         except:
@@ -222,11 +207,10 @@ def api_post(endpoint: str, data: dict, session: Optional[requests.Session] = No
         return 0, str(e)
 
 
-def api_delete(endpoint: str, session: Optional[requests.Session] = None) -> Tuple[int, Any]:
+def api_delete(endpoint: str) -> Tuple[int, Any]:
     """Make a DELETE request to the API."""
-    s = session or SESSION or requests.Session()
     try:
-        r = s.delete(f"{API_URL}/{endpoint}", timeout=30)
+        r = CLIENT.delete(f"/api/{endpoint}")
         try:
             return r.status_code, r.json() if r.content else None
         except:
@@ -368,8 +352,6 @@ def test_reports():
     """Test all report generation."""
     section("REPORT GENERATION TESTS")
 
-    session = get_session()
-
     # Test years based on seed data (2023, 2024, 2025)
     years = [2023, 2024, 2025]
 
@@ -378,7 +360,7 @@ def test_reports():
 
         # Complete Tax Report
         try:
-            r = session.get(f"{API_URL}/reports/complete_tax_report", params={"year": year}, timeout=60)
+            r = CLIENT.get("/api/reports/complete_tax_report", params={"year": year})
             if r.status_code == 200:
                 is_pdf = r.content[:4] == b'%PDF'
                 assert_true(is_pdf, f"Complete Tax Report {year} is valid PDF")
@@ -395,7 +377,7 @@ def test_reports():
 
         # IRS Forms (Form 8949 + Schedule D)
         try:
-            r = session.get(f"{API_URL}/reports/irs_reports", params={"year": year}, timeout=60)
+            r = CLIENT.get("/api/reports/irs_reports", params={"year": year})
             if r.status_code == 200:
                 is_pdf = r.content[:4] == b'%PDF'
                 assert_true(is_pdf, f"IRS Forms {year} is valid PDF")
@@ -411,8 +393,8 @@ def test_reports():
 
         # Transaction History CSV
         try:
-            r = session.get(f"{API_URL}/reports/simple_transaction_history",
-                          params={"year": year, "format": "csv"}, timeout=30)
+            r = CLIENT.get("/api/reports/simple_transaction_history",
+                          params={"year": year, "format": "csv"})
             if r.status_code == 200:
                 is_csv = "text/csv" in r.headers.get("content-type", "") or r.content.startswith(b"date,")
                 assert_true(is_csv, f"Transaction History CSV {year} is valid")
@@ -427,8 +409,8 @@ def test_reports():
 
         # Transaction History PDF
         try:
-            r = session.get(f"{API_URL}/reports/simple_transaction_history",
-                          params={"year": year, "format": "pdf"}, timeout=60)
+            r = CLIENT.get("/api/reports/simple_transaction_history",
+                          params={"year": year, "format": "pdf"})
             if r.status_code == 200:
                 is_pdf = r.content[:4] == b'%PDF'
                 assert_true(is_pdf, f"Transaction History PDF {year} is valid PDF")
@@ -450,11 +432,9 @@ def test_csv_roundtrip():
     """Test CSV export and import roundtrip."""
     section("CSV EXPORT/IMPORT ROUNDTRIP")
 
-    session = get_session()
-
     # Export current transactions
     subsection("CSV Export")
-    r = session.get(f"{API_URL}/backup/csv", timeout=30)
+    r = CLIENT.get("/api/backup/csv")
     assert_true(r.status_code == 200, "CSV export returns 200")
 
     csv_content = r.text
@@ -484,7 +464,7 @@ def test_csv_roundtrip():
     subsection("CSV Import")
     with open(temp_csv.name, 'rb') as f:
         files = {'file': ('transactions.csv', f, 'text/csv')}
-        r = session.post(f"{API_URL}/import/execute", files=files, timeout=60)
+        r = CLIENT.post("/api/import/execute", files=files)
 
     if r.status_code == 200:
         result = r.json()
@@ -752,23 +732,21 @@ def test_authenticated_endpoints():
     """Test endpoints that require authentication."""
     section("AUTHENTICATED ENDPOINT TESTS")
 
-    session = get_session()
-
     subsection("Backup Endpoints")
 
     # CSV export (requires auth)
-    r = session.get(f"{API_URL}/backup/csv", timeout=30)
+    r = CLIENT.get("/api/backup/csv")
     assert_true(r.status_code == 200, "CSV export with auth works")
 
     # Template download
-    r = session.get(f"{API_URL}/import/template", timeout=30)
+    r = CLIENT.get("/api/import/template")
     assert_true(r.status_code == 200, "CSV template download works")
 
     subsection("Import Validation")
 
     # Test import validation with empty file (endpoint is /import/preview)
     files = {'file': ('empty.csv', io.BytesIO(b""), 'text/csv')}
-    r = session.post(f"{API_URL}/import/preview", files=files, timeout=30)
+    r = CLIENT.post("/api/import/preview", files=files)
     # Should fail gracefully with 400
     assert_true(r.status_code == 400, "Empty CSV import rejected properly")
 
@@ -818,7 +796,7 @@ def print_summary():
 
 
 def main():
-    global VERBOSE
+    global VERBOSE, CLIENT
 
     parser = argparse.ArgumentParser(description="Comprehensive test suite for BitcoinTX")
     parser.add_argument("--skip-seed", action="store_true", help="Skip database reset and seeding")
@@ -833,21 +811,36 @@ def main():
     print(colored("=" * 70, Colors.BOLD))
     print()
 
-    # Login and check backend is running
-    global SESSION
-    try:
-        SESSION = get_session()
-        r = SESSION.get(f"{API_URL}/accounts/", timeout=5)
-        if not r.ok:
-            print(colored(f"ERROR: Backend returned {r.status_code}", Colors.RED))
-            sys.exit(1)
-    except requests.exceptions.ConnectionError:
-        print(colored(f"ERROR: Cannot connect to backend at {BASE_URL}", Colors.RED))
-        print("Make sure the backend is running:")
-        print("  uvicorn backend.main:app --host 127.0.0.1 --port 8000")
+    # Set up isolated test database and TestClient
+    from backend.tests.conftest import _seed_test_db
+    from backend.database import Base, get_db
+    from backend.main import app
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    engine = create_engine(f"sqlite:///{tmp.name}", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(bind=engine)
+    _seed_test_db(engine)
+
+    TestSessionLocal = sessionmaker(bind=engine)
+
+    def override_get_db():
+        db = TestSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    CLIENT = TestClient(app)
+    r = CLIENT.post("/api/login", json={"username": "admin", "password": "password"})
+    if r.status_code != 200:
+        print(colored(f"ERROR: Login failed: {r.status_code}", Colors.RED))
         sys.exit(1)
 
-    log("Backend is running", "PASS")
+    log("TestClient ready (isolated database)", "PASS")
 
     # Run tests
     try:
@@ -874,6 +867,11 @@ def main():
         print()
         log(f"Test suite error: {e}", "FAIL")
         RESULTS.failed += 1
+
+    # Cleanup
+    app.dependency_overrides.clear()
+    engine.dispose()
+    os.unlink(tmp.name)
 
     # Summary
     failures = print_summary()

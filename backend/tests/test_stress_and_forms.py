@@ -15,32 +15,24 @@ Requires: Backend running at http://127.0.0.1:8000
 """
 
 import pytest
-import requests
 import random
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional, Tuple
+from fastapi.testclient import TestClient
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
-BASE_URL = "http://127.0.0.1:8000"
-TRANSACTIONS_URL = f"{BASE_URL}/api/transactions"
-DELETE_ALL_URL = f"{BASE_URL}/api/transactions/delete_all"
-CALCULATIONS_URL = f"{BASE_URL}/api/calculations"
-DEBUG_URL = f"{BASE_URL}/api/debug"
-REPORTS_URL = f"{BASE_URL}/api/reports"
-ACCOUNTS_URL = f"{BASE_URL}/api/accounts"
-
-# Authenticated session (set by autouse fixture from conftest.py)
-SESSION: requests.Session = None
+# Authenticated TestClient (set by autouse fixture from conftest.py)
+CLIENT: TestClient = None
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _set_session(auth_session):
-    global SESSION
-    SESSION = auth_session
+def _set_client(auth_client):
+    global CLIENT
+    CLIENT = auth_client
 
 # Account IDs (standard BitcoinTX setup)
 EXTERNAL = 99       # External entity (for deposits/withdrawals)
@@ -72,14 +64,14 @@ SATOSHI_TOLERANCE = Decimal("0.00000001")
 
 def delete_all_transactions() -> bool:
     """Clear all transactions for a fresh start."""
-    r = SESSION.delete(DELETE_ALL_URL)
+    r = CLIENT.delete("/api/transactions/delete_all")
     return r.status_code in (200, 204)
 
 
 def create_tx(tx_data: Dict) -> Dict:
     """Create a transaction and return the response."""
-    r = SESSION.post(TRANSACTIONS_URL, json=tx_data)
-    if not r.ok:
+    r = CLIENT.post("/api/transactions", json=tx_data)
+    if not r.is_success:
         error_detail = r.text
         try:
             error_detail = r.json()
@@ -91,78 +83,78 @@ def create_tx(tx_data: Dict) -> Dict:
 
 def update_tx(tx_id: int, updates: Dict) -> Dict:
     """Update a transaction."""
-    r = SESSION.put(f"{TRANSACTIONS_URL}/{tx_id}", json=updates)
-    if not r.ok:
+    r = CLIENT.put(f"/api/transactions/{tx_id}", json=updates)
+    if not r.is_success:
         return {"error": True, "status_code": r.status_code, "detail": r.text}
     return r.json()
 
 
 def delete_tx(tx_id: int) -> bool:
     """Delete a transaction."""
-    r = SESSION.delete(f"{TRANSACTIONS_URL}/{tx_id}")
+    r = CLIENT.delete(f"/api/transactions/{tx_id}")
     return r.status_code in (200, 204)
 
 
 def get_transaction(tx_id: int) -> Optional[Dict]:
     """Get a single transaction by ID."""
-    r = SESSION.get(f"{TRANSACTIONS_URL}/{tx_id}")
-    if not r.ok:
+    r = CLIENT.get(f"/api/transactions/{tx_id}")
+    if not r.is_success:
         return None
     return r.json()
 
 
 def get_all_transactions() -> List[Dict]:
     """Get all transactions."""
-    r = SESSION.get(TRANSACTIONS_URL)
-    if not r.ok:
+    r = CLIENT.get("/api/transactions")
+    if not r.is_success:
         return []
     return r.json()
 
 
 def get_lots() -> List[Dict]:
     """Get all Bitcoin lots via debug endpoint."""
-    r = SESSION.get(f"{DEBUG_URL}/lots")
-    if not r.ok:
+    r = CLIENT.get("/api/debug/lots")
+    if not r.is_success:
         return []
     return r.json()
 
 
 def get_disposals() -> List[Dict]:
     """Get all lot disposals via debug endpoint."""
-    r = SESSION.get(f"{DEBUG_URL}/disposals")
-    if not r.ok:
+    r = CLIENT.get("/api/debug/disposals")
+    if not r.is_success:
         return []
     return r.json()
 
 
 def get_balance(account_id: int) -> float:
     """Get balance for a specific account."""
-    r = SESSION.get(f"{CALCULATIONS_URL}/account/{account_id}/balance")
-    if not r.ok:
+    r = CLIENT.get(f"/api/calculations/account/{account_id}/balance")
+    if not r.is_success:
         return 0.0
     return r.json().get("balance", 0.0)
 
 
 def get_balances() -> List[Dict]:
     """Get all account balances."""
-    r = SESSION.get(f"{CALCULATIONS_URL}/accounts/balances")
-    if not r.ok:
+    r = CLIENT.get("/api/calculations/accounts/balances")
+    if not r.is_success:
         return []
     return r.json()
 
 
 def get_gains_and_losses() -> Dict:
     """Get aggregated gains and losses."""
-    r = SESSION.get(f"{CALCULATIONS_URL}/gains-and-losses")
-    if not r.ok:
+    r = CLIENT.get("/api/calculations/gains-and-losses")
+    if not r.is_success:
         return {}
     return r.json()
 
 
 def get_irs_report_data(year: int) -> Optional[bytes]:
     """Get IRS reports PDF for a given year."""
-    r = SESSION.get(f"{REPORTS_URL}/irs_reports", params={"year": year})
-    if not r.ok:
+    r = CLIENT.get("/api/reports/irs_reports", params={"year": year})
+    if not r.is_success:
         return None
     return r.content
 

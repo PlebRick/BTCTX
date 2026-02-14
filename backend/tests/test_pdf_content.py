@@ -12,31 +12,26 @@ Requires: Backend running at http://127.0.0.1:8000
 """
 
 import pytest
-import requests
 import io
 import re
 from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from pypdf import PdfReader
+from fastapi.testclient import TestClient
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
-BASE_URL = "http://127.0.0.1:8000"
-TRANSACTIONS_URL = f"{BASE_URL}/api/transactions"
-DELETE_ALL_URL = f"{BASE_URL}/api/transactions/delete_all"
-REPORTS_URL = f"{BASE_URL}/api/reports"
-
-# Authenticated session (set by autouse fixture from conftest.py)
-SESSION: requests.Session = None
+# Authenticated TestClient (set by autouse fixture from conftest.py)
+CLIENT: TestClient = None
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _set_session(auth_session):
-    global SESSION
-    SESSION = auth_session
+def _set_client(auth_client):
+    global CLIENT
+    CLIENT = auth_client
 
 # Account IDs (standard BitcoinTX setup)
 BANK_USD = 1
@@ -51,14 +46,14 @@ EXCHANGE_BTC = 4
 
 def delete_all_transactions() -> bool:
     """Clear all transactions for a fresh start."""
-    r = SESSION.delete(DELETE_ALL_URL)
+    r = CLIENT.delete("/api/transactions/delete_all")
     return r.status_code in (200, 204)
 
 
 def create_tx(tx_data: Dict) -> Dict:
     """Create a transaction and return the response."""
-    r = SESSION.post(TRANSACTIONS_URL, json=tx_data)
-    if not r.ok:
+    r = CLIENT.post("/api/transactions", json=tx_data)
+    if not r.is_success:
         return {"error": True, "status_code": r.status_code, "detail": r.text}
     return r.json()
 
@@ -71,7 +66,7 @@ def build_timestamp(year: int, month: int, day: int, hour: int = 12) -> str:
 
 def get_complete_tax_report(year: int) -> Optional[bytes]:
     """Get the complete tax report PDF as bytes."""
-    r = SESSION.get(f"{REPORTS_URL}/complete_tax_report", params={"year": year})
+    r = CLIENT.get("/api/reports/complete_tax_report", params={"year": year})
     if r.status_code == 200:
         return r.content
     return None
@@ -79,7 +74,7 @@ def get_complete_tax_report(year: int) -> Optional[bytes]:
 
 def get_irs_report(year: int) -> Optional[bytes]:
     """Get IRS Form 8949 + Schedule D PDF as bytes."""
-    r = SESSION.get(f"{REPORTS_URL}/irs_reports", params={"year": year})
+    r = CLIENT.get("/api/reports/irs_reports", params={"year": year})
     if r.status_code == 200:
         return r.content
     return None
@@ -87,8 +82,8 @@ def get_irs_report(year: int) -> Optional[bytes]:
 
 def get_transaction_history_pdf(year: int) -> Optional[bytes]:
     """Get transaction history PDF as bytes."""
-    r = SESSION.get(
-        f"{REPORTS_URL}/simple_transaction_history",
+    r = CLIENT.get(
+        "/api/reports/simple_transaction_history",
         params={"year": year, "format": "pdf"}
     )
     if r.status_code == 200:
@@ -98,8 +93,8 @@ def get_transaction_history_pdf(year: int) -> Optional[bytes]:
 
 def get_transaction_history_csv(year: int) -> Optional[str]:
     """Get transaction history CSV as string."""
-    r = SESSION.get(
-        f"{REPORTS_URL}/simple_transaction_history",
+    r = CLIENT.get(
+        "/api/reports/simple_transaction_history",
         params={"year": year, "format": "csv"}
     )
     if r.status_code == 200:

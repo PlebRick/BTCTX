@@ -22,32 +22,25 @@ Requires: Backend running at http://127.0.0.1:8000
 """
 
 import pytest
-import requests
 import sys
 import json
 from decimal import Decimal, ROUND_HALF_DOWN
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
+from fastapi.testclient import TestClient
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
-BASE_URL = "http://127.0.0.1:8000"
-TRANSACTIONS_URL = f"{BASE_URL}/api/transactions"
-DELETE_ALL_URL = f"{BASE_URL}/api/transactions/delete_all"
-CALCULATIONS_URL = f"{BASE_URL}/api/calculations"
-DEBUG_URL = f"{BASE_URL}/api/debug"
-ACCOUNTS_URL = f"{BASE_URL}/api/accounts"
-
-# Authenticated session (set by autouse fixture or __main__)
-SESSION: requests.Session = None
+# Authenticated TestClient (set by autouse fixture from conftest.py)
+CLIENT: TestClient = None
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _set_session(auth_session):
-    global SESSION
-    SESSION = auth_session
+def _set_client(auth_client):
+    global CLIENT
+    CLIENT = auth_client
 
 # Account IDs (standard BitcoinTX setup)
 EXTERNAL = 99       # External entity (for deposits/withdrawals)
@@ -82,7 +75,7 @@ def log(msg: str, level: str = "INFO"):
 
 def delete_all_transactions():
     """Clear all transactions for a fresh start."""
-    r = SESSION.delete(DELETE_ALL_URL)
+    r = CLIENT.delete("/api/transactions/delete_all")
     if r.status_code not in (200, 204):
         log(f"Could not delete transactions: {r.status_code}", "FAIL")
         sys.exit(1)
@@ -91,8 +84,8 @@ def delete_all_transactions():
 
 def create_tx(tx_data: Dict) -> Dict:
     """Create a transaction and return the response."""
-    r = SESSION.post(TRANSACTIONS_URL, json=tx_data)
-    if not r.ok:
+    r = CLIENT.post("/api/transactions", json=tx_data)
+    if not r.is_success:
         error_detail = r.text
         try:
             error_detail = r.json()
@@ -104,64 +97,64 @@ def create_tx(tx_data: Dict) -> Dict:
 
 def get_transaction(tx_id: int) -> Dict:
     """Get a single transaction by ID."""
-    r = SESSION.get(f"{TRANSACTIONS_URL}/{tx_id}")
-    if not r.ok:
+    r = CLIENT.get(f"/api/transactions/{tx_id}")
+    if not r.is_success:
         return {"error": True, "status_code": r.status_code}
     return r.json()
 
 
 def get_all_transactions() -> List[Dict]:
     """Get all transactions."""
-    r = SESSION.get(TRANSACTIONS_URL)
-    if not r.ok:
+    r = CLIENT.get("/api/transactions")
+    if not r.is_success:
         return []
     return r.json()
 
 
 def get_balances() -> List[Dict]:
     """Get all account balances."""
-    r = SESSION.get(f"{CALCULATIONS_URL}/accounts/balances")
-    if not r.ok:
+    r = CLIENT.get("/api/calculations/accounts/balances")
+    if not r.is_success:
         return []
     return r.json()
 
 
 def get_balance(account_id: int) -> float:
     """Get balance for a specific account."""
-    r = SESSION.get(f"{CALCULATIONS_URL}/account/{account_id}/balance")
-    if not r.ok:
+    r = CLIENT.get(f"/api/calculations/account/{account_id}/balance")
+    if not r.is_success:
         return 0.0
     return r.json().get("balance", 0.0)
 
 
 def get_gains_and_losses() -> Dict:
     """Get aggregated gains and losses."""
-    r = SESSION.get(f"{CALCULATIONS_URL}/gains-and-losses")
-    if not r.ok:
+    r = CLIENT.get("/api/calculations/gains-and-losses")
+    if not r.is_success:
         return {}
     return r.json()
 
 
 def get_average_cost_basis() -> float:
     """Get average cost basis for held BTC."""
-    r = SESSION.get(f"{CALCULATIONS_URL}/average-cost-basis")
-    if not r.ok:
+    r = CLIENT.get("/api/calculations/average-cost-basis")
+    if not r.is_success:
         return 0.0
     return r.json().get("averageCostBasis", 0.0)
 
 
 def get_lots() -> List[Dict]:
     """Get all Bitcoin lots via debug endpoint."""
-    r = SESSION.get(f"{DEBUG_URL}/lots")
-    if not r.ok:
+    r = CLIENT.get("/api/debug/lots")
+    if not r.is_success:
         return []
     return r.json()
 
 
 def get_disposals() -> List[Dict]:
     """Get all lot disposals via debug endpoint."""
-    r = SESSION.get(f"{DEBUG_URL}/disposals")
-    if not r.ok:
+    r = CLIENT.get("/api/debug/disposals")
+    if not r.is_success:
         return []
     return r.json()
 
@@ -169,10 +162,10 @@ def get_disposals() -> List[Dict]:
 def get_ledger_entries(tx_id: Optional[int] = None) -> List[Dict]:
     """Get ledger entries, optionally filtered by transaction."""
     if tx_id:
-        r = SESSION.get(f"{DEBUG_URL}/transactions/{tx_id}/ledger-entries")
+        r = CLIENT.get(f"/api/debug/transactions/{tx_id}/ledger-entries")
     else:
-        r = SESSION.get(f"{DEBUG_URL}/ledger-entries")
-    if not r.ok:
+        r = CLIENT.get("/api/debug/ledger-entries")
+    if not r.is_success:
         return []
     return r.json()
 
@@ -2200,23 +2193,37 @@ def run_all_tests():
 
 
 if __name__ == "__main__":
-    try:
-        # Login to get authenticated session
-        SESSION = requests.Session()
-        r = SESSION.post(f"{BASE_URL}/api/login", json={"username": "admin", "password": "password"})
-        if not r.ok:
-            print(f"ERROR: Login failed at {BASE_URL}: {r.status_code}")
-            sys.exit(1)
+    from backend.tests.conftest import _seed_test_db
+    from backend.database import Base, get_db
+    from backend.main import app
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    import tempfile, os
 
-        # Quick connectivity check
-        r = SESSION.get(f"{BASE_URL}/api/accounts/")
-        if not r.ok:
-            print(f"ERROR: Cannot connect to backend at {BASE_URL}")
-            print("Make sure the backend is running: uvicorn backend.main:app --host 127.0.0.1 --port 8000")
-            sys.exit(1)
-    except requests.exceptions.ConnectionError:
-        print(f"ERROR: Cannot connect to backend at {BASE_URL}")
-        print("Make sure the backend is running: uvicorn backend.main:app --host 127.0.0.1 --port 8000")
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    engine = create_engine(f"sqlite:///{tmp.name}", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(bind=engine)
+    _seed_test_db(engine)
+
+    TestSessionLocal = sessionmaker(bind=engine)
+
+    def override_get_db():
+        db = TestSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    CLIENT = TestClient(app)
+    r = CLIENT.post("/api/login", json={"username": "admin", "password": "password"})
+    if r.status_code != 200:
+        print(f"ERROR: Login failed: {r.status_code}")
         sys.exit(1)
 
-    sys.exit(run_all_tests())
+    exit_code = run_all_tests()
+    app.dependency_overrides.clear()
+    engine.dispose()
+    os.unlink(tmp.name)
+    sys.exit(exit_code)
