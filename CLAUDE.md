@@ -3,7 +3,7 @@
 > This file provides context for AI assistants (Claude, etc.) working on this project.
 > It should be updated after significant changes to maintain continuity across sessions.
 
-**Last Updated:** 2025-01-17
+**Last Updated:** 2026-02-14
 
 ---
 
@@ -136,6 +136,8 @@ LotDisposal (FIFO consumption record)
 | `backend/routers/reports.py` | PDF report generation endpoints |
 | `backend/services/reports/form_8949.py` | IRS Form 8949 data preparation |
 | `backend/services/reports/pdftk_path.py` | Centralized pdftk path resolution (macOS desktop compat) |
+| `backend/tests/conftest.py` | Shared test fixtures (isolated TestClient + temp DB) |
+| `scripts/backup-db.sh` | Daily SQLite backup with 60-day retention |
 | `Dockerfile` | Multi-stage build (Node for frontend, Python for backend) |
 
 ---
@@ -221,7 +223,24 @@ git push plebrick master --tags  # Sync backup at releases
 
 ---
 
-## Recent Changes (Jan 2025)
+## Recent Changes
+
+### Session: 2026-02-14 (Test Isolation & Backups)
+1. **Test Suite Isolated from Production Database**
+   - Root cause: tests used `requests.Session` hitting live backend at `localhost:8000`, and `delete_all_transactions()` wiped production data
+   - Converted all 6 test files to use FastAPI `TestClient` with `app.dependency_overrides[get_db]`
+   - Tests now use a temporary SQLite database created fresh per pytest session
+   - No running backend required — `TestClient` runs the app in-process
+   - Fixed httpx API difference: `r.ok` (requests) → `r.is_success` (httpx/TestClient)
+   - Files modified: `conftest.py`, `test_stress_and_forms.py`, `test_pdf_content.py`, `test_comprehensive_transactions.py`, `test_everything.py`, `test_seed_data_integrity.py`
+   - All 158 tests pass against isolated temp DB
+
+2. **Daily Database Backup**
+   - Added `scripts/backup-db.sh` — uses `sqlite3 .backup` for safe online copy (handles WAL mode)
+   - Cron job runs daily at 3 AM CT
+   - Backups stored in `backups/btctx_YYYY-MM-DD.db` (gitignored)
+   - Auto-prunes backups older than 60 days
+   - Logs to `backups/backup.log`
 
 ### Session: 2025-01-17 (PDF Content Tests)
 1. **PDF Content Verification Test Suite**
@@ -400,6 +419,8 @@ git push plebrick master --tags  # Sync backup at releases
 - [ ] CSV import merge with existing data (Phase 2)
 
 ### Completed Recently
+- [x] Test isolation from production DB (Feb 2026) - TestClient + temp DB, no live backend needed
+- [x] Daily database backups (Feb 2026) - `scripts/backup-db.sh`, cron at 3 AM, 60-day retention
 - [x] Comprehensive test suite (Jan 2025) - 158 pytest tests + 17 pre-commit checks
   - `test_stress_and_forms.py`: stress testing, edge cases, IRS form validation
   - `test_pdf_content.py`: PDF content verification using pypdf text extraction
@@ -452,12 +473,29 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 > See [docs/STARTOS_COMPATIBILITY.md](docs/STARTOS_COMPATIBILITY.md) for full multi-arch build requirements.
 
-### Pre-Commit Testing (IMPORTANT)
+### Pytest Suite (IMPORTANT)
 
-**Run the pre-commit test suite before every commit**, especially when modifying backend code:
+**Tests are fully isolated** — they use FastAPI `TestClient` with a temporary SQLite database via `app.dependency_overrides[get_db]`. No running backend required, and the production database is never touched.
 
 ```bash
-# Full test suite (starts backend if needed)
+# Run all 158 tests (no backend needed)
+PYTHONPATH=/home/ubuntu76/Projects/BTCTX-org \
+  .venv/bin/pytest backend/tests/ -v --tb=short
+
+# Run a specific test file
+.venv/bin/pytest backend/tests/test_comprehensive_transactions.py -v
+```
+
+**Test architecture:**
+- `conftest.py` creates a temp SQLite DB, seeds admin user + 6 accounts
+- `auth_client` fixture provides an authenticated `TestClient`
+- `test_db` fixture provides direct SQLAlchemy session access
+- All fixtures are session-scoped (shared across test module)
+
+### Pre-Commit Testing
+
+```bash
+# Full pre-commit suite (starts backend if needed)
 ./scripts/pre-commit.sh
 
 # Quick mode (skip long-running tests)
