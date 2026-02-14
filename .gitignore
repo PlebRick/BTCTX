@@ -84,6 +84,9 @@ backend/create_db.py
 # --- Test Exports ---
 Export_Tests/
 
+# --- Database Backups ---
+backups/
+
 # --- Desktop Build ---
 desktop/build/
 desktop/dist/
