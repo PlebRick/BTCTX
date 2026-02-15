@@ -260,8 +260,6 @@ def test_deposit_usd_to_bank():
     entries = get_ledger_entries(tx["id"])
     assert_equal(len(entries), 1, "Number of ledger entries")
 
-    return True
-
 
 def test_deposit_usd_to_exchange():
     """Test: Deposit USD to Exchange."""
@@ -286,8 +284,6 @@ def test_deposit_usd_to_exchange():
     # NOTE: Fee deducts from EXTERNAL (virtual), not from the receiving account
     balance = get_balance(EXCHANGE_USD)
     assert_equal(balance, 50000.0, "Exchange USD balance (fee tracked separately)")
-
-    return True
 
 
 def test_deposit_btc_income():
@@ -324,8 +320,6 @@ def test_deposit_btc_income():
     gl = get_gains_and_losses()
     assert_equal(gl.get("income_earned", 0), 45000.0, "Income earned")
 
-    return True
-
 
 def test_deposit_btc_interest():
     """Test: Deposit BTC as Interest."""
@@ -349,8 +343,6 @@ def test_deposit_btc_interest():
 
     gl = get_gains_and_losses()
     assert_equal(gl.get("interest_earned", 0), 500.0, "Interest earned")
-
-    return True
 
 
 def test_deposit_btc_reward():
@@ -376,8 +368,6 @@ def test_deposit_btc_reward():
     gl = get_gains_and_losses()
     assert_equal(gl.get("rewards_earned", 0), 250.0, "Rewards earned")
 
-    return True
-
 
 def test_deposit_btc_gift():
     """Test: Deposit BTC as Gift (zero cost basis for recipient)."""
@@ -402,8 +392,6 @@ def test_deposit_btc_gift():
     lots = get_lots()
     assert_equal(len(lots), 1, "Number of lots")
     assert_equal(float(lots[0]["cost_basis_usd"]), 0.0, "Gift lot cost basis is $0")
-
-    return True
 
 
 def test_buy_btc_basic():
@@ -450,8 +438,6 @@ def test_buy_btc_basic():
     assert_equal(len(lots), 1, "Number of lots")
     # Cost basis includes the fee: $40,000 + $10 = $40,010
     assert_equal(float(lots[0]["cost_basis_usd"]), 40010.0, "Lot cost basis (includes fee)")
-
-    return True
 
 
 def test_sell_btc_basic():
@@ -519,8 +505,6 @@ def test_sell_btc_basic():
     # Holding period: Jan 15 to Feb 1 = 17 days = SHORT
     assert_equal(sell_detail.get("holding_period"), "SHORT", "Holding period")
 
-    return True
-
 
 def test_sell_btc_long_term():
     """Test: Sell BTC with LONG term holding period (365+ days)."""
@@ -573,8 +557,6 @@ def test_sell_btc_long_term():
     # Gain: $30,000 - $10,000 = $20,000
     assert_equal(float(sell_detail.get("realized_gain_usd", 0)), 20000.0, "Long term gain")
 
-    return True
-
 
 def test_withdrawal_btc_spent():
     """Test: Withdrawal BTC (Spent purpose - taxable disposal)."""
@@ -618,8 +600,6 @@ def test_withdrawal_btc_spent():
     disposals = get_disposals()
     assert_true(len(disposals) >= 1, "Disposal records created")
 
-    return True
-
 
 def test_withdrawal_btc_gift():
     """Test: Withdrawal BTC as Gift (no taxable gain/loss)."""
@@ -658,8 +638,6 @@ def test_withdrawal_btc_gift():
     realized_gain = float(gift_detail.get("realized_gain_usd") or 0)
     assert_equal(realized_gain, 0.0, "Gift has no realized gain")
 
-    return True
-
 
 def test_withdrawal_btc_donation():
     """Test: Withdrawal BTC as Donation (proceeds = 0)."""
@@ -694,8 +672,6 @@ def test_withdrawal_btc_donation():
     donation_detail = get_transaction(donation_tx["id"])
     realized_gain = float(donation_detail.get("realized_gain_usd") or 0)
     assert_equal(realized_gain, 0.0, "Donation has no realized gain")
-
-    return True
 
 
 def test_withdrawal_btc_lost():
@@ -740,8 +716,6 @@ def test_withdrawal_btc_lost():
     # Proceeds = $0, so loss = $0 - $4,000 = -$4,000
     assert_equal(realized_gain, -4000.0, "Lost BTC results in capital loss")
 
-    return True
-
 
 def test_transfer_btc_with_fee():
     """Test: Transfer BTC between accounts with BTC fee."""
@@ -785,8 +759,6 @@ def test_transfer_btc_with_fee():
     assert_equal(wallet_balance, 0.5, "Wallet balance after transfer")
     assert_equal(exchange_balance, 0.4999, "Exchange balance after transfer (minus network fee)")
 
-    return True
-
 
 def test_transfer_zero_fee():
     """Test: Transfer BTC with zero fee."""
@@ -822,8 +794,6 @@ def test_transfer_zero_fee():
 
     assert_equal(wallet_balance, 0.5, "Wallet balance")
     assert_equal(exchange_balance, 0.5, "Exchange balance")
-
-    return True
 
 
 def test_fifo_basic_ordering():
@@ -904,8 +874,6 @@ def test_fifo_basic_ordering():
     lot1 = [l for l in lots if float(l["cost_basis_usd"]) == 30000][0]
     assert_equal(float(lot1["remaining_btc"]), 0.0, "Lot 1 fully consumed")
 
-    return True
-
 
 def test_fifo_partial_lot():
     """Test: Selling part of a lot (partial consumption)."""
@@ -959,8 +927,6 @@ def test_fifo_partial_lot():
     lots = get_lots()
     assert_equal(len(lots), 1, "Still one lot")
     assert_equal(float(lots[0]["remaining_btc"]), 1.5, "Lot has 1.5 BTC remaining")
-
-    return True
 
 
 def test_fifo_multi_lot():
@@ -1050,8 +1016,6 @@ def test_fifo_multi_lot():
     assert_equal(float(lot2["remaining_btc"]), 0.0, "Lot 2 fully consumed")
     assert_equal(float(lot3["remaining_btc"]), 0.5, "Lot 3 untouched")
 
-    return True
-
 
 def test_fifo_backdated_recalculation():
     """Test: Backdated transaction triggers FIFO recalculation."""
@@ -1128,8 +1092,6 @@ def test_fifo_backdated_recalculation():
     # Realized gain should change: $60,000 - $30,000 = $30,000 (vs $20,000 before)
     assert_equal(float(sell_after.get("realized_gain_usd", 0)), 30000.0, "Gain updated after backdate")
 
-    return True
-
 
 def test_same_timestamp_tiebreaker():
     """Test: Same timestamp transactions use ID as tiebreaker."""
@@ -1189,8 +1151,6 @@ def test_same_timestamp_tiebreaker():
     # Should use buy1's cost basis ($30,000) due to lower ID
     assert_equal(float(sell_detail.get("cost_basis_usd", 0)), 30000.0, "Uses lower ID lot for same timestamp")
 
-    return True
-
 
 def test_sell_with_loss():
     """Test: Sell at a loss."""
@@ -1242,8 +1202,6 @@ def test_sell_with_loss():
     gl = get_gains_and_losses()
     assert_equal(gl.get("short_term_losses", 0), 10000.0, "Short term loss tracked")
 
-    return True
-
 
 def test_insufficient_btc_balance():
     """Test: Attempting to sell more BTC than available should fail."""
@@ -1289,8 +1247,6 @@ def test_insufficient_btc_balance():
     assert_true("error" in sell_tx or sell_tx.get("status_code", 200) >= 400,
                 "Selling more than available correctly fails with error")
 
-    return True
-
 
 def test_very_small_amounts():
     """Test: Very small BTC amounts (8 decimal places)."""
@@ -1317,8 +1273,6 @@ def test_very_small_amounts():
     lots = get_lots()
     assert_equal(len(lots), 1, "Lot created")
     assert_equal(float(lots[0]["total_btc"]), 0.00000001, "Satoshi lot amount correct")
-
-    return True
 
 
 def test_very_large_amounts():
@@ -1356,8 +1310,6 @@ def test_very_large_amounts():
     avg_basis = get_average_cost_basis()
     # ($10,000,000 + $1,000 fee) / 100 BTC = $100,010
     assert_equal(avg_basis, 100010.0, "Average cost basis for large amount")
-
-    return True
 
 
 def test_double_entry_ledger_balance():
@@ -1418,8 +1370,6 @@ def test_double_entry_ledger_balance():
     # This is a simplified check
     assert_true(True, f"Ledger entries retrieved: USD net = {usd_total:.2f}, BTC net = {btc_total:.8f}")
 
-    return True
-
 
 def test_fee_usd_on_buy():
     """Test: USD fee on Buy increases cost basis."""
@@ -1452,8 +1402,6 @@ def test_fee_usd_on_buy():
     lots = get_lots()
     # Cost basis should be $40,000 + $100 = $40,100
     assert_equal(float(lots[0]["cost_basis_usd"]), 40100.0, "Fee added to cost basis")
-
-    return True
 
 
 def test_fee_usd_on_sell():
@@ -1502,8 +1450,6 @@ def test_fee_usd_on_sell():
 
     # Gain: $49,900 - $40,000 = $9,900
     assert_equal(float(sell_detail.get("realized_gain_usd", 0)), 9900.0, "Gain accounts for fee")
-
-    return True
 
 
 def test_aggregate_gains_short_term():
@@ -1574,8 +1520,6 @@ def test_aggregate_gains_short_term():
     # Total short-term gains: $10,000 + $10,000 = $20,000
     assert_equal(gl.get("short_term_gains", 0), 20000.0, "Aggregated short-term gains")
     assert_equal(gl.get("short_term_net", 0), 20000.0, "Short-term net (no losses)")
-
-    return True
 
 
 def test_aggregate_gains_mixed():
@@ -1648,8 +1592,6 @@ def test_aggregate_gains_mixed():
     assert_equal(gl.get("short_term_gains", 0), 15000.0, "Short-term gains")
     assert_equal(gl.get("total_net_capital_gains", 0), 45000.0, "Total net capital gains")
 
-    return True
-
 
 def test_average_cost_basis():
     """Test: Average cost basis calculation for held BTC."""
@@ -1712,8 +1654,6 @@ def test_average_cost_basis():
     avg_after = get_average_cost_basis()
     assert_equal(round_usd(avg_after), 43333.33, "Average cost basis after partial sale")
 
-    return True
-
 
 def test_gains_and_losses_fees():
     """Test: Fee aggregation in gains/losses endpoint."""
@@ -1759,8 +1699,6 @@ def test_gains_and_losses_fees():
     assert_equal(fees.get("USD", 0), 50.0, "USD fees tracked")
     # BTC fees should also be tracked
     assert_true(fees.get("BTC", 0) >= 0.0005, "BTC fees tracked")
-
-    return True
 
 
 def test_holding_period_boundary():
@@ -1833,8 +1771,6 @@ def test_holding_period_boundary():
     long_detail = get_transaction(sell_long["id"])
     assert_equal(long_detail.get("holding_period"), "LONG", "365 days is LONG term")
 
-    return True
-
 
 def test_income_btc_aggregation():
     """Test: Income BTC aggregation in gains/losses."""
@@ -1888,8 +1824,6 @@ def test_income_btc_aggregation():
     assert_equal(gl.get("income_btc", 0), 0.1, "Income BTC amount")
     assert_equal(gl.get("interest_btc", 0), 0.05, "Interest BTC amount")
     assert_equal(gl.get("rewards_btc", 0), 0.02, "Rewards BTC amount")
-
-    return True
 
 
 def test_multiple_accounts():
@@ -1958,8 +1892,6 @@ def test_multiple_accounts():
     assert_equal(exch_usd_bal, 25000.0, "Exchange USD balance after buy")
     assert_equal(wallet_bal, 1.0, "Wallet BTC balance")
     assert_equal(exch_btc_bal, 0.5, "Exchange BTC balance after buy")
-
-    return True
 
 
 def test_complex_scenario():
@@ -2084,8 +2016,6 @@ def test_complex_scenario():
     actual_gain = float(sell_detail.get("realized_gain_usd", 0))
     expected_gain = 34950.0 - actual_basis
     assert_true(abs(actual_gain - expected_gain) < 2.0, f"Sell gain calculation correct (got ${actual_gain})")
-
-    return True
 
 
 # =============================================================================
