@@ -205,7 +205,7 @@ gh release upload vX.Y.Z asset.dmg --repo DigiMonk73/BTCTX
 multi-arch (amd64+arm64) manifest. Version tags are immutable — never re-push
 different bytes under an existing tag; cut a new patch version instead. `:latest`
 is convenience only and must never be the only tag. The wrapper
-(PlebRick/BTCTX-StartOS) pins the version tag in its manifest and auto-detects
+(DigiMonk73/BTCTX-StartOS) pins the version tag in its manifest and auto-detects
 new releases from Docker Hub. Use `scripts/release-docker.sh`, which enforces
 all of this. Full details: [docs/STARTOS_COMPATIBILITY.md](docs/STARTOS_COMPATIBILITY.md).
 

@@ -272,7 +272,7 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 ### Docker Tag Contract (Wrapper Dependency)
 
-The StartOS wrapper (PlebRick/BTCTX-StartOS) pins our image by **version tag**
+The StartOS wrapper (DigiMonk73/BTCTX-StartOS) pins our image by **version tag**
 in its manifest, and a daily job compares its pinned tag against Docker Hub to
 detect new releases. Every release MUST satisfy:
 
