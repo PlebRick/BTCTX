@@ -40,7 +40,7 @@ BitcoinTX uses a **two-repository architecture** for StartOS deployment:
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  btctx-startos (StartOS Wrapper)                                │
-│  https://github.com/PlebRick/BTCTX-StartOS                      │
+│  https://github.com/DigiMonk73/BTCTX-StartOS                      │
 │                                                                 │
 │  Contains:                                                      │
 │  - manifest.ts (package metadata, volume definitions)           │
@@ -487,4 +487,4 @@ arch: ['aarch64', 'x86_64']
 | Database path | `/data/btctx.db` |
 | Database env var | `DATABASE_FILE` |
 | Main repo | https://github.com/BitcoinTX-org/BTCTX-org |
-| Wrapper repo | https://github.com/PlebRick/BTCTX-StartOS |
+| Wrapper repo | https://github.com/DigiMonk73/BTCTX-StartOS |

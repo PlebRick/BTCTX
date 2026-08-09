@@ -259,7 +259,7 @@ backend/assets/irs_templates/
 3. Run full test suite
 4. Build and test Docker image
 5. Create release tag `v0.3.0`
-6. Push to both remotes (origin and plebrick)
+6. Push to both remotes (origin and digimonk)
 
 ---
 

@@ -169,7 +169,7 @@ LotDisposal (FIFO consumption record)
 
 ### Git State
 - **Primary Repo:** BitcoinTX-org/BTCTX (origin)
-- **Backup Repo:** PlebRick/BTCTX (plebrick remote)
+- **Backup Repo:** DigiMonk73/BTCTX (digimonk remote)
 - **Branches:** `master` (production), `develop` (active work)
 
 ---
@@ -180,23 +180,23 @@ LotDisposal (FIFO consumption record)
 | Remote | Repo | Purpose |
 |--------|------|---------|
 | `origin` | BitcoinTX-org/BTCTX-org | Organization repo |
-| `plebrick` | PlebRick/BTCTX | Personal backup repo |
+| `digimonk` | DigiMonk73/BTCTX | Personal backup repo |
 
 **IMPORTANT: Keep Both Repos in Perfect Sync**
 
 These two repos must always be identical. When releasing:
-1. Push branches to BOTH remotes: `git push origin <branch> && git push plebrick <branch>`
-2. Push tags to BOTH remotes: `git push origin --tags && git push plebrick --tags`
+1. Push branches to BOTH remotes: `git push origin <branch> && git push digimonk <branch>`
+2. Push tags to BOTH remotes: `git push origin --tags && git push digimonk --tags`
 3. Create GitHub releases on BOTH repos with identical content
 4. Upload release assets (DMG, etc.) to BOTH repos
 
 ```bash
 # Release checklist:
-git push origin master --tags && git push plebrick master --tags
+git push origin master --tags && git push digimonk master --tags
 gh release create vX.Y.Z --repo BitcoinTX-org/BTCTX-org --title "..." --notes "..."
-gh release create vX.Y.Z --repo PlebRick/BTCTX --title "..." --notes "..."
+gh release create vX.Y.Z --repo DigiMonk73/BTCTX --title "..." --notes "..."
 gh release upload vX.Y.Z asset.dmg --repo BitcoinTX-org/BTCTX-org
-gh release upload vX.Y.Z asset.dmg --repo PlebRick/BTCTX
+gh release upload vX.Y.Z asset.dmg --repo DigiMonk73/BTCTX
 ./scripts/release-docker.sh vX.Y.Z   # Docker Hub push (enforces StartOS wrapper tag contract)
 ```
 
@@ -225,7 +225,7 @@ git checkout master
 git merge develop
 git tag -a v1.0.0 -m "Release v1.0.0: Description"
 git push origin master --tags
-git push plebrick master --tags  # Sync backup at releases
+git push digimonk master --tags  # Sync backup at releases
 ```
 
 ### Current Version
@@ -304,7 +304,7 @@ git push plebrick master --tags  # Sync backup at releases
    - Edit transactions now show realized gain in success toast (feature parity with create)
 
 3. **Release v0.5.5**
-   - Tagged and pushed to both repos (origin, plebrick)
+   - Tagged and pushed to both repos (origin, digimonk)
    - GitHub releases created with DMG on both repos
    - Docker image pushed: `b1ackswan/btctx:v0.5.5` and `latest`
 
@@ -374,7 +374,7 @@ git push plebrick master --tags  # Sync backup at releases
    - Fixed logout font rendering on macOS dark backgrounds (dark red #811922 → brighter red #cf4655)
 
 3. **Release v0.5.2**
-   - Tagged and pushed to both repos (origin, plebrick)
+   - Tagged and pushed to both repos (origin, digimonk)
    - Built and pushed multi-arch Docker image
 
 ### Session: 2025-01-16
@@ -423,7 +423,7 @@ git push plebrick master --tags  # Sync backup at releases
    - Removed unused `bitcoin-logo.png`
 
 4. **Release v0.5.1**
-   - Tagged and pushed to both repos (origin, plebrick)
+   - Tagged and pushed to both repos (origin, digimonk)
    - Built and pushed multi-arch Docker image
 
 ### Session: 2025-01-10

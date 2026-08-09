@@ -258,7 +258,7 @@ Existing exports will show the actual `from_account` used (Bank or Exchange USD)
 git checkout develop
 git reset --hard pre-bank-buy
 git push --force origin develop
-git push --force plebrick develop
+git push --force digimonk develop
 ```
 
 ### To Rollback Master
@@ -266,7 +266,7 @@ git push --force plebrick develop
 git checkout master
 git reset --hard pre-bank-buy-master
 git push --force origin master
-git push --force plebrick master
+git push --force digimonk master
 ```
 
 ### Alternative: Revert Single Commit
